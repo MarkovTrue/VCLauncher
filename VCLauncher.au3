@@ -1,4 +1,4 @@
-#pragma compile(Out, ..\..\..\..\Portable\Video Compare 25.09\VCLauncher.exe)
+#pragma compile(Out, VCLauncher.exe)
 #pragma compile(Icon, Assets\icon.ico)
 
 #include <GUIConstantsEx.au3>
@@ -14,16 +14,24 @@ Opt("GUIOnEventMode", 1)
 
 ; Имя ini-файла для хранения последних путей
 Global Const $sAppName = "VCLauncher 0.22"
-Global Const $sDirIni = @ScriptDir & "\VCLauncher.ini"
-Global Const $sDirFFprobe = "D:\Projects\Repos\Develop\MultiMerge\Extra\ffmpeg-avcodex64\bin\ffprobe.exe"
+Global Const $sDirIni = @ScriptDir & '\VCLauncher.ini'
+Global Const $sDirFFprobe = @ScriptDir & '\ffprobe.exe'
+Global Const $sDirVideoCompare = @ScriptDir & '\video-compare.exe'
+
 Global Const $iGuiWidth = 460
 Global Const $iGuiHeight = 120
 
 ; Ссылки на элементы GUI
 Global $hGui, $iInput1, $iInput2, $iButtonChoose1, $iButtonChoose2, $iButtonCompare, $iRadioDirect, $iRadioVertical
 ; Остальные переменные
-Global $sDirFile1 = IniRead($sDirIni, "LastDirs", "Video1", ""), _
-	$sDirFile2 = IniRead($sDirIni, "LastDirs", "Video2", "")
+Global $sDirFile1 = IniRead($sDirIni, "LastDirs", "Video1", "")
+Global $sDirFile2 = IniRead($sDirIni, "LastDirs", "Video2", "")
+
+
+If Not FileExists($sDirVideoCompare) Then
+	MsgBox(48, $sAppName, 'Не найден "video-compare.exe", а должен лежать тут' & @CR & $sDirFFprobe)
+	Exit
+EndIf
 
 If Not FileExists($sDirFFprobe) Then
 	MsgBox(48, $sAppName, 'Не найден "ffprobe.exe", а должен лежать тут' & @CR & $sDirFFprobe)
@@ -175,7 +183,7 @@ Func _OnEvent_ButtonCompare()
     EndIf
 
     ; Формирование команды video-compare
-    $sRunKey = '"video-compare.exe"'
+    $sRunKey = '"' & $sDirVideoCompare & '"'
 
     ; Режим сравнения
     Local $iMaxVideoWidth, $iMaxVideoHeight
@@ -233,9 +241,9 @@ EndFunc
 Func _GetVideoResolution($sDirVideo)
 	Local $sOutput = "", $sLine
 	; Команда ffprobe
-	Local $sRunKeys = $sDirFFprobe & ' -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "' & $sDirVideo & '"'
+	Local $sRunKeys = '"' & $sDirFFprobe & '" -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "' & $sDirVideo & '"'
 	; Выполняем
-	Local $iProcessPid = Run(@ComSpec & " /c " & $sRunKeys, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
+	Local $iProcessPid = Run($sRunKeys, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
 	; Читаем вывод
 	While 1
 		$sLine = StdoutRead($iProcessPid)
@@ -243,6 +251,7 @@ Func _GetVideoResolution($sDirVideo)
 		$sOutput &= $sLine
 	WEnd
 
+	ConsoleWrite(@ComSpec & " /c " & $sRunKeys & @CR)
 ;~ 	MsgBox(48, $sAppName, $sDirVideo & @CR & $sOutput)
 	ConsoleWrite($sDirVideo & @CR & $sOutput & @CR)
 
@@ -255,7 +264,7 @@ Func _GetWidthFromFFprobeString($sVar)
 	If $aLineSplit[0] >= 2 Then
 		Return Int($aLineSplit[1])
 	EndIf
-	MsgBox(48, $sAppName, '_GetWidthFromFFprobeString ошибка' & @CR & $sVar)
+;~ 	MsgBox(48, $sAppName, '_GetWidthFromFFprobeString ошибка' & @CR & $sVar)
 	Return 0
 EndFunc
 
@@ -264,7 +273,7 @@ Func _GetHeightFromFFprobeString($sVar)
 	If $aLineSplit[0] >= 2 Then
 		Return Int($aLineSplit[2])
 	EndIf
-	MsgBox(48, $sAppName, '_GetHeightFromFFprobeString ошибка' & @CR & $sVar)
+;~ 	MsgBox(48, $sAppName, '_GetHeightFromFFprobeString ошибка' & @CR & $sVar)
 	Return 0
 EndFunc
 
