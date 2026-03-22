@@ -14,7 +14,7 @@
 - 🎯 Поддержка Drag-and-drop
 - 💾 Автосохранение последних выбранных файлов
 
-### VCLauncher использует, уже включено в релиз
+### VCLauncher использует (уже включено в релиз)
 
 - [FFmpeg](https://github.com/FFmpeg/FFmpeg) - ffprobe.exe
 - [Video-compare](https://github.com/pixop/video-compare)
