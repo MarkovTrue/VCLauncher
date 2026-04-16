@@ -1,1 +1,7 @@
 VCLauncher.ini
+temp_format_*
+Backup/
+sync/
+CLAUDE.md
+.claude/
+.vscode/

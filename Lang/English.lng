@@ -1,0 +1,104 @@
+[GUI]
+File1=Video 1
+File2=Video 2
+Choose=Choose
+FileNotSelected=File not selected
+CompareMode=Mode:
+CompareDirect=Direct compare
+CompareVertical=Vertical compare
+Compare=Compare
+Running=Running…
+SwapTip=Swap files
+Offset=Offset:
+SyncVideo=Synchronize video
+TabHotkeys=Hotkeys
+TabCommand=Command
+TabSettings=Settings
+Language=Language:
+Theme=Theme:
+ThemeSystem=System
+ThemeLight=Light
+ThemeDark=Dark
+ClearCache=Clear cache
+
+[Dialogs]
+SelectVideo1=Select video 1
+SelectVideo2=Select video 2
+
+[Info]
+Resolution=Resolution
+HeightDiff=height difference
+
+[Errors]
+ToolNotFound="%TOOL%" not found. Specify the full path in the settings file, under the Tools section.
+SettingsWillOpen=The settings file will now be opened.
+Error=Error
+UnsupportedFormat=Unsupported file format:
+SupportedFormats=Supported formats:
+
+[Filter]
+Video=Video
+
+[Hotkeys]
+1==== Basic ===
+2=H: Toggle on-screen help text for controls
+3=V: Toggle video info overlay
+4=Space: Toggle play/pause
+5=,: Toggle bidirectional in-buffer loop/pause
+6=.: Toggle forward-only in-buffer loop/pause
+7=Escape: Quit
+8=Left arrow: Seek 1 second backward
+9=Right arrow: Seek 1 second forward
+10=Up arrow: Seek 15 seconds forward
+11=Down arrow: Seek 15 seconds backward
+12=Page up: Seek 600 seconds forward
+13=Page down: Seek 600 seconds backward
+14=Z: Magnify area around cursor (shown in lower-left corner)
+15=C: Magnify area around cursor (shown in lower-right corner)
+16=J: Reduce playback speed
+17=L: Increase playback speed
+18=A: Move to the previous frame in the buffer
+19=D: Move to the next frame in the buffer
+20=E: Re-center view around mouse position
+21=R: Global re-center and reset zoom to 100% (x1)
+22=S: Swap left and right video
+23=Tab: Cycle through right videos
+24=1: Toggle hide/show left video
+25=2: Toggle hide/show right video
+26=3: Toggle hide/show HUD
+27=4: Zoom to 1:1 pixels
+28=5: Zoom 50% (x0.5)
+29=6: Zoom 100% (x1)
+30=7: Zoom 200% (x2)
+31=8: Zoom 400% (x4)
+32=9: Zoom 800% (x8)
+33=0: Toggle video/subtraction mode
+34=+: Time-shift right video 1 frame forward
+35=-: Time-shift right video 1 frame backward
+36==== Advanced ===
+37=P: Print mouse position and pixel value under cursor to console
+38=M: Print image similarity metrics to console
+39=F: Save both frames and the on-screen content as PNG images
+40=I: Toggle fast/high-quality resizing for input alignment
+41=T: Toggle nearest-neighbor/bilinear video texture filtering
+42=Y: Cycle through subtraction modes
+43=U: Toggle luminance-only subtraction mode
+44=X: Show the current video frame and UI update rates (FPS)
+45=F1: Toggle Histogram window
+46=F2: Toggle Vectorscope window
+47=F3: Toggle Waveform window
+48=Backspace: Clear crop(s)
+49=Shift+L: Crop left video interactively
+50=Shift+R: Crop right video interactively
+51=Shift+B: Crop both videos to the same area
+52=Shift+D: Decode and advance one frame
+53=Shift+A: Seek to the previous frame (best with intra-frame formats)
+54=Shift+F: Select a region and save cutouts as PNGs
+55=Shift+W: Restore saved window size
+56=Ctrl+W: Restore startup window size
+57=Ctrl+Shift+W: Save current window size
+58=Ctrl+Shift+1..0: Switch directly to right video 1-10
+59=Ctrl+C / Cmd+C: Copy the current timestamp of the left video to the clipboard
+60=Ctrl+V / Cmd+V: Paste a timestamp from the clipboard and seek to that position
+61=Ctrl + +/-: Time-shift right video by 10 frames
+62=Alt + +/-: Time-shift right video by 100 frames
