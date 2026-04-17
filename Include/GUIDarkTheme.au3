@@ -613,17 +613,11 @@ Func __GUIDarkTheme_WM_CTLCOLOR($hWnd, $iMsg, $wParam, $lParam)
 	Local $hCtrl = $lParam
 
 	Switch __WinAPI_GetClassName($hCtrl)
-		Case 'Static'
-			;ConsoleWrite("static handle: " & $hCtrl & @CRLF)
-			; set transparent background
+		Case 'Static', 'Button'
 			__WinAPI_SetBkMode($hDC, $TRANSPARENT)
-			; set text color (if necessary) - e.g., white
-			;__WinAPI_SetTextColor($hDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_TEXT_LIGHT))
-			__WinAPI_SetTextColor($hDC, __GUIDarkMenu_ColorToCOLORREF(0xff00ff))
-			; return NULL_BRUSH (stock object), so Windows does NOT fill with your dark brush
+			__WinAPI_SetTextColor($hDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_TEXT_LIGHT))
 			Local $hNull = __WinAPI_GetStockObject(5) ; 5 = NULL_BRUSH
 			If $hNull Then Return $hNull
-			; Fallback if not available:
 			Return $GUI_RUNDEFMSG
 	EndSwitch
 
@@ -1479,7 +1473,9 @@ Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPrefe
 					If $bPreferNewTheme And $g_b24H2Plus Then
 						$sThemeName = 'DarkMode_DarkTheme'
 					Else
-						If StringInStr($sStyles, "BS_GROUPBOX") Or StringInStr($sStyles, "BS_AUTORADIOBUTTON") Then
+						If StringInStr($sStyles, "BS_GROUPBOX") Or StringInStr($sStyles, "BS_AUTORADIOBUTTON") _
+							Or StringInStr($sStyles, "BS_AUTOCHECKBOX") Or StringInStr($sStyles, "BS_CHECKBOX") _
+							Or StringInStr($sStyles, "BS_AUTO3STATE") Or StringInStr($sStyles, "BS_3STATE") Then
 							$bSpecialBtn = True
 						Else
 							$sThemeName = 'DarkMode_Explorer'
@@ -1634,10 +1630,12 @@ Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPrefe
 			$sThemeList = 'Header'
 
 		Case 'Static'
-			;If $bEnableDarkTheme Then
 			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-			;EndIf
-			;GUIRegisterMsg($WM_CTLCOLORSTATIC, "__GUIDarkTheme_WM_CTLCOLOR")
+			If $bEnableDarkTheme Then
+				GUIRegisterMsg($WM_CTLCOLORSTATIC, "__GUIDarkTheme_WM_CTLCOLOR")
+			Else
+				GUIRegisterMsg($WM_CTLCOLORSTATIC, "")
+			EndIf
 
 		Case 'SysDateTimePick32'
 			; if SysDateTimePick32 exists, obtain handle for SysDateTimePick32 and register WM_NOTIFY
