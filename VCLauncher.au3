@@ -14,38 +14,42 @@
 #include <ComboConstants.au3>
 #include <GDIPlus.au3>
 #include "Include\GUIDarkTheme.au3"
+#include "Include\FontHelper.au3"
 
 Opt("GUIOnEventMode", 1)
 
 ; Константы приложения
-Global Const $sAppName = "VCLauncher 1.04"
-Global Const $sPathIni = @ScriptDir & '\VCLauncher.ini'
-Global Const $sPathCache = @ScriptDir & '\VCLauncher.cache'
-Global Const $aSupportedExtensions[] = ["mp4", "avi", "mkv", "mov", "wmv", "webm", "mpg", "mpeg"]
-Global Const $iGuiWidth = 500
-Global Const $iHeaderH = 80 ; высота шапки с логотипом
-Global Const $iGuiHeight = $iHeaderH + 266
+Global Const $gc_sAppName = "VCLauncher 1.04"
+Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
+Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
+Global Const $gc_aSupportedExtensions[] = ["mp4", "avi", "mkv", "mov", "wmv", "webm", "mpg", "mpeg"]
+Global Const $gc_iGuiWidth = 500
+Global Const $gc_iHeaderH = 80 ; высота шапки с логотипом
+Global Const $gc_iGuiHeight = $gc_iHeaderH + 266
 
 ; Переменные путей к инструментам (загружаются из ini)
-Global $sPathVideoCompare = @ScriptDir & '\video-compare.exe'
-Global $sPathSync = @ScriptDir & '\sync\dist\sync.exe'
+Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
+Global $g_sPathSync = @ScriptDir & '\sync\dist\sync.exe'
+Global $g_sPathFFmpeg = @ScriptDir & '\sync\dist\ffmpeg_mini.exe'
 
-; Создание ini по умолчанию, если отсутствует
+; Пропуск N секунд от начала видео при поиске сдвига (sync.exe --skip N)
+Global $g_iSyncSkipSec = Int(IniRead($gc_sPathIni, "Settings", "SyncSkipSec", 60))
+
+; Создание ini и cache по умолчанию, если отсутствуют
 _EnsureIniDefaults()
+_EnsureUtf16File($gc_sPathCache)
 
 ; Ссылки на элементы GUI
-Global $hGui, $iInput1, $iInput2, $iButtonChoose1, $iButtonChoose2, $iButtonSwap, $iButtonCompare, $iButtonClearCache, $iRadioDirect, $iRadioVertical
-Global $iLogoPic, $hLogoBitmap = 0 ; картинка-логотип в шапке и её HBITMAP для освобождения
+Global $g_hGui, $g_iInput1, $g_iInput2, $g_iButtonChoose1, $g_iButtonChoose2, $g_iButtonSwap, $g_iButtonCompare, $g_iButtonClearCache, $g_iRadioDirect, $g_iRadioVertical
+Global $g_iLogoPic, $g_hLogoBitmap = 0 ; картинка-логотип в шапке и её HBITMAP для освобождения
 Global $g_sAppFont = "MS Shell Dlg 2", $g_iAppFontSize = 9
-; Кеш разрешений видео в пределах сессии. Ключ = путь|размер|mtime — автоматически
-; инвалидируется, если файл на диске заменён.
-Global $g_oInfoCache = ObjCreate("Scripting.Dictionary")
-; Кеш результата sync: ключ = пара файлов + size + mtime, значение = сдвиг в мс
-Global $g_oSyncCache = ObjCreate("Scripting.Dictionary")
-Global $iLabel1, $iLabel2, $iLabelInfo1, $iLabelInfo2, $iLabelCompare, $iLabelCommand
-Global $iEditCommand, $iComboLang, $iLabelSettings, $iLabelLang, $iLabelTheme, $iComboTheme
-Global $iSeparator, $iSeparator2
-Global $iLabelOffset, $iCheckSync, $iProgressSync, $iInputOffset
+; Кеш в памяти: разрешения видео и сдвиги sync. Ключ включает mtime —
+; автоматически инвалидируется, если файл на диске заменён.
+Global $g_oCache = ObjCreate("Scripting.Dictionary")
+Global $g_iLabel1, $g_iLabel2, $g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelCompare, $g_iLabelCommand
+Global $g_iEditCommand, $g_iComboLang, $g_iLabelSettings, $g_iLabelLang, $g_iLabelTheme, $g_iComboTheme
+Global $g_iSeparator, $g_iSeparator2
+Global $g_iLabelOffset, $g_iCheckSync, $g_iProgressSync, $g_iInputOffset
 
 Global $g_sLangFile = "", $g_sCurrentLang = "", $g_oLangDict = Null
 
@@ -55,25 +59,25 @@ Global $g_bDarkMode = False
 Global $g_bThemeInitialized = False ; флаг: применяли ли уже UDF-тему
 Global $g_iClrBg, $g_iClrFg, $g_iClrInfo, $g_iClrInput, $g_iClrSep
 ; Остальные переменные (чтение и нормализация путей; относительные пути считаем от папки скрипта)
-Global $sVideoFile1 = _NormalizePath(IniRead($sPathIni, "LastDirs", "Video1", ""))
-Global $sVideoFile2 = _NormalizePath(IniRead($sPathIni, "LastDirs", "Video2", ""))
+Global $g_sVideoFile1 = _NormalizePath(IniRead($gc_sPathIni, "LastDirs", "Video1", ""))
+Global $g_sVideoFile2 = _NormalizePath(IniRead($gc_sPathIni, "LastDirs", "Video2", ""))
 
 
 _ResolveToolPaths()
 _InitLanguage()
 _InitTheme()
 
-If Not FileExists($sPathVideoCompare) Then
-	MsgBox(48, $sAppName, StringReplace(Lang("Errors", "ToolNotFound", '"%TOOL%" not found.'), "%TOOL%", "video-compare.exe") & @CR & @CR & _
+If Not FileExists($g_sPathVideoCompare) Then
+	MsgBox(48, $gc_sAppName, StringReplace(Lang("Errors", "ToolNotFound", '"%TOOL%" not found.'), "%TOOL%", "video-compare.exe") & @CR & @CR & _
 			Lang("Errors", "SettingsWillOpen", "The settings file will now be opened."))
-	ShellExecute($sPathIni)
+	ShellExecute($gc_sPathIni)
 	Exit
 EndIf
 
-If Not FileExists($sPathSync) Then
-	MsgBox(48, $sAppName, StringReplace(Lang("Errors", "ToolNotFound", '"%TOOL%" not found.'), "%TOOL%", "sync.exe") & @CR & @CR & _
+If Not FileExists($g_sPathSync) Then
+	MsgBox(48, $gc_sAppName, StringReplace(Lang("Errors", "ToolNotFound", '"%TOOL%" not found.'), "%TOOL%", "sync.exe") & @CR & @CR & _
 			Lang("Errors", "SettingsWillOpen", "The settings file will now be opened."))
-	ShellExecute($sPathIni)
+	ShellExecute($gc_sPathIni)
 	Exit
 EndIf
 
@@ -86,90 +90,96 @@ WEnd
 
 
 Func _MainGUI()
-	$hGui = GUICreate($sAppName, $iGuiWidth, $iGuiHeight, -1, -1, $WS_SIZEBOX + $WS_SYSMENU + $WS_MINIMIZEBOX, $WS_EX_ACCEPTFILES)
+	$g_hGui = GUICreate($gc_sAppName, $gc_iGuiWidth, $gc_iGuiHeight, -1, -1, $WS_SIZEBOX + $WS_SYSMENU + $WS_MINIMIZEBOX, $WS_EX_ACCEPTFILES)
 
 	_ApplyAppFont()
 
 	; Шапка: логотип слева + 4 строки горячих клавиш справа (рисуется в _RenderHeader)
-	$iLogoPic = GUICtrlCreatePic("", 0, 0, $iGuiWidth, $iHeaderH)
+	$g_iLogoPic = GUICtrlCreatePic("", 0, 0, $gc_iGuiWidth, $gc_iHeaderH)
 
-	Local $iY = $iHeaderH + 10 ; отступ от нижнего края шапки
+	Local $iY = $gc_iHeaderH + 10 ; отступ от нижнего края шапки
 
 	; --- Видео 1 ---
-	$iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 10, $iY + 2, 74, 20)
+	$g_iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 10, $iY + 2, 74, 20)
 
-	$iInput1 = GUICtrlCreateInput("", 90, $iY, $iGuiWidth - 180, 20)
-	GUICtrlSetState($iInput1, $GUI_DROPACCEPTED)
-	If $sVideoFile1 <> "" Then GUICtrlSetData($iInput1, _GetFileName($sVideoFile1))
+	$g_iInput1 = GUICtrlCreateInput("", 90, $iY, $gc_iGuiWidth - 180, 20)
+	GUICtrlSetState($g_iInput1, $GUI_DROPACCEPTED)
+	If $g_sVideoFile1 <> "" Then
+		GUICtrlSetData($g_iInput1, _GetFileName($g_sVideoFile1))
+		_ResetInputCaret($g_iInput1)
+	EndIf
 
-	$iButtonChoose1 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $iGuiWidth - 82, $iY - 1, 74, 23)
+	$g_iButtonChoose1 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY - 1, 74, 23)
 
-	$iLabelInfo1 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 22, $iGuiWidth - 180, 15)
-	GUICtrlSetColor($iLabelInfo1, 0x808080)
+	$g_iLabelInfo1 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 22, $gc_iGuiWidth - 180, 15)
+	GUICtrlSetColor($g_iLabelInfo1, 0x808080)
 
 	; --- Видео 2 ---
-	$iLabel2 = GUICtrlCreateLabel(Lang("GUI", "File2", "File 2"), 10, $iY + 50, 74, 20)
+	$g_iLabel2 = GUICtrlCreateLabel(Lang("GUI", "File2", "File 2"), 10, $iY + 50, 74, 20)
 
-	$iInput2 = GUICtrlCreateInput("", 90, $iY + 48, $iGuiWidth - 180, 20)
-	GUICtrlSetState($iInput2, $GUI_DROPACCEPTED)
-	If $sVideoFile2 <> "" Then GUICtrlSetData($iInput2, _GetFileName($sVideoFile2))
+	$g_iInput2 = GUICtrlCreateInput("", 90, $iY + 48, $gc_iGuiWidth - 180, 20)
+	GUICtrlSetState($g_iInput2, $GUI_DROPACCEPTED)
+	If $g_sVideoFile2 <> "" Then
+		GUICtrlSetData($g_iInput2, _GetFileName($g_sVideoFile2))
+		_ResetInputCaret($g_iInput2)
+	EndIf
 
-	$iButtonSwap = GUICtrlCreateButton(ChrW(0x21C5), $iGuiWidth - 82, $iY + 23, 74, 23)
-	GUICtrlSetTip($iButtonSwap, Lang("GUI", "SwapTip", "Swap files"))
-	GUICtrlSetFont($iButtonSwap, $g_iAppFontSize + 1, 700, 0, $g_sAppFont)
+	$g_iButtonSwap = GUICtrlCreateButton(ChrW(0x21C5), $gc_iGuiWidth - 82, $iY + 23, 74, 23)
+	GUICtrlSetTip($g_iButtonSwap, Lang("GUI", "SwapTip", "Swap files"))
+	GUICtrlSetFont($g_iButtonSwap, $g_iAppFontSize + 1, 700, 0, $g_sAppFont)
 
-	$iButtonChoose2 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $iGuiWidth - 82, $iY + 47, 74, 23)
+	$g_iButtonChoose2 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY + 47, 74, 23)
 
-	$iLabelInfo2 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 70, $iGuiWidth - 180, 15)
-	GUICtrlSetColor($iLabelInfo2, 0x808080)
+	$g_iLabelInfo2 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 70, $gc_iGuiWidth - 180, 15)
+	GUICtrlSetColor($g_iLabelInfo2, 0x808080)
 
 	; --- Разделитель ---
-	$iSeparator = GUICtrlCreateLabel("", 0, $iY + 93, $iGuiWidth, 1)
-	GUICtrlSetBkColor($iSeparator, 0xC0C0C0)
+	$g_iSeparator = GUICtrlCreateLabel("", 0, $iY + 93, $gc_iGuiWidth, 1)
+	GUICtrlSetBkColor($g_iSeparator, 0xC0C0C0)
 
 	; --- Режим сравнения ---
-	$iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 105, 74, 20)
+	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 105, 74, 20)
 
-	$iRadioDirect = GUICtrlCreateRadio(Lang("GUI", "CompareDirect", "Direct"), 90, $iY + 103, 130, 20)
-	$iRadioVertical = GUICtrlCreateRadio(Lang("GUI", "CompareVertical", "Vertical"), 230, $iY + 103, 160, 20)
-	GUICtrlSetState($iRadioDirect, $GUI_CHECKED)
+	$g_iRadioDirect = GUICtrlCreateRadio(Lang("GUI", "CompareDirect", "Direct"), 90, $iY + 103, 130, 20)
+	$g_iRadioVertical = GUICtrlCreateRadio(Lang("GUI", "CompareVertical", "Vertical"), 230, $iY + 103, 160, 20)
+	GUICtrlSetState($g_iRadioDirect, $GUI_CHECKED)
 
 	; --- Синхронизация ---
-	$iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 130, 74, 20)
-	$iCheckSync = GUICtrlCreateCheckbox(Lang("GUI", "SyncVideo", "Synchronize video"), 90, $iY + 128, 210, 20)
-	GUICtrlSetState($iCheckSync, $GUI_CHECKED)
-	$iInputOffset = GUICtrlCreateInput("", $iGuiWidth - 150, $iY + 128, 60, 20)
-	GUICtrlSetState($iInputOffset, $GUI_DISABLE)
-	$iProgressSync = GUICtrlCreateProgress($iGuiWidth - 150, $iY + 128, 60, 20)
-	GUICtrlSetState($iProgressSync, $GUI_HIDE)
+	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 130, 74, 20)
+	$g_iCheckSync = GUICtrlCreateCheckbox(Lang("GUI", "SyncVideo", "Synchronize video"), 90, $iY + 128, 210, 20)
+	GUICtrlSetState($g_iCheckSync, $GUI_CHECKED)
+	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 128, 60, 20)
+	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
+	$g_iProgressSync = GUICtrlCreateProgress($gc_iGuiWidth - 150, $iY + 128, 60, 20)
+	GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
 
 	; --- Команда ---
-	$iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 159, 74, 20)
+	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 159, 74, 20)
 
-	$iEditCommand = GUICtrlCreateEdit("", 90, $iY + 156, $iGuiWidth - 180, 34, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL))
+	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 156, $gc_iGuiWidth - 180, 34, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL))
 
 	; --- Кнопка «Сравнить» ---
 	Local Const $BS_MULTILINE = 0x2000
-	$iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $iGuiWidth - 82, $iY + 106, 74, 74, $BS_MULTILINE)
-	_SetButtonIcon($iButtonCompare, @SystemDir & "\imageres.dll", 18, 32)
+	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 106, 74, 74, $BS_MULTILINE)
+	_SetButtonIcon($g_iButtonCompare, @SystemDir & "\imageres.dll", 18, 32)
 
 	; --- Разделитель 2 ---
-	$iSeparator2 = GUICtrlCreateLabel("", 0, $iY + 195, $iGuiWidth, 1)
-	GUICtrlSetBkColor($iSeparator2, 0xC0C0C0)
+	$g_iSeparator2 = GUICtrlCreateLabel("", 0, $iY + 195, $gc_iGuiWidth, 1)
+	GUICtrlSetBkColor($g_iSeparator2, 0xC0C0C0)
 
 	; --- Настройки: язык, тема и сброс кеша (в одну строку) ---
-	$iLabelSettings = GUICtrlCreateLabel(Lang("GUI", "TabSettings", "Settings:"), 10, $iY + 206, 74, 20)
-	$iLabelLang = GUICtrlCreateLabel(Lang("GUI", "Language", "Language:"), 90, $iY + 206, 40, 20)
-	$iComboLang = GUICtrlCreateCombo("", 130, $iY + 204, 90, 200, $CBS_DROPDOWNLIST)
-	GUICtrlSetData($iComboLang, "English|Русский", ($g_sCurrentLang = "Russian") ? "Русский" : "English")
-	_SetComboItemHeight($iComboLang, 17)
+	$g_iLabelSettings = GUICtrlCreateLabel(Lang("GUI", "TabSettings", "Settings:"), 10, $iY + 206, 74, 20)
+	$g_iLabelLang = GUICtrlCreateLabel(Lang("GUI", "Language", "Language:"), 90, $iY + 206, 40, 20)
+	$g_iComboLang = GUICtrlCreateCombo("", 130, $iY + 204, 90, 200, $CBS_DROPDOWNLIST)
+	GUICtrlSetData($g_iComboLang, "English|Русский", ($g_sCurrentLang = "Russian") ? "Русский" : "English")
+	_SetComboItemHeight($g_iComboLang, 17)
 
-	$iLabelTheme = GUICtrlCreateLabel(Lang("GUI", "Theme", "Theme:"), 230, $iY + 206, 40, 20)
-	$iComboTheme = GUICtrlCreateCombo("", 270, $iY + 204, 90, 200, $CBS_DROPDOWNLIST)
+	$g_iLabelTheme = GUICtrlCreateLabel(Lang("GUI", "Theme", "Theme:"), 230, $iY + 206, 40, 20)
+	$g_iComboTheme = GUICtrlCreateCombo("", 270, $iY + 204, 90, 200, $CBS_DROPDOWNLIST)
 	_PopulateComboTheme()
-	_SetComboItemHeight($iComboTheme, 17)
+	_SetComboItemHeight($g_iComboTheme, 17)
 
-	$iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), $iGuiWidth - 82, $iY + 203, 74, 23)
+	$g_iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), $gc_iGuiWidth - 102, $iY + 203, 94, 23)
 
 	_SetCtrlResizing()
 	_RenderHeader()
@@ -184,16 +194,16 @@ EndFunc   ;==>_MainGUI
 
 
 Func _DefineEvents()
-	GUICtrlSetOnEvent($iButtonChoose1, "_OnEvent_ButtonChoose")
-	GUICtrlSetOnEvent($iButtonChoose2, "_OnEvent_ButtonChoose")
-	GUICtrlSetOnEvent($iButtonSwap, "_OnEvent_ButtonSwap")
-	GUICtrlSetOnEvent($iButtonCompare, "_OnEvent_ButtonCompare")
-	GUICtrlSetOnEvent($iButtonClearCache, "_OnEvent_ButtonClearCache")
-	GUICtrlSetOnEvent($iCheckSync, "_OnEvent_CheckSync")
-	GUICtrlSetOnEvent($iRadioDirect, "_OnEvent_RadioChanged")
-	GUICtrlSetOnEvent($iRadioVertical, "_OnEvent_RadioChanged")
-	GUICtrlSetOnEvent($iComboLang, "_OnEvent_ComboLang")
-	GUICtrlSetOnEvent($iComboTheme, "_OnEvent_ComboTheme")
+	GUICtrlSetOnEvent($g_iButtonChoose1, "_OnEvent_ButtonChoose")
+	GUICtrlSetOnEvent($g_iButtonChoose2, "_OnEvent_ButtonChoose")
+	GUICtrlSetOnEvent($g_iButtonSwap, "_OnEvent_ButtonSwap")
+	GUICtrlSetOnEvent($g_iButtonCompare, "_OnEvent_ButtonCompare")
+	GUICtrlSetOnEvent($g_iButtonClearCache, "_OnEvent_ButtonClearCache")
+	GUICtrlSetOnEvent($g_iCheckSync, "_OnEvent_CheckSync")
+	GUICtrlSetOnEvent($g_iRadioDirect, "_OnEvent_RadioChanged")
+	GUICtrlSetOnEvent($g_iRadioVertical, "_OnEvent_RadioChanged")
+	GUICtrlSetOnEvent($g_iComboLang, "_OnEvent_ComboLang")
+	GUICtrlSetOnEvent($g_iComboTheme, "_OnEvent_ComboTheme")
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_GUI_EVENT_CLOSE")
 	GUISetOnEvent($GUI_EVENT_DROPPED, "_OnEvent_GUI_EVENT_DROPPED")
 
@@ -205,46 +215,47 @@ EndFunc   ;==>_DefineEvents
 
 Func _OnEvent_WM_GETMINMAXINFO($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $iMsg, $wParam
-	If $hWnd = $hGui Then
+	If $hWnd = $g_hGui Then
 		Local $tMINMAXINFO = DllStructCreate("int;int;" & _
 				"int MaxSizeX; int MaxSizeY;" & _
 				"int MaxPositionX;int MaxPositionY;" & _
 				"int MinTrackSizeX; int MinTrackSizeY;" & _
 				"int MaxTrackSizeX; int MaxTrackSizeY", _
 				$lParam)
-		DllStructSetData($tMINMAXINFO, "MinTrackSizeX", $iGuiWidth) ; минимальная ширина окна
-		DllStructSetData($tMINMAXINFO, "MinTrackSizeY", $iGuiHeight + 14) ; минимальная высота окна
+		DllStructSetData($tMINMAXINFO, "MinTrackSizeX", $gc_iGuiWidth) ; минимальная ширина окна
+		DllStructSetData($tMINMAXINFO, "MinTrackSizeY", $gc_iGuiHeight + 14) ; минимальная высота окна
 	EndIf
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>_OnEvent_WM_GETMINMAXINFO
+
 
 
 Func _OnEvent_ButtonChoose()
 	Local $iButtonID = @GUI_CtrlId
 	Local $sTitle, $sIniKey, $iInputCtrl
 
-	If $iButtonID = $iButtonChoose1 Then
+	If $iButtonID = $g_iButtonChoose1 Then
 		$sTitle = Lang("Dialogs", "SelectVideo1", "Select video 1")
 		$sIniKey = "Video1"
-		$iInputCtrl = $iInput1
-		Local $sCurrentFile = $sVideoFile1
+		$iInputCtrl = $g_iInput1
+		Local $sCurrentFile = $g_sVideoFile1
 	Else
 		$sTitle = Lang("Dialogs", "SelectVideo2", "Select video 2")
 		$sIniKey = "Video2"
-		$iInputCtrl = $iInput2
-		Local $sCurrentFile = $sVideoFile2
+		$iInputCtrl = $g_iInput2
+		Local $sCurrentFile = $g_sVideoFile2
 	EndIf
 
 	Local $sFile = FileOpenDialog($sTitle, _PathGetDir($sCurrentFile), _GetVideoExtensionsFilter(), 1, _GetFileName($sCurrentFile))
 	If Not @error And FileExists($sFile) Then
-		If $iButtonID = $iButtonChoose1 Then
-			$sVideoFile1 = $sFile
+		If $iButtonID = $g_iButtonChoose1 Then
+			$g_sVideoFile1 = $sFile
 		Else
-			$sVideoFile2 = $sFile
+			$g_sVideoFile2 = $sFile
 		EndIf
 		GUICtrlSetData($iInputCtrl, _GetFileName($sFile))
-		IniWrite($sPathIni, "LastDirs", $sIniKey, $sFile)
-		GUICtrlSetData($iInputOffset, "")
+		IniWrite($gc_sPathIni, "LastDirs", $sIniKey, $sFile)
+		GUICtrlSetData($g_iInputOffset, "")
 		_TryFillCachedOffset()
 		_UpdateFilesInfo()
 	EndIf
@@ -252,65 +263,70 @@ EndFunc   ;==>_OnEvent_ButtonChoose
 
 
 Func _OnEvent_ButtonCompare()
-	If Not FileExists($sVideoFile1) Or Not FileExists($sVideoFile2) Then Return
+	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then Return
 
 	; Индикация «идёт запуск»: блокируем кнопку и меняем её надпись
-	GUICtrlSetState($iButtonCompare, $GUI_DISABLE)
-	GUICtrlSetData($iButtonCompare, Lang("GUI", "Running", "Running..."))
+	GUICtrlSetState($g_iButtonCompare, $GUI_DISABLE)
+	GUICtrlSetData($g_iButtonCompare, Lang("GUI", "Running", "Running..."))
 
 	; Синхронизация, если включена
-	If GUICtrlRead($iCheckSync) = $GUI_CHECKED Then
-		GUICtrlSetState($iInputOffset, $GUI_HIDE)
-		GUICtrlSetState($iProgressSync, $GUI_SHOW)
-		GUICtrlSetData($iProgressSync, 0)
-		Local $iOffsetMs = _GetSyncOffset($sVideoFile1, $sVideoFile2)
-		GUICtrlSetData($iProgressSync, 100)
+	If GUICtrlRead($g_iCheckSync) = $GUI_CHECKED Then
+		GUICtrlSetState($g_iInputOffset, $GUI_HIDE)
+		GUICtrlSetState($g_iProgressSync, $GUI_SHOW)
+		GUICtrlSetData($g_iProgressSync, 0)
+		Local $iOffsetMs = _GetSyncOffset($g_sVideoFile1, $g_sVideoFile2)
+		GUICtrlSetData($g_iProgressSync, 100)
 		Sleep(100)
-		GUICtrlSetData($iInputOffset, $iOffsetMs)
-		GUICtrlSetState($iProgressSync, $GUI_HIDE)
-		GUICtrlSetState($iInputOffset, $GUI_SHOW)
+		GUICtrlSetData($g_iInputOffset, $iOffsetMs)
+		GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
+		GUICtrlSetState($g_iInputOffset, $GUI_SHOW)
 	EndIf
 
 	_UpdateCommandField()
 
-	Local $sCmdLine = StringReplace(StringReplace(GUICtrlRead($iEditCommand), @CR, " "), @LF, " ")
+	Local $sCmdLine = StringReplace(StringReplace(GUICtrlRead($g_iEditCommand), @CR, " "), @LF, " ")
 	$sCmdLine = StringStripWS($sCmdLine, 3)
 	If $sCmdLine <> "" Then _RunVideoCompare($sCmdLine)
 
 	; Возвращаем кнопку в исходное состояние
-	GUICtrlSetData($iButtonCompare, Lang("GUI", "Compare", "Compare"))
+	GUICtrlSetData($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
 	_UpdateFilesInfo()
 EndFunc   ;==>_OnEvent_ButtonCompare
 
 
 Func _OnEvent_ButtonClearCache()
 	; Очищаем кеш в памяти
-	$g_oSyncCache.RemoveAll()
-	$g_oInfoCache.RemoveAll()
+	$g_oCache.RemoveAll()
 
-	; Удаляем файл кеша на диске
-	FileDelete($sPathCache)
+	; Удаляем файл кеша на диске и пересоздаём пустой с BOM
+	FileDelete($gc_sPathCache)
+	_EnsureUtf16File($gc_sPathCache)
 
 	; Очищаем поле сдвига
-	GUICtrlSetData($iInputOffset, "")
+	GUICtrlSetData($g_iInputOffset, "")
+
+	; Обновляем поле команды
+	_UpdateCommandField()
 EndFunc   ;==>_OnEvent_ButtonClearCache
 
 
 Func _OnEvent_ButtonSwap()
-	Local $sTmp = $sVideoFile1
-	$sVideoFile1 = $sVideoFile2
-	$sVideoFile2 = $sTmp
+	Local $sTmp = $g_sVideoFile1
+	$g_sVideoFile1 = $g_sVideoFile2
+	$g_sVideoFile2 = $sTmp
 
-	IniWrite($sPathIni, "LastDirs", "Video1", $sVideoFile1)
-	IniWrite($sPathIni, "LastDirs", "Video2", $sVideoFile2)
+	IniWrite($gc_sPathIni, "LastDirs", "Video1", $g_sVideoFile1)
+	IniWrite($gc_sPathIni, "LastDirs", "Video2", $g_sVideoFile2)
 
-	GUICtrlSetData($iInput1, $sVideoFile1 = "" ? "" : _GetFileName($sVideoFile1))
-	GUICtrlSetData($iInput2, $sVideoFile2 = "" ? "" : _GetFileName($sVideoFile2))
+	GUICtrlSetData($g_iInput1, $g_sVideoFile1 = "" ? "" : _GetFileName($g_sVideoFile1))
+	_ResetInputCaret($g_iInput1)
+	GUICtrlSetData($g_iInput2, $g_sVideoFile2 = "" ? "" : _GetFileName($g_sVideoFile2))
+	_ResetInputCaret($g_iInput2)
 
 	; Инвертируем сдвиг вместо повторного поиска
-	Local $sOffset = GUICtrlRead($iInputOffset)
+	Local $sOffset = GUICtrlRead($g_iInputOffset)
 	If $sOffset <> "" Then
-		GUICtrlSetData($iInputOffset, -Int($sOffset))
+		GUICtrlSetData($g_iInputOffset, -Int($sOffset))
 	EndIf
 	_UpdateFilesInfo()
 EndFunc   ;==>_OnEvent_ButtonSwap
@@ -322,11 +338,11 @@ EndFunc   ;==>_OnEvent_RadioChanged
 
 
 Func _OnEvent_CheckSync()
-	If GUICtrlRead($iCheckSync) = $GUI_CHECKED Then
-		GUICtrlSetState($iInputOffset, $GUI_DISABLE)
+	If GUICtrlRead($g_iCheckSync) = $GUI_CHECKED Then
+		GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
 		_TryFillCachedOffset()
 	Else
-		GUICtrlSetState($iInputOffset, $GUI_ENABLE)
+		GUICtrlSetState($g_iInputOffset, $GUI_ENABLE)
 	EndIf
 	_UpdateCommandField()
 EndFunc   ;==>_OnEvent_CheckSync
@@ -342,16 +358,16 @@ Func _OnEvent_WM_DROPFILES($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg, $wParam, $lParam
 
 	; Определяем над каким элементом находится курсор
-	Local $aCursorInfo = GUIGetCursorInfo($hGui)
+	Local $aCursorInfo = GUIGetCursorInfo($g_hGui)
 	If @error Then Return $GUI_RUNDEFMSG
 
 	Local $iCtrlID = $aCursorInfo[4]
 
 	; Подсвечиваем соответствующий элемент
-	If $iCtrlID = $iInput1 Then
-		GUICtrlSetBkColor($iInput1, $COLOR_SKYBLUE)
-	ElseIf $iCtrlID = $iInput2 Then
-		GUICtrlSetBkColor($iInput2, $COLOR_SKYBLUE)
+	If $iCtrlID = $g_iInput1 Then
+		GUICtrlSetBkColor($g_iInput1, $COLOR_SKYBLUE)
+	ElseIf $iCtrlID = $g_iInput2 Then
+		GUICtrlSetBkColor($g_iInput2, $COLOR_SKYBLUE)
 	EndIf
 
 	; Через небольшую задержку восстанавливаем исходный вид после drop события
@@ -366,7 +382,7 @@ Func _OnEvent_GUI_EVENT_DROPPED()
 	Local $sDropFile = @GUI_DragFile
 
 	; Проверяем, что файл брошен на один из input полей
-	If $iDropId <> $iInput1 And $iDropId <> $iInput2 Then Return
+	If $iDropId <> $g_iInput1 And $iDropId <> $g_iInput2 Then Return
 
 	; Проверяем существование файла
 	If Not FileExists($sDropFile) Then Return
@@ -374,7 +390,7 @@ Func _OnEvent_GUI_EVENT_DROPPED()
 	; Проверяем расширение файла
 	If Not _IsValidVideoExtension($sDropFile) Then
 		Local $sExt = StringLower(StringRegExpReplace($sDropFile, '^.*\.', ''))
-		MsgBox(48, $sAppName, Lang("Errors", "UnsupportedFormat", "Unsupported file format:") & " " & $sExt & @CR & @CR & _
+		MsgBox(48, $gc_sAppName, Lang("Errors", "UnsupportedFormat", "Unsupported file format:") & " " & $sExt & @CR & @CR & _
 				Lang("Errors", "SupportedFormats", "Supported formats:") & " " & _GetVideoExtensionsFilter())
 		Return
 	EndIf
@@ -393,12 +409,12 @@ Func _OnEvent_WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 	If $iNotifyCode <> $EN_KILLFOCUS Then Return $GUI_RUNDEFMSG
 
 	; Обработка поля сдвига — обновляем команду при потере фокуса
-	If $iID = $iInputOffset Then
+	If $iID = $g_iInputOffset Then
 		_UpdateCommandField()
 		Return $GUI_RUNDEFMSG
 	EndIf
 
-	If $iID <> $iInput1 And $iID <> $iInput2 Then Return $GUI_RUNDEFMSG
+	If $iID <> $g_iInput1 And $iID <> $g_iInput2 Then Return $GUI_RUNDEFMSG
 
 	Local $sInputValue = GUICtrlRead($iID)
 	If $sInputValue = "" Then Return $GUI_RUNDEFMSG
@@ -412,19 +428,19 @@ Func _OnEvent_WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 	Else
 		; Относительный путь - ищем относительно папки текущего видеофайла
 		Local $sContextDir = ""
-		If $iID = $iInput1 And FileExists($sVideoFile1) Then
-			$sContextDir = _PathGetDir($sVideoFile1)
-		ElseIf $iID = $iInput2 And FileExists($sVideoFile2) Then
-			$sContextDir = _PathGetDir($sVideoFile2)
+		If $iID = $g_iInput1 And FileExists($g_sVideoFile1) Then
+			$sContextDir = _PathGetDir($g_sVideoFile1)
+		ElseIf $iID = $g_iInput2 And FileExists($g_sVideoFile2) Then
+			$sContextDir = _PathGetDir($g_sVideoFile2)
 		EndIf
 
 		If $sContextDir = "" Then
 			; Нет контекстной папки - сбрасываем поле
-			If $iID = $iInput1 Then
-				$sVideoFile1 = ""
+			If $iID = $g_iInput1 Then
+				$g_sVideoFile1 = ""
 				GUICtrlSetData($iID, "")
-			ElseIf $iID = $iInput2 Then
-				$sVideoFile2 = ""
+			ElseIf $iID = $g_iInput2 Then
+				$g_sVideoFile2 = ""
 				GUICtrlSetData($iID, "")
 			EndIf
 			_UpdateFilesInfo()
@@ -447,39 +463,39 @@ EndFunc   ;==>_OnEvent_WM_COMMAND
 
 
 Func _OnEvent_ComboLang()
-	Local $sSelected = GUICtrlRead($iComboLang)
+	Local $sSelected = GUICtrlRead($g_iComboLang)
 	Local $sNewLang = "Russian"
 	If $sSelected = "English" Then $sNewLang = "English"
 	If $sNewLang = $g_sCurrentLang Then Return
 	$g_sCurrentLang = $sNewLang
 	$g_sLangFile = @ScriptDir & "\Lang\" & $g_sCurrentLang & ".lng"
-	IniWrite($sPathIni, "Settings", "Language", $g_sCurrentLang)
+	IniWrite($gc_sPathIni, "Settings", "Language", $g_sCurrentLang)
 	_LoadLangFile()
 	_ApplyLanguage()
 EndFunc   ;==>_OnEvent_ComboLang
 
 
 Func _OnEvent_ComboTheme()
-	Local $sSelected = GUICtrlRead($iComboTheme)
+	Local $sSelected = GUICtrlRead($g_iComboTheme)
 	Local $sNew = $g_sTheme
 	If $sSelected = Lang("GUI", "ThemeSystem", "System") Then $sNew = "System"
 	If $sSelected = Lang("GUI", "ThemeLight", "Light") Then $sNew = "Light"
 	If $sSelected = Lang("GUI", "ThemeDark", "Dark") Then $sNew = "Dark"
 	If $sNew = $g_sTheme Then Return
 	$g_sTheme = $sNew
-	IniWrite($sPathIni, "Settings", "Theme", $sNew)
+	IniWrite($gc_sPathIni, "Settings", "Theme", $sNew)
 	_ApplyTheme()
 EndFunc   ;==>_OnEvent_ComboTheme
 
 
 Func _UpdateFilesInfo()
-	Local $bFile1Exists = FileExists($sVideoFile1)
-	Local $bFile2Exists = FileExists($sVideoFile2)
+	Local $bFile1Exists = FileExists($g_sVideoFile1)
+	Local $bFile2Exists = FileExists($g_sVideoFile2)
 
 	; Если оба файла существуют, вычисляем crop
 	If $bFile1Exists And $bFile2Exists Then
-		Local $aInfo1 = _GetVideoInfo($sVideoFile1)
-		Local $aInfo2 = _GetVideoInfo($sVideoFile2)
+		Local $aInfo1 = _GetVideoInfo($g_sVideoFile1)
+		Local $aInfo2 = _GetVideoInfo($g_sVideoFile2)
 		Local $aCropArgs = _CalculateCropArgs($aInfo1, $aInfo2)
 
 		; Формируем текст для первого файла
@@ -488,7 +504,7 @@ Func _UpdateFilesInfo()
 			Local $iCropDiff1 = $aInfo1[1] - $aCropArgs[2]
 			$sText1 &= ", " & Lang("Info", "HeightDiff", "height difference") & " " & $iCropDiff1
 		EndIf
-		GUICtrlSetData($iLabelInfo1, $sText1)
+		GUICtrlSetData($g_iLabelInfo1, $sText1)
 
 		; Формируем текст для второго файла
 		Local $sText2 = Lang("Info", "Resolution", "Resolution") & " " & $aInfo2[0] & "x" & $aInfo2[1]
@@ -496,53 +512,53 @@ Func _UpdateFilesInfo()
 			Local $iCropDiff2 = $aInfo2[1] - $aCropArgs[3]
 			$sText2 &= ", " & Lang("Info", "HeightDiff", "height difference") & " " & $iCropDiff2
 		EndIf
-		GUICtrlSetData($iLabelInfo2, $sText2)
+		GUICtrlSetData($g_iLabelInfo2, $sText2)
 
-		GUICtrlSetState($iButtonCompare, $GUI_ENABLE)
+		GUICtrlSetState($g_iButtonCompare, $GUI_ENABLE)
 
 		; Читаем сдвиг из поля ввода
-		Local $sOffset = GUICtrlRead($iInputOffset)
+		Local $sOffset = GUICtrlRead($g_iInputOffset)
 		Local $iOffsetMs = ($sOffset <> "") ? Int($sOffset) : 0
 
 		; Обновляем поле команды
-		Local $bIsVertical = (GUICtrlRead($iRadioVertical) = $GUI_CHECKED)
+		Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
 		Local $sCmdLine = _BuildVideoCompareCommand($aInfo1, $aInfo2, $aCropArgs, $bIsVertical, $iOffsetMs)
-		GUICtrlSetData($iEditCommand, $sCmdLine)
+		GUICtrlSetData($g_iEditCommand, $sCmdLine)
 	Else
 		; Показываем только разрешение без crop
 		If $bFile1Exists Then
-			Local $aInfo1 = _GetVideoInfo($sVideoFile1)
-			GUICtrlSetData($iLabelInfo1, Lang("Info", "Resolution", "Resolution") & " " & $aInfo1[0] & "x" & $aInfo1[1])
+			Local $aInfo1 = _GetVideoInfo($g_sVideoFile1)
+			GUICtrlSetData($g_iLabelInfo1, Lang("Info", "Resolution", "Resolution") & " " & $aInfo1[0] & "x" & $aInfo1[1])
 		Else
-			GUICtrlSetData($iLabelInfo1, Lang("GUI", "FileNotSelected", "File not selected"))
+			GUICtrlSetData($g_iLabelInfo1, Lang("GUI", "FileNotSelected", "File not selected"))
 		EndIf
 
 		If $bFile2Exists Then
-			Local $aInfo2 = _GetVideoInfo($sVideoFile2)
-			GUICtrlSetData($iLabelInfo2, Lang("Info", "Resolution", "Resolution") & " " & $aInfo2[0] & "x" & $aInfo2[1])
+			Local $aInfo2 = _GetVideoInfo($g_sVideoFile2)
+			GUICtrlSetData($g_iLabelInfo2, Lang("Info", "Resolution", "Resolution") & " " & $aInfo2[0] & "x" & $aInfo2[1])
 		Else
-			GUICtrlSetData($iLabelInfo2, Lang("GUI", "FileNotSelected", "File not selected"))
+			GUICtrlSetData($g_iLabelInfo2, Lang("GUI", "FileNotSelected", "File not selected"))
 		EndIf
 
-		GUICtrlSetState($iButtonCompare, $GUI_DISABLE)
-		GUICtrlSetData($iEditCommand, "")
+		GUICtrlSetState($g_iButtonCompare, $GUI_DISABLE)
+		GUICtrlSetData($g_iEditCommand, "")
 	EndIf
 EndFunc   ;==>_UpdateFilesInfo
 
 
 Func _UpdateCommandField()
-	If Not FileExists($sVideoFile1) Or Not FileExists($sVideoFile2) Then
-		GUICtrlSetData($iEditCommand, "")
+	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then
+		GUICtrlSetData($g_iEditCommand, "")
 		Return
 	EndIf
-	Local $aVideo1Info = _GetVideoInfo($sVideoFile1)
-	Local $aVideo2Info = _GetVideoInfo($sVideoFile2)
+	Local $aVideo1Info = _GetVideoInfo($g_sVideoFile1)
+	Local $aVideo2Info = _GetVideoInfo($g_sVideoFile2)
 	Local $aCropArgs = _CalculateCropArgs($aVideo1Info, $aVideo2Info)
-	Local $sOffset = GUICtrlRead($iInputOffset)
+	Local $sOffset = GUICtrlRead($g_iInputOffset)
 	Local $iOffsetMs = ($sOffset <> "") ? Int($sOffset) : 0
-	Local $bIsVertical = (GUICtrlRead($iRadioVertical) = $GUI_CHECKED)
+	Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
 	Local $sCmdLine = _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical, $iOffsetMs)
-	GUICtrlSetData($iEditCommand, $sCmdLine)
+	GUICtrlSetData($g_iEditCommand, $sCmdLine)
 EndFunc   ;==>_UpdateCommandField
 
 
@@ -599,65 +615,146 @@ Func _CalculateCropArgs($aVideo1Info, $aVideo2Info)
 EndFunc   ;==>_CalculateCropArgs
 
 
-Func _GetSyncOffset($sFile1, $sFile2)
-	Local $iSize1 = FileGetSize($sFile1)
-	Local $sMtime1 = FileGetTime($sFile1, $FT_MODIFIED, 1)
-	Local $iSize2 = FileGetSize($sFile2)
-	Local $sMtime2 = FileGetTime($sFile2, $FT_MODIFIED, 1)
-	Local $sMemKey = $sFile1 & "|" & $iSize1 & "|" & $sMtime1 & "|" & $sFile2 & "|" & $iSize2 & "|" & $sMtime2
+; Уникальный идентификатор файла (имя + размер, без пути)
+Func _BuildFileId($sFile)
+	Return _GetFileName($sFile) & "|" & FileGetSize($sFile)
+EndFunc   ;==>_BuildFileId
 
-	; Кеш в памяти
-	If $g_oSyncCache.Exists($sMemKey) Then Return $g_oSyncCache.Item($sMemKey)
+
+; Возвращает составной ключ пары файлов для кеша в памяти
+Func _BuildPairKey($sFile1, $sFile2)
+	Return _BuildFileId($sFile1) & "|" & FileGetTime($sFile1, $FT_MODIFIED, 1) & _
+			"|" & _BuildFileId($sFile2) & "|" & FileGetTime($sFile2, $FT_MODIFIED, 1)
+EndFunc   ;==>_BuildPairKey
+
+
+; Возвращает индекс файла из секции [Info], проверяя mtime.
+; Если записи нет или mtime устарел — возвращает массив ["", ""]
+; Иначе — [индекс, разрешение]
+Func _GetCacheInfo($sFile)
+	Local $aEmpty[2] = ["", ""]
+	Local $sDiskKey = _BuildFileId($sFile)
+	Local $sCached = IniRead($gc_sPathCache, "Info", $sDiskKey, "")
+	If $sCached = "" Then Return $aEmpty
+
+	Local $aParts = StringSplit($sCached, "|")
+	If $aParts[0] < 3 Then Return $aEmpty
+
+	Local $sMtime = FileGetTime($sFile, $FT_MODIFIED, 1)
+	If $aParts[2] <> $sMtime Then Return $aEmpty
+
+	Local $aResult[2] = [$aParts[1], $aParts[3]]
+	Return $aResult
+EndFunc   ;==>_GetCacheInfo
+
+
+; Сохраняет инфо о файле в [Info], возвращает присвоенный индекс
+Func _SaveCacheInfo($sFile, $sResolution)
+	Local $sDiskKey = _BuildFileId($sFile)
+	Local $sMtime = FileGetTime($sFile, $FT_MODIFIED, 1)
+
+	; Если уже есть запись — обновляем с тем же индексом
+	Local $sCached = IniRead($gc_sPathCache, "Info", $sDiskKey, "")
+	Local $iIdx
+	If $sCached <> "" Then
+		$iIdx = Int(StringSplit($sCached, "|")[1])
+	Else
+		; Берём счётчик из [Meta], инкрементируем
+		$iIdx = Int(IniRead($gc_sPathCache, "Meta", "NextId", "1"))
+		IniWrite($gc_sPathCache, "Meta", "NextId", $iIdx + 1)
+	EndIf
+
+	IniWrite($gc_sPathCache, "Info", $sDiskKey, $iIdx & "|" & $sMtime & "|" & $sResolution)
+	Return $iIdx
+EndFunc   ;==>_SaveCacheInfo
+
+
+; Ищет сдвиг в кеше (память + диск, прямая + обратная пара)
+; Возвращает массив [$bFound, $iOffset]
+Func _LookupSyncCache($sFile1, $sFile2)
+	Local $aResult[2] = [False, 0]
+	Local $sMemKey = _BuildPairKey($sFile1, $sFile2)
+
+	; Кеш в памяти (прямая пара)
+	If $g_oCache.Exists($sMemKey) Then
+		$aResult[0] = True
+		$aResult[1] = $g_oCache.Item($sMemKey)
+		Return $aResult
+	EndIf
 
 	; Кеш в памяти (обратная пара — инвертируем сдвиг)
-	Local $sMemKeyRev = $sFile2 & "|" & $iSize2 & "|" & $sMtime2 & "|" & $sFile1 & "|" & $iSize1 & "|" & $sMtime1
-	If $g_oSyncCache.Exists($sMemKeyRev) Then
-		Local $iOffset = -$g_oSyncCache.Item($sMemKeyRev)
-		$g_oSyncCache.Item($sMemKey) = $iOffset
-		Return $iOffset
+	Local $sMemKeyRev = _BuildPairKey($sFile2, $sFile1)
+	If $g_oCache.Exists($sMemKeyRev) Then
+		$aResult[0] = True
+		$aResult[1] = -$g_oCache.Item($sMemKeyRev)
+		$g_oCache.Item($sMemKey) = $aResult[1]
+		Return $aResult
 	EndIf
 
-	; Кеш на диске (ключ: path1|path2, значение: size1|mtime1|size2|mtime2|offset)
-	Local $sDiskKey = $sFile1 & "|" & $sFile2
-	Local $sCached = IniRead($sPathCache, "SyncCache", $sDiskKey, "")
-	If $sCached <> "" Then
-		Local $aParts = StringSplit($sCached, "|")
-		If $aParts[0] >= 5 And $aParts[1] = String($iSize1) And $aParts[2] = $sMtime1 _
-				And $aParts[3] = String($iSize2) And $aParts[4] = $sMtime2 Then
-			Local $iOffset = Int($aParts[5])
-			$g_oSyncCache.Item($sMemKey) = $iOffset
-			Return $iOffset
-		EndIf
+	; Кеш на диске: находим индексы из [Info] и ищем в [Sync]
+	Local $aInfo1 = _GetCacheInfo($sFile1)
+	Local $aInfo2 = _GetCacheInfo($sFile2)
+	If $aInfo1[0] = "" Or $aInfo2[0] = "" Then Return $aResult
+
+	; Проверяем прямую и обратную пару
+	Local $sSyncVal = IniRead($gc_sPathCache, "Sync", $aInfo1[0] & "|" & $aInfo2[0], "")
+	If $sSyncVal <> "" Then
+		$aResult[0] = True
+		$aResult[1] = Int($sSyncVal)
+		$g_oCache.Item($sMemKey) = $aResult[1]
+		Return $aResult
 	EndIf
 
-	; Кеш на диске (обратная пара — инвертируем сдвиг)
-	Local $sDiskKeyRev = $sFile2 & "|" & $sFile1
-	Local $sCachedRev = IniRead($sPathCache, "SyncCache", $sDiskKeyRev, "")
-	If $sCachedRev <> "" Then
-		Local $aParts = StringSplit($sCachedRev, "|")
-		If $aParts[0] >= 5 And $aParts[1] = String($iSize2) And $aParts[2] = $sMtime2 _
-				And $aParts[3] = String($iSize1) And $aParts[4] = $sMtime1 Then
-			Local $iOffset = -Int($aParts[5])
-			$g_oSyncCache.Item($sMemKey) = $iOffset
-			Return $iOffset
-		EndIf
+	Local $sSyncValRev = IniRead($gc_sPathCache, "Sync", $aInfo2[0] & "|" & $aInfo1[0], "")
+	If $sSyncValRev <> "" Then
+		$aResult[0] = True
+		$aResult[1] = -Int($sSyncValRev)
+		$g_oCache.Item($sMemKey) = $aResult[1]
+		Return $aResult
 	EndIf
+
+	Return $aResult
+EndFunc   ;==>_LookupSyncCache
+
+
+; Сохраняет сдвиг sync в кеш (память + диск)
+Func _SaveSyncCache($sFile1, $sFile2, $iOffset)
+	Local $sMemKey = _BuildPairKey($sFile1, $sFile2)
+	Local $sMemKeyRev = _BuildPairKey($sFile2, $sFile1)
+
+	$g_oCache.Item($sMemKey) = $iOffset
+	$g_oCache.Item($sMemKeyRev) = -$iOffset
+
+	; Получаем/создаём индексы файлов в [Info]
+	Local $aInfo1 = _GetCacheInfo($sFile1)
+	Local $aInfo2 = _GetCacheInfo($sFile2)
+	Local $iIdx1 = ($aInfo1[0] <> "") ? Int($aInfo1[0]) : _SaveCacheInfo($sFile1, $aInfo1[1])
+	Local $iIdx2 = ($aInfo2[0] <> "") ? Int($aInfo2[0]) : _SaveCacheInfo($sFile2, $aInfo2[1])
+
+	IniWrite($gc_sPathCache, "Sync", $iIdx1 & "|" & $iIdx2, $iOffset)
+EndFunc   ;==>_SaveSyncCache
+
+
+Func _GetSyncOffset($sFile1, $sFile2)
+	; Поиск в кеше (память + диск)
+	Local $aCached = _LookupSyncCache($sFile1, $sFile2)
+	If $aCached[0] Then Return $aCached[1]
 
 	; Вызов sync.exe с таймаутом и прогрессом
-	Local $iOffset = _RunSyncWithTimeout($sFile1, $sFile2, 30)
+	Local $vOffset = _RunSyncWithTimeout($sFile1, $sFile2, 30)
 
-	; Сохраняем в оба кеша (прямая и обратная пары)
-	$g_oSyncCache.Item($sMemKey) = $iOffset
-	$g_oSyncCache.Item($sMemKeyRev) = -$iOffset
-	IniWrite($sPathCache, "SyncCache", $sDiskKey, $iSize1 & "|" & $sMtime1 & "|" & $iSize2 & "|" & $sMtime2 & "|" & $iOffset)
-	IniWrite($sPathCache, "SyncCache", $sDiskKeyRev, $iSize2 & "|" & $sMtime2 & "|" & $iSize1 & "|" & $sMtime1 & "|" & - $iOffset)
+	; При таймауте sync возвращает "" — не кешируем, возвращаем 0
+	If $vOffset = "" Then Return 0
+
+	Local $iOffset = Int($vOffset)
+	_SaveSyncCache($sFile1, $sFile2, $iOffset)
 
 	Return $iOffset
 EndFunc   ;==>_GetSyncOffset
 
 
 Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
-	Local $sCmdLine = '"' & $sPathSync & '" sync --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '"'
+	Local $sCmdLine = '"' & $g_sPathSync & '" sync --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
 	Local $iPid = Run($sCmdLine, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
 	Local $hTimer = TimerInit()
 	Local $iTimeoutMs = $iTimeoutSec * 1000
@@ -666,15 +763,16 @@ Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 	While ProcessExists($iPid)
 		Local $iElapsed = TimerDiff($hTimer)
 
-		; Таймаут — убиваем процесс, возвращаем 0
+		; Таймаут — убиваем процесс, возвращаем "" (не кешировать)
 		If $iElapsed >= $iTimeoutMs Then
 			ProcessClose($iPid)
-			Return 0
+			ConsoleWrite("sync.exe: таймаут (" & $iTimeoutSec & " сек)" & @CR)
+			Return ""
 		EndIf
 
 		; Обновляем прогрессбар (0–95% за $iTimeoutSec секунд)
 		Local $iPct = Int(($iElapsed / $iTimeoutMs) * 95)
-		GUICtrlSetData($iProgressSync, $iPct)
+		GUICtrlSetData($g_iProgressSync, $iPct)
 
 		; Читаем stdout неблокирующе
 		$sOutput &= StdoutRead($iPid)
@@ -693,38 +791,16 @@ EndFunc   ;==>_RunSyncWithTimeout
 
 
 Func _TryFillCachedOffset()
-	If GUICtrlRead($iCheckSync) <> $GUI_CHECKED Then Return
-	If Not FileExists($sVideoFile1) Or Not FileExists($sVideoFile2) Then Return
+	If GUICtrlRead($g_iCheckSync) <> $GUI_CHECKED Then Return
+	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then Return
 
-	Local $iSize1 = FileGetSize($sVideoFile1)
-	Local $sMtime1 = FileGetTime($sVideoFile1, $FT_MODIFIED, 1)
-	Local $iSize2 = FileGetSize($sVideoFile2)
-	Local $sMtime2 = FileGetTime($sVideoFile2, $FT_MODIFIED, 1)
-	Local $sMemKey = $sVideoFile1 & "|" & $iSize1 & "|" & $sMtime1 & "|" & $sVideoFile2 & "|" & $iSize2 & "|" & $sMtime2
-
-	; Кеш в памяти
-	If $g_oSyncCache.Exists($sMemKey) Then
-		GUICtrlSetData($iInputOffset, $g_oSyncCache.Item($sMemKey))
-		Return
-	EndIf
-
-	; Кеш на диске
-	Local $sDiskKey = $sVideoFile1 & "|" & $sVideoFile2
-	Local $sCached = IniRead($sPathCache, "SyncCache", $sDiskKey, "")
-	If $sCached <> "" Then
-		Local $aParts = StringSplit($sCached, "|")
-		If $aParts[0] >= 5 And $aParts[1] = String($iSize1) And $aParts[2] = $sMtime1 _
-				And $aParts[3] = String($iSize2) And $aParts[4] = $sMtime2 Then
-			Local $iOffset = Int($aParts[5])
-			$g_oSyncCache.Item($sMemKey) = $iOffset
-			GUICtrlSetData($iInputOffset, $iOffset)
-		EndIf
-	EndIf
+	Local $aCached = _LookupSyncCache($g_sVideoFile1, $g_sVideoFile2)
+	If $aCached[0] Then GUICtrlSetData($g_iInputOffset, $aCached[1])
 EndFunc   ;==>_TryFillCachedOffset
 
 
 Func _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical, $iOffsetMs = 0)
-	Local $sCmdLine = '"' & $sPathVideoCompare & '"'
+	Local $sCmdLine = '"' & $g_sPathVideoCompare & '"'
 
 	; Проверяем, нужно ли окно на весь экран
 	If _ShouldUseFullscreen($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical) Then
@@ -744,7 +820,7 @@ Func _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVerti
 
 	; Добавляем crop и пути к файлам
 	$sCmdLine &= " " & $aCropArgs[0] & $aCropArgs[1] & _
-			'"' & $sVideoFile1 & '" "' & $sVideoFile2 & '"'
+			'"' & $g_sVideoFile1 & '" "' & $g_sVideoFile2 & '"'
 
 	Return $sCmdLine
 EndFunc   ;==>_BuildVideoCompareCommand
@@ -839,7 +915,7 @@ Func _RunVideoCompare($sCmdLine)
 	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", $hProcess)
 	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", DllStructGetData($tPI, "hThread"))
 
-	If StringInStr($sOutput, "Error:") Then MsgBox(48, $sAppName, Lang("Errors", "Error", "Error") & @CR & $sOutput)
+	If StringInStr($sOutput, "Error:") Then MsgBox(48, $gc_sAppName, Lang("Errors", "Error", "Error") & @CR & $sOutput)
 EndFunc   ;==>_RunVideoCompare
 
 
@@ -848,30 +924,29 @@ Func _GetVideoResolution($sVideoPath)
 
 	Local $iSize = FileGetSize($sVideoPath)
 	Local $sMtime = FileGetTime($sVideoPath, $FT_MODIFIED, 1)
-	Local $sMemKey = $sVideoPath & "|" & $iSize & "|" & $sMtime
+	Local $sMemKey = _BuildFileId($sVideoPath) & "|" & $sMtime
 
 	; Кеш в памяти
-	If $g_oInfoCache.Exists($sMemKey) Then Return $g_oInfoCache.Item($sMemKey)
+	If $g_oCache.Exists($sMemKey) Then Return $g_oCache.Item($sMemKey)
 
-	; Кеш на диске (формат значения: size|mtime|result)
-	Local $sCached = IniRead($sPathCache, "InfoCache", $sVideoPath, "")
-	If $sCached <> "" Then
-		Local $aParts = StringSplit($sCached, "|")
-		If $aParts[0] >= 3 And $aParts[1] = String($iSize) And $aParts[2] = $sMtime Then
-			$g_oInfoCache.Item($sMemKey) = $aParts[3]
-			Return $aParts[3]
-		EndIf
+	; Кеш на диске [Info]: ключ name|size, значение idx|mtime|resolution
+	Local $aInfo = _GetCacheInfo($sVideoPath)
+	If $aInfo[1] <> "" Then
+		$g_oCache.Item($sMemKey) = $aInfo[1]
+		Return $aInfo[1]
 	EndIf
 
-	; Вызов sync.exe info
-	Local $sCmdLine = '"' & $sPathSync & '" info "' & $sVideoPath & '"'
-	Local $sOutput = _RunToolReadStdout($sCmdLine)
+	; Вызов ffmpeg_mini.exe -i (парсинг разрешения из строки Video:)
+	Local $sCmdLine = '"' & $g_sPathFFmpeg & '" -hide_banner -i "' & $sVideoPath & '"'
+	Local $sRaw = _RunToolReadStderr($sCmdLine)
+	Local $aMatch = StringRegExp($sRaw, "Video:\s.*?,\s(\d+)x(\d+)", 1)
+	Local $sOutput = (IsArray($aMatch) ? $aMatch[0] & "," & $aMatch[1] : "")
 	ConsoleWrite($sVideoPath & " -> " & $sOutput & @CR)
 
 	; Сохраняем в оба кеша
 	If $sOutput <> "" Then
-		$g_oInfoCache.Item($sMemKey) = $sOutput
-		IniWrite($sPathCache, "InfoCache", $sVideoPath, $iSize & "|" & $sMtime & "|" & $sOutput)
+		$g_oCache.Item($sMemKey) = $sOutput
+		_SaveCacheInfo($sVideoPath, $sOutput)
 	EndIf
 
 	Return $sOutput
@@ -890,6 +965,18 @@ Func _RunToolReadStdout($sCmdLine)
 EndFunc   ;==>_RunToolReadStdout
 
 
+Func _RunToolReadStderr($sCmdLine)
+	Local $iPid = Run($sCmdLine, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
+	Local $sOutput = "", $sLine
+	While 1
+		$sLine = StderrRead($iPid)
+		If @error Then ExitLoop
+		$sOutput &= $sLine
+	WEnd
+	Return StringStripWS($sOutput, 3)
+EndFunc   ;==>_RunToolReadStderr
+
+
 Func _SetCtrlResizing()
 
 	; Комбинации флагов GUICtrlSetResizing
@@ -902,38 +989,38 @@ Func _SetCtrlResizing()
 	Local $iDockStretchH_B = $GUI_DOCKLEFT + $GUI_DOCKBOTTOM + $GUI_DOCKRIGHT + $GUI_DOCKHEIGHT
 
 	; Растягиваемые по горизонтали
-	GUICtrlSetResizing($iLogoPic, $iDockStretchH)
-	GUICtrlSetResizing($iInput1, $iDockStretchH)
-	GUICtrlSetResizing($iLabelInfo1, $iDockStretchH)
-	GUICtrlSetResizing($iInput2, $iDockStretchH)
-	GUICtrlSetResizing($iLabelInfo2, $iDockStretchH)
-	GUICtrlSetResizing($iSeparator, $iDockStretchH)
-	GUICtrlSetResizing($iSeparator2, $iDockStretchH_B)
-	GUICtrlSetResizing($iEditCommand, $iDockStretchHV)
-	GUICtrlSetResizing($iProgressSync, $iDockStretchH)
+	GUICtrlSetResizing($g_iLogoPic, $iDockStretchH)
+	GUICtrlSetResizing($g_iInput1, $iDockStretchH)
+	GUICtrlSetResizing($g_iLabelInfo1, $iDockStretchH)
+	GUICtrlSetResizing($g_iInput2, $iDockStretchH)
+	GUICtrlSetResizing($g_iLabelInfo2, $iDockStretchH)
+	GUICtrlSetResizing($g_iSeparator, $iDockStretchH)
+	GUICtrlSetResizing($g_iSeparator2, $iDockStretchH_B)
+	GUICtrlSetResizing($g_iEditCommand, $iDockStretchHV)
+	GUICtrlSetResizing($g_iProgressSync, $iDockStretchH)
 
 	; Фиксированные слева
-	GUICtrlSetResizing($iLabel1, $iDockFixed)
-	GUICtrlSetResizing($iLabelOffset, $iDockFixed)
-	GUICtrlSetResizing($iCheckSync, $iDockFixed)
-	GUICtrlSetResizing($iLabel2, $iDockFixed)
-	GUICtrlSetResizing($iLabelCompare, $iDockFixed)
-	GUICtrlSetResizing($iRadioDirect, $iDockFixed)
-	GUICtrlSetResizing($iRadioVertical, $iDockFixed)
-	GUICtrlSetResizing($iLabelCommand, $iDockFixed)
-	GUICtrlSetResizing($iLabelSettings, $iDockFixedBL)
-	GUICtrlSetResizing($iLabelLang, $iDockFixedBL)
-	GUICtrlSetResizing($iComboLang, $iDockFixedBL)
-	GUICtrlSetResizing($iLabelTheme, $iDockFixedBL)
-	GUICtrlSetResizing($iComboTheme, $iDockFixedBL)
+	GUICtrlSetResizing($g_iLabel1, $iDockFixed)
+	GUICtrlSetResizing($g_iLabelOffset, $iDockFixed)
+	GUICtrlSetResizing($g_iCheckSync, $iDockFixed)
+	GUICtrlSetResizing($g_iLabel2, $iDockFixed)
+	GUICtrlSetResizing($g_iLabelCompare, $iDockFixed)
+	GUICtrlSetResizing($g_iRadioDirect, $iDockFixed)
+	GUICtrlSetResizing($g_iRadioVertical, $iDockFixed)
+	GUICtrlSetResizing($g_iLabelCommand, $iDockFixed)
+	GUICtrlSetResizing($g_iLabelSettings, $iDockFixedBL)
+	GUICtrlSetResizing($g_iLabelLang, $iDockFixedBL)
+	GUICtrlSetResizing($g_iComboLang, $iDockFixedBL)
+	GUICtrlSetResizing($g_iLabelTheme, $iDockFixedBL)
+	GUICtrlSetResizing($g_iComboTheme, $iDockFixedBL)
 
 	; Фиксированные справа
-	GUICtrlSetResizing($iButtonChoose1, $iDockFixedRight)
-	GUICtrlSetResizing($iButtonSwap, $iDockFixedRight)
-	GUICtrlSetResizing($iButtonChoose2, $iDockFixedRight)
-	GUICtrlSetResizing($iButtonCompare, $iDockFixedBR)
-	GUICtrlSetResizing($iButtonClearCache, $iDockFixedBR)
-	GUICtrlSetResizing($iInputOffset, $iDockFixedRight)
+	GUICtrlSetResizing($g_iButtonChoose1, $iDockFixedRight)
+	GUICtrlSetResizing($g_iButtonSwap, $iDockFixedRight)
+	GUICtrlSetResizing($g_iButtonChoose2, $iDockFixedRight)
+	GUICtrlSetResizing($g_iButtonCompare, $iDockFixedBR)
+	GUICtrlSetResizing($g_iButtonClearCache, $iDockFixedBR)
+	GUICtrlSetResizing($g_iInputOffset, $iDockFixedRight)
 EndFunc   ;==>_SetCtrlResizing
 
 
@@ -950,7 +1037,7 @@ Func _RenderHeader()
 		Return
 	EndIf
 
-	Local $iDstW = $iGuiWidth, $iDstH = $iHeaderH
+	Local $iDstW = $gc_iGuiWidth, $iDstH = $gc_iHeaderH
 	Local $iSrcW = _GDIPlus_ImageGetWidth($hImage)
 	Local $iSrcH = _GDIPlus_ImageGetHeight($hImage)
 
@@ -1002,12 +1089,12 @@ Func _RenderHeader()
 	_GDIPlus_Shutdown()
 	If Not $hBmp Then Return
 
-	Local $hWnd = GUICtrlGetHandle($iLogoPic)
+	Local $hWnd = GUICtrlGetHandle($g_iLogoPic)
 	Local Const $STM_SETIMAGE = 0x0172, $IMAGE_BITMAP = 0
 	Local $aRet = DllCall("user32.dll", "handle", "SendMessageW", "hwnd", $hWnd, _
 			"uint", $STM_SETIMAGE, "wparam", $IMAGE_BITMAP, "lparam", $hBmp)
 	If Not @error And IsArray($aRet) And $aRet[0] Then _WinAPI_DeleteObject($aRet[0])
-	$hLogoBitmap = $hBmp
+	$g_hLogoBitmap = $hBmp
 EndFunc   ;==>_RenderHeader
 
 
@@ -1046,9 +1133,9 @@ EndFunc   ;==>_SetButtonIcon
 
 
 Func _DisposeLogo()
-	If $hLogoBitmap Then
-		_WinAPI_DeleteObject($hLogoBitmap)
-		$hLogoBitmap = 0
+	If $g_hLogoBitmap Then
+		_WinAPI_DeleteObject($g_hLogoBitmap)
+		$g_hLogoBitmap = 0
 	EndIf
 EndFunc   ;==>_DisposeLogo
 
@@ -1057,8 +1144,8 @@ Func _RestoreControlsStyle()
 	AdlibUnRegister("_RestoreControlsStyle")
 
 	; Восстанавливаем цвет фона input полей
-	GUICtrlSetBkColor($iInput1, $g_iClrInput)
-	GUICtrlSetBkColor($iInput2, $g_iClrInput)
+	GUICtrlSetBkColor($g_iInput1, $g_iClrInput)
+	GUICtrlSetBkColor($g_iInput2, $g_iClrInput)
 
 	; Обновляем информацию о файлах
 	_UpdateFilesInfo()
@@ -1068,7 +1155,7 @@ EndFunc   ;==>_RestoreControlsStyle
 Func _GetVideoExtensionsFilter()
 	Local $sExtensions = ""
 	Local $sExt = ''
-	For $sExt In $aSupportedExtensions
+	For $sExt In $gc_aSupportedExtensions
 		$sExtensions &= "*." & $sExt & ";"
 	Next
 	Return Lang("Filter", "Video", "Video") & " (" & StringTrimRight($sExtensions, 1) & ")"
@@ -1084,30 +1171,8 @@ Func _SetComboItemHeight($iCtrl, $iItemHeight)
 EndFunc   ;==>_SetComboItemHeight
 
 
-Func _FontExists($sName)
-	Local Const $sKey = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
-	Local $i = 1, $sValName
-	While True
-		$sValName = RegEnumVal($sKey, $i)
-		If @error Then ExitLoop
-		; Значения вида "Segoe UI (TrueType)", "Segoe UI Bold (TrueType)" и т.п.
-		If StringRegExp($sValName, "(?i)^\Q" & $sName & "\E(\s|\(|$)") Then Return True
-		$i += 1
-	WEnd
-	Return False
-EndFunc   ;==>_FontExists
-
-
 Func _ApplyAppFont()
-	Local $aCandidates[3] = ["Segoe UI", "Tahoma", "MS Shell Dlg 2"]
-	For $sCand In $aCandidates
-		If _FontExists($sCand) Then
-			$g_sAppFont = $sCand
-			ExitLoop
-		EndIf
-	Next
-	; MS Shell Dlg 2 — алиас, который система маппит сама, поэтому он всегда доступен как фолбэк
-	GUISetFont($g_iAppFontSize, 400, 0, $g_sAppFont, $hGui)
+	$g_sAppFont = _FontApply($g_hGui, $g_iAppFontSize)
 EndFunc   ;==>_ApplyAppFont
 
 
@@ -1125,9 +1190,15 @@ Func _GetFileName($sPath)
 EndFunc   ;==>_GetFileName
 
 
+Func _ResetInputCaret($iCtrlID)
+	; EM_SETSEL = 0x00B1 — ставим каретку в начало, чтобы текст выравнивался по левому краю
+	GUICtrlSendMsg($iCtrlID, 0x00B1, 0, 0)
+EndFunc   ;==>_ResetInputCaret
+
+
 Func _IsValidVideoExtension($sFilePath)
 	Local $sExt = StringLower(StringRegExpReplace($sFilePath, '^.*\.', ''))
-	For $sSupportedExt In $aSupportedExtensions
+	For $sSupportedExt In $gc_aSupportedExtensions
 		If $sExt = $sSupportedExt Then Return True
 	Next
 	Return False
@@ -1135,30 +1206,46 @@ EndFunc   ;==>_IsValidVideoExtension
 
 
 Func _SetVideoFile($iInputID, $sFilePath)
-	If $iInputID = $iInput1 Then
-		$sVideoFile1 = $sFilePath
-		GUICtrlSetData($iInput1, $sFilePath = "" ? "" : _GetFileName($sFilePath))
-		IniWrite($sPathIni, "LastDirs", "Video1", $sFilePath)
-	ElseIf $iInputID = $iInput2 Then
-		$sVideoFile2 = $sFilePath
-		GUICtrlSetData($iInput2, $sFilePath = "" ? "" : _GetFileName($sFilePath))
-		IniWrite($sPathIni, "LastDirs", "Video2", $sFilePath)
+	If $iInputID = $g_iInput1 Then
+		$g_sVideoFile1 = $sFilePath
+		GUICtrlSetData($g_iInput1, $sFilePath = "" ? "" : _GetFileName($sFilePath))
+		_ResetInputCaret($g_iInput1)
+		IniWrite($gc_sPathIni, "LastDirs", "Video1", $sFilePath)
+	ElseIf $iInputID = $g_iInput2 Then
+		$g_sVideoFile2 = $sFilePath
+		GUICtrlSetData($g_iInput2, $sFilePath = "" ? "" : _GetFileName($sFilePath))
+		_ResetInputCaret($g_iInput2)
+		IniWrite($gc_sPathIni, "LastDirs", "Video2", $sFilePath)
 	EndIf
-	GUICtrlSetData($iInputOffset, "")
+	GUICtrlSetData($g_iInputOffset, "")
 	_TryFillCachedOffset()
 	_UpdateFilesInfo()
 EndFunc   ;==>_SetVideoFile
 
 
 Func _EnsureIniDefaults()
-	If Not FileExists($sPathIni) Then
-		; Создаём ini со значениями по умолчанию
-		IniWrite($sPathIni, "LastDirs", "Video1", "")
-		IniWrite($sPathIni, "LastDirs", "Video2", "")
-		IniWrite($sPathIni, "Tools", "VideoCompare", "video-compare.exe")
-		IniWrite($sPathIni, "Tools", "Sync", "sync\dist\sync.exe")
-	EndIf
+	If FileExists($gc_sPathIni) Then Return
+	; Создаём ini с UTF-16 LE BOM (поддержка Unicode-путей) и значениями по умолчанию
+	Local $sContent = "[LastDirs]" & @CRLF & _
+			"Video1=" & @CRLF & _
+			"Video2=" & @CRLF & _
+			"[Tools]" & @CRLF & _
+			"VideoCompare=video-compare.exe" & @CRLF & _
+			"Sync=sync\dist\sync.exe" & @CRLF & _
+			"FFmpeg=sync\dist\ffmpeg-mini.exe" & @CRLF & _
+			"[Settings]" & @CRLF & _
+			"SyncSkipSec=120" & @CRLF
+	_EnsureUtf16File($gc_sPathIni, $sContent)
 EndFunc   ;==>_EnsureIniDefaults
+
+
+; Создаёт пустой файл с UTF-16 LE BOM, если он ещё не существует
+Func _EnsureUtf16File($sFilePath, $sContent = "")
+	If FileExists($sFilePath) Then Return
+	Local $hFile = FileOpen($sFilePath, $FO_OVERWRITE + $FO_UTF16_LE)
+	If $sContent <> "" Then FileWrite($hFile, $sContent)
+	FileClose($hFile)
+EndFunc   ;==>_EnsureUtf16File
 
 
 Func _NormalizePath($sValue)
@@ -1170,14 +1257,19 @@ EndFunc   ;==>_NormalizePath
 
 
 Func _ResolveToolPaths()
-	Local $sIniVideoCompare = _NormalizePath(IniRead($sPathIni, "Tools", "VideoCompare", ""))
-	If Not FileExists($sPathVideoCompare) And FileExists($sIniVideoCompare) Then
-		$sPathVideoCompare = $sIniVideoCompare
+	Local $sIniVideoCompare = _NormalizePath(IniRead($gc_sPathIni, "Tools", "VideoCompare", ""))
+	If Not FileExists($g_sPathVideoCompare) And FileExists($sIniVideoCompare) Then
+		$g_sPathVideoCompare = $sIniVideoCompare
 	EndIf
 
-	Local $sIniSync = _NormalizePath(IniRead($sPathIni, "Tools", "Sync", ""))
-	If Not FileExists($sPathSync) And FileExists($sIniSync) Then
-		$sPathSync = $sIniSync
+	Local $sIniSync = _NormalizePath(IniRead($gc_sPathIni, "Tools", "Sync", ""))
+	If Not FileExists($g_sPathSync) And FileExists($sIniSync) Then
+		$g_sPathSync = $sIniSync
+	EndIf
+
+	Local $sIniFFmpeg = _NormalizePath(IniRead($gc_sPathIni, "Tools", "FFmpeg", ""))
+	If Not FileExists($g_sPathFFmpeg) And FileExists($sIniFFmpeg) Then
+		$g_sPathFFmpeg = $sIniFFmpeg
 	EndIf
 EndFunc   ;==>_ResolveToolPaths
 
@@ -1193,7 +1285,7 @@ EndFunc   ;==>Lang
 
 
 Func _InitLanguage()
-	$g_sCurrentLang = IniRead($sPathIni, "Settings", "Language", "")
+	$g_sCurrentLang = IniRead($gc_sPathIni, "Settings", "Language", "")
 	If $g_sCurrentLang = "" Then
 		; Авто-определение по языку системы
 		If @OSLang = "0419" Or @OSLang = "0422" Then
@@ -1238,20 +1330,20 @@ EndFunc   ;==>_LoadLangFile
 
 
 Func _ApplyLanguage()
-	GUICtrlSetData($iLabel1, Lang("GUI", "File1", "File 1"))
-	GUICtrlSetData($iLabel2, Lang("GUI", "File2", "File 2"))
-	GUICtrlSetData($iButtonChoose1, Lang("GUI", "Choose", "Choose"))
-	GUICtrlSetData($iButtonChoose2, Lang("GUI", "Choose", "Choose"))
-	GUICtrlSetData($iLabelCompare, Lang("GUI", "CompareMode", "Compare:"))
-	GUICtrlSetData($iRadioDirect, Lang("GUI", "CompareDirect", "Direct"))
-	GUICtrlSetData($iRadioVertical, Lang("GUI", "CompareVertical", "Vertical"))
-	GUICtrlSetData($iButtonCompare, Lang("GUI", "Compare", "Compare"))
-	GUICtrlSetData($iLabelOffset, Lang("GUI", "Offset", "Offset:"))
-	GUICtrlSetData($iCheckSync, Lang("GUI", "SyncVideo", "Synchronize video"))
-	GUICtrlSetData($iLabelCommand, Lang("GUI", "TabCommand", "Command"))
-	GUICtrlSetData($iLabelSettings, Lang("GUI", "TabSettings", "Settings:"))
-	GUICtrlSetData($iLabelLang, Lang("GUI", "Language", "Language:"))
-	GUICtrlSetData($iLabelTheme, Lang("GUI", "Theme", "Theme:"))
+	GUICtrlSetData($g_iLabel1, Lang("GUI", "File1", "File 1"))
+	GUICtrlSetData($g_iLabel2, Lang("GUI", "File2", "File 2"))
+	GUICtrlSetData($g_iButtonChoose1, Lang("GUI", "Choose", "Choose"))
+	GUICtrlSetData($g_iButtonChoose2, Lang("GUI", "Choose", "Choose"))
+	GUICtrlSetData($g_iLabelCompare, Lang("GUI", "CompareMode", "Compare:"))
+	GUICtrlSetData($g_iRadioDirect, Lang("GUI", "CompareDirect", "Direct"))
+	GUICtrlSetData($g_iRadioVertical, Lang("GUI", "CompareVertical", "Vertical"))
+	GUICtrlSetData($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
+	GUICtrlSetData($g_iLabelOffset, Lang("GUI", "Offset", "Offset:"))
+	GUICtrlSetData($g_iCheckSync, Lang("GUI", "SyncVideo", "Synchronize video"))
+	GUICtrlSetData($g_iLabelCommand, Lang("GUI", "TabCommand", "Command"))
+	GUICtrlSetData($g_iLabelSettings, Lang("GUI", "TabSettings", "Settings:"))
+	GUICtrlSetData($g_iLabelLang, Lang("GUI", "Language", "Language:"))
+	GUICtrlSetData($g_iLabelTheme, Lang("GUI", "Theme", "Theme:"))
 	_PopulateComboTheme()
 	_RenderHeader()
 	_UpdateFilesInfo()
@@ -1262,7 +1354,7 @@ EndFunc   ;==>_ApplyLanguage
 ; === Темы оформления ===
 
 Func _InitTheme()
-	$g_sTheme = IniRead($sPathIni, "Settings", "Theme", "System")
+	$g_sTheme = IniRead($gc_sPathIni, "Settings", "Theme", "System")
 	If $g_sTheme <> "System" And $g_sTheme <> "Light" And $g_sTheme <> "Dark" Then
 		$g_sTheme = "System"
 	EndIf
@@ -1291,11 +1383,11 @@ EndFunc   ;==>_ReadSystemDarkMode
 
 Func _SetPalette()
 	If $g_bDarkMode Then
-		$g_iClrBg = 0x202020
-		$g_iClrFg = 0xE0E0E0
+		$g_iClrBg = $COLOR_CONTROL_BG
+		$g_iClrFg = $COLOR_TEXT_LIGHT
 		$g_iClrInfo = 0x9A9A9A
 		$g_iClrInput = 0x3C3C3C
-		$g_iClrSep = 0x3F3F3F
+		$g_iClrSep = $COLOR_BORDER
 	Else
 		$g_iClrBg = 0xF0F0F0
 		$g_iClrFg = 0x000000
@@ -1324,9 +1416,9 @@ Func _ApplyTheme()
 			$COLOR_CONTROL_BG = 0x202020
 			$COLOR_BORDER_LIGHT = 0xB0B0B0
 			$COLOR_BORDER = 0x3F3F3F
-			_GUIDarkTheme_ApplyDark($hGui, True)
+			_GUIDarkTheme_ApplyDark($g_hGui, True)
 		Else
-			_GUIDarkTheme_ApplyLight($hGui)
+			_GUIDarkTheme_ApplyLight($g_hGui)
 		EndIf
 		$g_bThemeInitialized = True
 	EndIf
@@ -1335,19 +1427,23 @@ Func _ApplyTheme()
 	_SetPalette()
 
 	; UDF ставит фон окна 0x121212 — в тёмной теме делаем его светлее
-	If $g_bDarkMode Then GUISetBkColor($g_iClrBg, $hGui)
+	If $g_bDarkMode Then GUISetBkColor($g_iClrBg, $g_hGui)
 
 	; Info-лейблы — серый оттенок
-	GUICtrlSetColor($iLabelInfo1, $g_iClrInfo)
-	GUICtrlSetColor($iLabelInfo2, $g_iClrInfo)
+	GUICtrlSetColor($g_iLabelInfo1, $g_iClrInfo)
+	GUICtrlSetColor($g_iLabelInfo2, $g_iClrInfo)
+
+	; Поле ввода сдвига
+	GUICtrlSetColor($g_iInputOffset, $g_iClrFg)
+	GUICtrlSetBkColor($g_iInputOffset, $g_iClrInput)
 
 	; Горизонтальный разделитель
-	GUICtrlSetBkColor($iSeparator, $g_iClrSep)
-	GUICtrlSetBkColor($iSeparator2, $g_iClrSep)
+	GUICtrlSetBkColor($g_iSeparator, $g_iClrSep)
+	GUICtrlSetBkColor($g_iSeparator2, $g_iClrSep)
 
 	; Финальная полная перерисовка окна
 	; RDW_INVALIDATE=0x1, RDW_UPDATENOW=0x100, RDW_ALLCHILDREN=0x80
-	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $hGui, "ptr", 0, "handle", 0, "uint", 0x181)
+	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", 0x181)
 EndFunc   ;==>_ApplyTheme
 
 
@@ -1358,6 +1454,6 @@ Func _PopulateComboTheme()
 	Local $sCurrent = $sSystem
 	If $g_sTheme = "Light" Then $sCurrent = $sLight
 	If $g_sTheme = "Dark" Then $sCurrent = $sDark
-	GUICtrlSetData($iComboTheme, "")
-	GUICtrlSetData($iComboTheme, $sSystem & "|" & $sLight & "|" & $sDark, $sCurrent)
+	GUICtrlSetData($g_iComboTheme, "")
+	GUICtrlSetData($g_iComboTheme, $sSystem & "|" & $sLight & "|" & $sDark, $sCurrent)
 EndFunc   ;==>_PopulateComboTheme
