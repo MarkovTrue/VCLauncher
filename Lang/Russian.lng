@@ -7,10 +7,13 @@ CompareMode=Режим:
 CompareDirect=Прямое сравнение
 CompareVertical=Вертикальное сравнение
 Compare=Сравнить
-Running=Запущено…
+Running=Запущено
 SwapTip=Поменять файлы местами
 Offset=Сдвиг:
 SyncVideo=Автоматически синхронизировать
+OffsetAuto=Автоматически
+OffsetManual=Указать вручную
+OffsetMs=мс
 TabHotkeys=Шпаргалка
 TabCommand=Команда
 TabSettings=Настройки
@@ -35,6 +38,7 @@ SettingsWillOpen=Сейчас будет открыт файл настроек.
 Error=Ошибка
 UnsupportedFormat=Неподдерживаемый формат файла:
 SupportedFormats=Поддерживаемые форматы:
+ResolutionUnknown=Разрешение не определено
 
 [Filter]
 Video=Видео
@@ -54,3 +58,8 @@ Video=Видео
 12=-: Сдвиг правого видео на 1 кадр назад
 13=Ctrl + +/-: Сдвиг правого видео на 10 кадров
 14=Alt + +/-: Сдвиг правого видео на 100 кадров
+
+[Sync]
+StatusTimeout=sync: тайм-аут (Сбросить кеш, чтобы повторить)
+StatusNoMatch=sync: совпадений не найдено (Сбросить кеш, чтобы повторить)
+StatusError=sync: ошибка
