@@ -1,8 +1,14 @@
 VCLauncher.ini
+VCLauncher.cache
 temp_format_*
 Backup/
-sync/
+Sync/
 CLAUDE.md
+.claudeignore
 .claude/
 .vscode/
-VCLauncher.cache
+Assets/KeyIcons/Source/
+Assets/KeyIcons/BuildKeyIcons.ps1
+Assets/KeyIcons/PIPELINE.md
+Assets/CompareIcons/BuildCompareIcons.ps1
+Docs/Sync.md

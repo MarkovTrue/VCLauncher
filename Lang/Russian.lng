@@ -3,17 +3,16 @@ File1=Видео 1
 File2=Видео 2
 Choose=Выбрать
 FileNotSelected=Файл не выбран
-CompareMode=Режим:
+CompareMode=Режим
 CompareDirect=Прямое сравнение
 CompareVertical=Вертикальное сравнение
 Compare=Сравнить
 Running=Запущено
 SwapTip=Поменять файлы местами
-Offset=Сдвиг:
+Offset=Смещение
 SyncVideo=Автоматически синхронизировать
 OffsetAuto=Автоматически
-OffsetManual=Указать вручную
-OffsetMs=мс
+OffsetManual=Задержка в мс
 TabHotkeys=Шпаргалка
 TabCommand=Команда
 TabSettings=Настройки
@@ -39,25 +38,25 @@ Error=Ошибка
 UnsupportedFormat=Неподдерживаемый формат файла:
 SupportedFormats=Поддерживаемые форматы:
 ResolutionUnknown=Разрешение не определено
+VideoCompareFailed=video-compare завершился с ошибкой
+VideoCompareNoOutput=Нет сообщения об ошибке в выводе.
 
 [Filter]
 Video=Видео
 
 [Hotkeys]
-1=H: Подсказки управления
-2=V: Информация о видео
-3=Left arrow Right arrow: Перемотка на 1 сек
-4=Up arrow Down arrow: Перемотка на 15 сек
-5=Page up Page down: Перемотка на 600 сек
-6=3: Показать/скрыть HUD
-7=4 5 6 7 8 9 Масштаб
-8=0: Режим видео/вычитание
-9=Y: Переключить режим вычитания
-10=F: Сохранить оба кадра и содержимое экрана как PNG
-11=+: Сдвиг правого видео на 1 кадр вперёд
-12=-: Сдвиг правого видео на 1 кадр назад
-13=Ctrl + +/-: Сдвиг правого видео на 10 кадров
-14=Alt + +/-: Сдвиг правого видео на 100 кадров
+1=Горячие клавиши Video Compare
+2={H} Подсказки управления
+3={Y} Информация о видео
+4={LEFT}{RIGHT} Перемотка ±1 сек
+5={UP}{DOWN} Перемотка ±15 сек
+6={PGUP}{PGDOWN} Перемотка ±10 мин
+7={3} Показать/скрыть HUD
+8={0} Режим видео/вычитания
+9={Y} Переключить режим вычитания
+10={PLUS}{MINUS} Сдвиг ±1 кадр
+11={CTRL}{PLUS}{MINUS} Сдвиг ±10 кадров
+12={ALT}{PLUS}{MINUS} Сдвиг ±100 кадров
 
 [Sync]
 StatusTimeout=sync: тайм-аут (Сбросить кеш, чтобы повторить)

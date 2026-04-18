@@ -3,17 +3,16 @@ File1=Video 1
 File2=Video 2
 Choose=Choose
 FileNotSelected=File not selected
-CompareMode=Mode:
+CompareMode=Mode
 CompareDirect=Direct compare
 CompareVertical=Vertical compare
 Compare=Compare
 Running=Running
 SwapTip=Swap files
-Offset=Offset:
+Offset=Delay
 SyncVideo=Synchronize video
 OffsetAuto=Automatically
-OffsetManual=Set manually
-OffsetMs=ms
+OffsetManual=Set manually ms
 TabHotkeys=Hotkeys
 TabCommand=Command
 TabSettings=Settings
@@ -39,25 +38,25 @@ Error=Error
 UnsupportedFormat=Unsupported file format:
 SupportedFormats=Supported formats:
 ResolutionUnknown=Resolution not detected
+VideoCompareFailed=video-compare exited with an error
+VideoCompareNoOutput=No error message in output.
 
 [Filter]
 Video=Video
 
 [Hotkeys]
-1=H: Control hints
-2=V: Video info
-3=Left arrow Right arrow: Seek 1 sec
-4=Up arrow Down arrow: Seek 15 sec
-5=Page up Page down: Seek 600 sec
-6=3: Show/hide HUD
-7=4 5 6 7 8 9 Zoom
-8=0: Video/subtraction mode
-9=Y: Toggle subtraction mode
-10=F: Save both frames and screen as PNG
-11=+: Shift right video 1 frame forward
-12=-: Shift right video 1 frame back
-13=Ctrl + +/-: Shift right video by 10 frames
-14=Alt + +/-: Shift right video by 100 frames
+1=Video Compare hotkeys
+2={H} Control hints
+3={Y} Video info
+4={LEFT}{RIGHT} Seek ±1 sec
+5={UP}{DOWN} Seek ±15 sec
+6={PGUP}{PGDOWN} Seek ±10 min
+7={3} Show/hide HUD
+8={0} Video/subtraction mode
+9={Y} Toggle subtraction mode
+10={PLUS}{MINUS} Shift ±1 frame
+11={CTRL}{PLUS}{MINUS} Shift ±10 frames
+12={ALT}{PLUS}{MINUS} Shift ±100 frames
 
 [Sync]
 StatusTimeout=sync: timeout (Clear cache to retry)
