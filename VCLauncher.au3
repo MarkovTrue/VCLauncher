@@ -12,9 +12,9 @@
 #include <ColorConstants.au3>
 #include <EditConstants.au3>
 #include <ComboConstants.au3>
-#include <GDIPlus.au3>
 #include "Include\GUIDarkTheme.au3"
 #include "Include\FontHelper.au3"
+#include "Include\HeaderHelper.au3"
 
 Opt("GUIOnEventMode", 1)
 
@@ -23,18 +23,19 @@ Global Const $gc_sAppName = "VCLauncher 1.04"
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
 Global Const $gc_aSupportedExtensions[] = ["mp4", "avi", "mkv", "mov", "wmv", "webm", "mpg", "mpeg"]
-Global Const $gc_iGuiWidth = 500
-Global Const $gc_iHeaderH = 80 ; высота шапки с логотипом
-Global Const $gc_iGuiHeight = $gc_iHeaderH + 310
+Global Const $gc_iGuiWidth = 490
+Global Const $gc_iHeaderH = 90 ; высота шапки с логотипом
+Global Const $gc_iGuiHeight = $gc_iHeaderH + 314
 
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
-Global $g_sPathSync = @ScriptDir & '\sync\dist\sync.exe'
-Global $g_sPathFFmpeg = @ScriptDir & '\sync\dist\ffmpeg_mini.exe'
+Global $g_sPathSync = @ScriptDir & '\Sync\dist\Sync.exe'
+Global $g_sPathFFmpeg = @ScriptDir & '\Sync\dist\FFmpeg.exe'
 
-; Пропуск N секунд от начала видео при поиске сдвига (sync.exe --skip N)
-Global $g_iSyncSkipSec = Int(IniRead($gc_sPathIni, "Settings", "SyncSkipSec", 60))
-; Максимальное время работы sync.exe в секундах — по истечении процесс убивается
+; Пропуск N секунд от начала видео при поиске сдвига (Sync.exe --skip N)
+Global $g_iSyncSkipSec = Int(IniRead($gc_sPathIni, "Settings", "SyncSkipSec", 300))
+Global $g_sSyncMethod = IniRead($gc_sPathIni, "Settings", "SyncMethod", "audio") ; audio | video
+; Максимальное время работы Sync.exe в секундах — по истечении процесс убивается
 Global $g_iSyncTimeoutSec = Int(IniRead($gc_sPathIni, "Settings", "SyncTimeoutSec", 60))
 
 ; Создание ini и cache по умолчанию, если отсутствуют
@@ -44,6 +45,7 @@ _EnsureUtf16File($gc_sPathCache)
 ; Ссылки на элементы GUI
 Global $g_hGui, $g_iInput1, $g_iInput2, $g_iButtonChoose1, $g_iButtonChoose2, $g_iButtonSwap, $g_iButtonCompare, $g_iButtonClearCache, $g_iRadioDirect, $g_iRadioVertical
 Global $g_iLogoPic, $g_hLogoBitmap = 0 ; картинка-логотип в шапке и её HBITMAP для освобождения
+Global $g_hCompareImgList = 0 ; HIMAGELIST иконки кнопки «Сравнить» для освобождения при замене
 Global $g_sAppFont = "MS Shell Dlg 2", $g_iAppFontSize = 9
 ; Кеш в памяти: разрешения видео и сдвиги sync. Ключ включает mtime —
 ; автоматически инвалидируется, если файл на диске заменён.
@@ -51,7 +53,7 @@ Global $g_oCache = ObjCreate("Scripting.Dictionary")
 Global $g_iLabel1, $g_iLabel2, $g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelCompare, $g_iLabelCommand
 Global $g_iEditCommand, $g_iComboLang, $g_iLabelSettings, $g_iLabelLang, $g_iLabelTheme, $g_iComboTheme
 Global $g_iSeparator, $g_iSeparator2
-Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iLabelOffsetMs, $g_iProgressSync, $g_iInputOffset
+Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iProgressSync, $g_iInputOffset
 
 Global $g_sLangFile = "", $g_sCurrentLang = "", $g_oLangDict = Null
 
@@ -70,7 +72,7 @@ _InitLanguage()
 _InitTheme()
 
 _CheckToolExists($g_sPathVideoCompare, "video-compare.exe")
-_CheckToolExists($g_sPathSync, "sync.exe")
+_CheckToolExists($g_sPathSync, "Sync.exe")
 
 _MainGUI()
 _DefineEvents()
@@ -85,15 +87,15 @@ Func _MainGUI()
 
 	_ApplyAppFont()
 
-	; Шапка: логотип слева + 4 строки горячих клавиш справа (рисуется в _RenderHeader)
+	; Шапка: логотип слева + шпаргалка горячих клавиш справа (рисуется в _RenderHeader)
 	$g_iLogoPic = GUICtrlCreatePic("", 0, 0, $gc_iGuiWidth, $gc_iHeaderH)
 
 	Local $iY = $gc_iHeaderH + 12 ; отступ от нижнего края шапки
 
 	; --- Видео 1 ---
-	$g_iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 10, $iY + 2, 74, 20)
+	$g_iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 10, $iY + 3, 74, 20)
 
-	$g_iInput1 = GUICtrlCreateInput("", 90, $iY, $gc_iGuiWidth - 180, 20)
+	$g_iInput1 = GUICtrlCreateInput("", 90, $iY, $gc_iGuiWidth - 180, 21)
 	GUICtrlSetState($g_iInput1, $GUI_DROPACCEPTED)
 	If $g_sVideoFile1 <> "" Then
 		GUICtrlSetData($g_iInput1, _GetFileName($g_sVideoFile1))
@@ -102,77 +104,78 @@ Func _MainGUI()
 
 	$g_iButtonChoose1 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY - 1, 70, 23)
 
-	$g_iLabelInfo1 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 22, $gc_iGuiWidth - 180, 15)
+	$g_iLabelInfo1 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 24, $gc_iGuiWidth - 180, 15)
 	GUICtrlSetColor($g_iLabelInfo1, 0x808080)
 
 	; --- Видео 2 ---
-	$g_iLabel2 = GUICtrlCreateLabel(Lang("GUI", "File2", "File 2"), 10, $iY + 50, 74, 20)
+	$g_iLabel2 = GUICtrlCreateLabel(Lang("GUI", "File2", "File 2"), 10, $iY + 54, 74, 20)
 
-	$g_iInput2 = GUICtrlCreateInput("", 90, $iY + 48, $gc_iGuiWidth - 180, 20)
+	$g_iInput2 = GUICtrlCreateInput("", 90, $iY + 52, $gc_iGuiWidth - 180, 21)
 	GUICtrlSetState($g_iInput2, $GUI_DROPACCEPTED)
 	If $g_sVideoFile2 <> "" Then
 		GUICtrlSetData($g_iInput2, _GetFileName($g_sVideoFile2))
 		_ResetInputCaret($g_iInput2)
 	EndIf
 
-	$g_iButtonSwap = GUICtrlCreateButton(ChrW(0x21C5), $gc_iGuiWidth - 82, $iY + 23, 70, 23)
+	$g_iButtonChoose2 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY + 51, 70, 23)
+
+	$g_iLabelInfo2 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 76, $gc_iGuiWidth - 180, 15)
+	GUICtrlSetColor($g_iLabelInfo2, 0x808080)
+
+	; --- Поменять местами ---
+	$g_iButtonSwap = GUICtrlCreateButton(ChrW(0x21C5), $gc_iGuiWidth - 82, $iY + 25, 70, 23)
 	GUICtrlSetTip($g_iButtonSwap, Lang("GUI", "SwapTip", "Swap files"))
 	GUICtrlSetFont($g_iButtonSwap, $g_iAppFontSize + 1, 700, 0, $g_sAppFont)
 
-	$g_iButtonChoose2 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY + 47, 70, 23)
-
-	$g_iLabelInfo2 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 70, $gc_iGuiWidth - 180, 15)
-	GUICtrlSetColor($g_iLabelInfo2, 0x808080)
-
 	; --- Разделитель ---
-	$g_iSeparator = GUICtrlCreateLabel("", 0, $iY + 93, $gc_iGuiWidth, 1)
+	$g_iSeparator = GUICtrlCreateLabel("", 0, $iY + 100, $gc_iGuiWidth, 1)
 	GUICtrlSetBkColor($g_iSeparator, 0xC0C0C0)
 
 	; --- Режим сравнения ---
-	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 105, 74, 20)
-
-	$g_iRadioDirect = GUICtrlCreateRadio(Lang("GUI", "CompareDirect", "Direct"), 90, $iY + 103, 130, 20)
-	$g_iRadioVertical = GUICtrlCreateRadio(Lang("GUI", "CompareVertical", "Vertical"), 230, $iY + 103, 160, 20)
+	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 137, 74, 20)
+	GUIStartGroup()
+	$g_iRadioDirect = GUICtrlCreateRadio(Lang("GUI", "CompareDirect", "Direct"), 90, $iY + 135, 130, 20)
+	$g_iRadioVertical = GUICtrlCreateRadio(Lang("GUI", "CompareVertical", "Vertical"), 230, $iY + 135, 160, 20)
 	GUICtrlSetState($g_iRadioDirect, $GUI_CHECKED)
 
 	; --- Синхронизация ---
-	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 130, 74, 20)
-	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Automatically"), 90, $iY + 128, 120, 20)
-	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Set manually"), 215, $iY + 128, 110, 20)
+	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 112, 74, 20)
+	GUIStartGroup()
+	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Automatically"), 90, $iY + 110, 120, 20)
+	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Set manually"), 230, $iY + 110, 105, 20)
 	GUICtrlSetState($g_iRadioOffsetAuto, $GUI_CHECKED)
-	$g_iLabelOffsetMs = GUICtrlCreateLabel(Lang("GUI", "OffsetMs", "ms"), $gc_iGuiWidth - 174, $iY + 130, 20, 20)
-	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 128, 60, 20)
+	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 110, 60, 20)
 	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
-	$g_iProgressSync = GUICtrlCreateProgress($gc_iGuiWidth - 150, $iY + 128, 60, 20)
+	$g_iProgressSync = GUICtrlCreateProgress($gc_iGuiWidth - 150, $iY + 110, 60, 20)
 	GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
 
 	; --- Команда ---
-	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 159, 74, 20)
+	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 166, 74, 20)
 
-	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 156, $gc_iGuiWidth - 180, 70, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL))
+	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 163, $gc_iGuiWidth - 180, 70, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $WS_VSCROLL))
 
 	; --- Кнопка «Сравнить» ---
 	Local Const $BS_MULTILINE = 0x2000
-	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 156, 70, 70, $BS_MULTILINE)
-	_SetButtonIcon($g_iButtonCompare, @SystemDir & "\imageres.dll", 18, 32)
+	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 163, 70, 70, $BS_MULTILINE)
+	_UpdateCompareButtonIcon()
 
 	; --- Разделитель 2 ---
-	$g_iSeparator2 = GUICtrlCreateLabel("", 0, $iY + 235, $gc_iGuiWidth, 1)
+	$g_iSeparator2 = GUICtrlCreateLabel("", 0, $iY + 242, $gc_iGuiWidth, 1)
 	GUICtrlSetBkColor($g_iSeparator2, 0xC0C0C0)
 
 	; --- Настройки: язык, тема и сброс кеша (в одну строку) ---
-	$g_iLabelSettings = GUICtrlCreateLabel(Lang("GUI", "TabSettings", "Settings:"), 10, $iY + 246, 74, 20)
-	$g_iLabelLang = GUICtrlCreateLabel(Lang("GUI", "Language", "Language:"), 90, $iY + 246, 40, 20)
-	$g_iComboLang = GUICtrlCreateCombo("", 130, $iY + 246, 90, 200, $CBS_DROPDOWNLIST)
+	$g_iLabelSettings = GUICtrlCreateLabel(Lang("GUI", "TabSettings", "Settings:"), 10, $iY + 253, 74, 20)
+	$g_iLabelLang = GUICtrlCreateLabel(Lang("GUI", "Language", "Language:"), 90, $iY + 253, 40, 20)
+	$g_iComboLang = GUICtrlCreateCombo("", 130, $iY + 253, 90, 200, $CBS_DROPDOWNLIST)
 	GUICtrlSetData($g_iComboLang, "English|Русский", ($g_sCurrentLang = "Russian") ? "Русский" : "English")
 	_SetComboItemHeight($g_iComboLang, 17)
 
-	$g_iLabelTheme = GUICtrlCreateLabel(Lang("GUI", "Theme", "Theme:"), 230, $iY + 246, 40, 20)
-	$g_iComboTheme = GUICtrlCreateCombo("", 270, $iY + 246, 90, 200, $CBS_DROPDOWNLIST)
+	$g_iLabelTheme = GUICtrlCreateLabel(Lang("GUI", "Theme", "Theme:"), 230, $iY + 253, 40, 20)
+	$g_iComboTheme = GUICtrlCreateCombo("", 270, $iY + 253, 90, 200, $CBS_DROPDOWNLIST)
 	_PopulateComboTheme()
 	_SetComboItemHeight($g_iComboTheme, 17)
 
-	$g_iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), $gc_iGuiWidth - 102, $iY + 246, 94, 23)
+	$g_iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), $gc_iGuiWidth - 102, $iY + 253, 94, 23)
 
 	_SetCtrlResizing()
 	_RenderHeader()
@@ -217,7 +220,7 @@ Func _OnEvent_WM_GETMINMAXINFO($hWnd, $iMsg, $wParam, $lParam)
 				"int MaxTrackSizeX; int MaxTrackSizeY", _
 				$lParam)
 		DllStructSetData($tMINMAXINFO, "MinTrackSizeX", $gc_iGuiWidth) ; минимальная ширина окна
-		DllStructSetData($tMINMAXINFO, "MinTrackSizeY", $gc_iGuiHeight + 14) ; минимальная высота окна
+		DllStructSetData($tMINMAXINFO, "MinTrackSizeY", $gc_iGuiHeight) ; минимальная высота окна
 	EndIf
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>_OnEvent_WM_GETMINMAXINFO
@@ -266,7 +269,6 @@ Func _OnEvent_ButtonCompare()
 	; Синхронизация в автоматическом режиме
 	If GUICtrlRead($g_iRadioOffsetAuto) = $GUI_CHECKED Then
 		GUICtrlSetState($g_iInputOffset, $GUI_HIDE)
-		GUICtrlSetState($g_iLabelOffsetMs, $GUI_HIDE)
 		GUICtrlSetState($g_iProgressSync, $GUI_SHOW)
 		GUICtrlSetData($g_iProgressSync, 0)
 		Local $aSync = _GetSyncOffset($g_sVideoFile1, $g_sVideoFile2)
@@ -274,12 +276,10 @@ Func _OnEvent_ButtonCompare()
 		Sleep(100)
 		GUICtrlSetData($g_iInputOffset, ($aSync[0] = "OK") ? $aSync[1] : "")
 		GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
-		GUICtrlSetState($g_iLabelOffsetMs, $GUI_SHOW)
 		GUICtrlSetState($g_iInputOffset, $GUI_SHOW)
 		_UpdateSyncStatusTip($aSync[0])
+		_UpdateCommandField()
 	EndIf
-
-	_UpdateCommandField()
 
 	Local $sCmdLine = StringReplace(StringReplace(GUICtrlRead($g_iEditCommand), @CR, " "), @LF, " ")
 	$sCmdLine = StringStripWS($sCmdLine, 3)
@@ -331,6 +331,7 @@ EndFunc   ;==>_OnEvent_ButtonSwap
 
 
 Func _OnEvent_RadioChanged()
+	_UpdateCompareButtonIcon()
 	_UpdateCommandField()
 EndFunc   ;==>_OnEvent_RadioChanged
 
@@ -347,7 +348,11 @@ EndFunc   ;==>_OnEvent_RadioOffsetModeChanged
 
 
 Func _OnEvent_GUI_EVENT_CLOSE()
-	_DisposeLogo()
+	_HeaderDisposeBitmap($g_hLogoBitmap)
+	If $g_hCompareImgList Then
+		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $g_hCompareImgList)
+		$g_hCompareImgList = 0
+	EndIf
 	Exit
 EndFunc   ;==>_OnEvent_GUI_EVENT_CLOSE
 
@@ -813,7 +818,7 @@ Func _GetSyncOffset($sFile1, $sFile2)
 		Return $aHit
 	EndIf
 
-	; Вызов sync.exe с таймаутом и прогрессом
+	; Вызов Sync.exe с таймаутом и прогрессом
 	Local $aRun = _RunSyncWithTimeout($sFile1, $sFile2, $g_iSyncTimeoutSec)
 
 	; Сохраняем ЛЮБОЙ исход: валидный сдвиг как число, неудачу как маркер
@@ -827,14 +832,14 @@ Func _GetSyncOffset($sFile1, $sFile2)
 EndFunc   ;==>_GetSyncOffset
 
 
-; Запускает sync.exe и ждёт результат с таймаутом.
+; Запускает Sync.exe и ждёт результат с таймаутом.
 ; Возвращает массив [$sStatus, $iOffset]:
 ;   ["OK", <число>]   — sync вернул валидный сдвиг (exit 0 + число в stdout)
 ;   ["TIMEOUT", 0]    — истёк $iTimeoutSec, процесс убит
-;   ["NOMATCH", 0]    — sync.exe завершился с ненулевым exit code (совпадений не найдено)
+;   ["NOMATCH", 0]    — Sync.exe завершился с ненулевым exit code (совпадений не найдено)
 ;   ["ERROR", 0]      — прочие сбои (exit 0, но stdout без числа)
 Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
-	Local $sCmdLine = '"' & $g_sPathSync & '" sync --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
+	Local $sCmdLine = '"' & $g_sPathSync & '" sync --method ' & $g_sSyncMethod & ' --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
 	Local $iPid = Run($sCmdLine, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
 	Local $hProcess = _WinAPI_OpenProcess(0x00100000 + 0x00000400, False, $iPid) ; SYNCHRONIZE | QUERY_INFORMATION — для GetExitCodeProcess после ProcessClose/ExitLoop
 	Local $hTimer = TimerInit()
@@ -848,7 +853,7 @@ Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 
 		If $iElapsed >= $iTimeoutMs Then
 			ProcessClose($iPid)
-			ConsoleWrite("sync.exe: таймаут (" & $iTimeoutSec & " сек)" & @CR)
+			   ConsoleWrite("Sync.exe: таймаут (" & $iTimeoutSec & " сек)" & @CRLF)
 			If $hProcess Then _WinAPI_CloseHandle($hProcess)
 			Return $aTimeout
 		EndIf
@@ -980,7 +985,7 @@ EndFunc   ;==>_ShouldUseFullscreen
 
 
 Func _RunVideoCompare($sCmdLine)
-	ConsoleWrite($sCmdLine & @CR)
+	ConsoleWrite($sCmdLine & @CRLF)
 
 	Local Const $CREATE_NO_WINDOW = 0x08000000
 	Local Const $STARTF_USESTDHANDLES = 0x00000100
@@ -1048,12 +1053,59 @@ Func _RunVideoCompare($sCmdLine)
 		EndIf
 	WEnd
 
+	; Код выхода процесса: 0 — успех, иначе — ошибка
+	Local $iExitCode = 0
+	Local $aExit = DllCall("kernel32.dll", "bool", "GetExitCodeProcess", "handle", $hProcess, "dword*", 0)
+	If Not @error And $aExit[0] Then $iExitCode = $aExit[2]
+
 	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", $hRead)
 	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", $hProcess)
 	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", DllStructGetData($tPI, "hThread"))
 
-	If StringInStr($sOutput, "Error:") Then MsgBox(48, $gc_sAppName, Lang("Errors", "Error", "Error") & @CR & $sOutput)
+	; video-compare пишет в консоль в OEM-кодировке (CP866 на русской Windows) — конвертируем в Unicode.
+	; CP_OEMCP = 1 — кодовая страница консоли по умолчанию.
+	If $sOutput <> "" Then $sOutput = _WinAPI_MultiByteToWideChar($sOutput, 1, 0, True)
+
+	; Приводим код выхода к знаковому: -1 читается лучше, чем 4294967295
+	Local $iExitSigned = $iExitCode
+	If $iExitSigned > 0x7FFFFFFF Then $iExitSigned -= 0x100000000
+
+	ConsoleWrite($sOutput & @CRLF & "[exit=" & $iExitSigned & "]" & @CRLF)
+
+	If $iExitCode <> 0 Then _ShowVideoCompareError($sOutput, $iExitSigned)
 EndFunc   ;==>_RunVideoCompare
+
+
+Func _ShowVideoCompareError($sOutput, $iExitCode)
+	Local $sMsg = _ExtractErrorLines($sOutput)
+	If $sMsg = "" Then $sMsg = StringStripWS($sOutput, 3)
+	If $sMsg = "" Then $sMsg = Lang("Errors", "VideoCompareNoOutput", "Нет сообщения об ошибке в выводе.")
+
+	; Обрезаем слишком длинный вывод, чтобы MsgBox не разрастался
+	Local Const $iMaxLen = 1500
+	If StringLen($sMsg) > $iMaxLen Then $sMsg = "..." & StringRight($sMsg, $iMaxLen)
+
+	MsgBox(16, $gc_sAppName, _
+			Lang("Errors", "VideoCompareFailed", "video-compare завершился с ошибкой") & " (exit " & $iExitCode & ")" & @CRLF & @CRLF & $sMsg)
+EndFunc   ;==>_ShowVideoCompareError
+
+
+Func _ExtractErrorLines($sOutput)
+	; Выделяем строки с маркерами ошибок video-compare и FFmpeg
+	Local $sNorm = StringReplace(StringReplace($sOutput, @CRLF, @LF), @CR, @LF)
+	Local $aLines = StringSplit($sNorm, @LF, 1)
+	Local $aMarkers[5] = ["Error:", "Exception", "terminate called", "Assertion", "Fatal"]
+	Local $sResult = ""
+	For $i = 1 To $aLines[0]
+		For $j = 0 To UBound($aMarkers) - 1
+			If StringInStr($aLines[$i], $aMarkers[$j]) Then
+				$sResult &= $aLines[$i] & @CRLF
+				ExitLoop
+			EndIf
+		Next
+	Next
+	Return StringStripWS($sResult, 3)
+EndFunc   ;==>_ExtractErrorLines
 
 
 Func _GetVideoResolution($sVideoPath)
@@ -1073,12 +1125,12 @@ Func _GetVideoResolution($sVideoPath)
 		Return $aInfo[1]
 	EndIf
 
-	; Вызов ffmpeg_mini.exe -i (парсинг разрешения из строки Video:)
+	; Вызов ffmpeg.exe -i (парсинг разрешения из строки Video:)
 	Local $sCmdLine = '"' & $g_sPathFFmpeg & '" -hide_banner -i "' & $sVideoPath & '"'
 	Local $sRaw = _RunToolReadStderr($sCmdLine)
 	Local $aMatch = StringRegExp($sRaw, "Video:\s.*?,\s(\d+)x(\d+)", 1)
 	Local $sOutput = (IsArray($aMatch) ? $aMatch[0] & "," & $aMatch[1] : "")
-	ConsoleWrite($sVideoPath & " -> " & $sOutput & @CR)
+	ConsoleWrite($sVideoPath & " -> " & $sOutput & @CRLF)
 
 	; Сохраняем в оба кеша
 	If $sOutput <> "" Then
@@ -1114,7 +1166,7 @@ Func _SetCtrlResizing()
 	Local $iDockStretchH_B = $GUI_DOCKLEFT + $GUI_DOCKBOTTOM + $GUI_DOCKRIGHT + $GUI_DOCKHEIGHT
 
 	; Растягиваемые по горизонтали
-	GUICtrlSetResizing($g_iLogoPic, $iDockStretchH)
+	GUICtrlSetResizing($g_iLogoPic, $iDockFixed)
 	GUICtrlSetResizing($g_iInput1, $iDockStretchH)
 	GUICtrlSetResizing($g_iLabelInfo1, $iDockStretchH)
 	GUICtrlSetResizing($g_iInput2, $iDockStretchH)
@@ -1129,7 +1181,6 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iLabelOffset, $iDockFixed)
 	GUICtrlSetResizing($g_iRadioOffsetAuto, $iDockFixed)
 	GUICtrlSetResizing($g_iRadioOffsetManual, $iDockFixed)
-	GUICtrlSetResizing($g_iLabelOffsetMs, $iDockFixedRight)
 	GUICtrlSetResizing($g_iLabel2, $iDockFixed)
 	GUICtrlSetResizing($g_iLabelCompare, $iDockFixed)
 	GUICtrlSetResizing($g_iRadioDirect, $iDockFixed)
@@ -1151,77 +1202,27 @@ Func _SetCtrlResizing()
 EndFunc   ;==>_SetCtrlResizing
 
 
+
 Func _RenderHeader()
-	_DisposeLogo()
+	; Новый порядок: help, info, HUD, mode, toggle, seek1, seek15, shift10, shift100, shift1 (нижняя первой колонки — наверх второй)
+	Local $aHintRows[10]
+	$aHintRows[0] = Lang("Hotkeys", "2", "{H} Control hints")
+	$aHintRows[1] = Lang("Hotkeys", "3", "{Y} Video info")
+	$aHintRows[2] = Lang("Hotkeys", "7", "{3} Show/hide HUD")
+	$aHintRows[3] = Lang("Hotkeys", "8", "{0} Video/subtraction mode")
+	$aHintRows[4] = Lang("Hotkeys", "9", "{Y} Toggle subtraction mode")
+	$aHintRows[5] = Lang("Hotkeys", "4", "{LEFT}{RIGHT} Seek ±1 sec")
+	$aHintRows[6] = Lang("Hotkeys", "5", "{UP}{DOWN} Seek ±15 sec")
+	$aHintRows[7] = Lang("Hotkeys", "10", "{PLUS}{MINUS} Shift ±1 frame")
+	$aHintRows[8] = Lang("Hotkeys", "11", "{CTRL}{PLUS}{MINUS} Shift ±10 frames")
+	$aHintRows[9] = Lang("Hotkeys", "12", "{ALT}{PLUS}{MINUS} Shift ±100 frames")
 
-	Local $sLogoPath = @ScriptDir & "\Assets\logo.png"
-	If Not FileExists($sLogoPath) Then Return
 
-	_GDIPlus_Startup()
-	Local $hImage = _GDIPlus_ImageLoadFromFile($sLogoPath)
-	If @error Or Not $hImage Then
-		_GDIPlus_Shutdown()
-		Return
-	EndIf
+	Local $sLogoPath = @ScriptDir & "\Assets\Logo.png"
+	Local $sIconsRoot = @ScriptDir & "\Assets\KeyIcons"
+	Local $sKeyTheme = $g_bDarkMode ? "Dark" : "Light"
 
-	Local $iDstW = $gc_iGuiWidth, $iDstH = $gc_iHeaderH
-	Local $iSrcW = _GDIPlus_ImageGetWidth($hImage)
-	Local $iSrcH = _GDIPlus_ImageGetHeight($hImage)
-
-	; Масштабируем по ширине (cover), обрезаем по высоте
-	Local $nScale = $iDstW / $iSrcW
-	Local $iScaledW = $iDstW
-	Local $iScaledH = Int($iSrcH * $nScale)
-	Local $iOffY = Int(($iDstH - $iScaledH) / 2)
-
-	Local $hCanvas = _GDIPlus_BitmapCreateFromScan0($iDstW, $iDstH)
-	Local $hGfx = _GDIPlus_ImageGetGraphicsContext($hCanvas)
-	_GDIPlus_GraphicsSetInterpolationMode($hGfx, 7) ; HighQualityBicubic
-	_GDIPlus_GraphicsSetTextRenderingHint($hGfx, 5) ; AntiAliasGridFit
-
-	; Рисуем логотип (cover: заполняем всю ширину, обрезаем сверху/снизу)
-	_GDIPlus_GraphicsDrawImageRect($hGfx, $hImage, 0, $iOffY, $iScaledW, $iScaledH)
-	_GDIPlus_ImageDispose($hImage)
-
-	; 4 строки из шпаргалки справа
-	Local $aHints[4]
-	$aHints[0] = Lang("Hotkeys", "2", "H: Show/hide hints")
-	$aHints[1] = Lang("Hotkeys", "3", "V: Show/hide video info")
-	$aHints[2] = Lang("Hotkeys", "4", "Space: Play/Pause")
-	$aHints[3] = Lang("Hotkeys", "7", "Escape: Exit")
-
-	Local $hFamily = _GDIPlus_FontFamilyCreate($g_sAppFont)
-	Local $hFont = _GDIPlus_FontCreate($hFamily, 7.5)
-	Local $hBrush = _GDIPlus_BrushCreateSolid(0xCCFFFFFF) ; белый полупрозрачный
-	Local $hFormat = _GDIPlus_StringFormatCreate()
-
-	Local $iTextX = Int($iDstW * 0.52)
-	Local $iLineH = 14
-	Local $iTextY = Int(($iDstH - 4 * $iLineH) / 2)
-
-	For $i = 0 To 3
-		Local $tLayout = _GDIPlus_RectFCreate($iTextX, $iTextY + $i * $iLineH, $iDstW - $iTextX - 5, $iLineH)
-		_GDIPlus_GraphicsDrawStringEx($hGfx, $aHints[$i], $hFont, $tLayout, $hFormat, $hBrush)
-	Next
-
-	_GDIPlus_FontDispose($hFont)
-	_GDIPlus_FontFamilyDispose($hFamily)
-	_GDIPlus_BrushDispose($hBrush)
-	_GDIPlus_StringFormatDispose($hFormat)
-
-	; Устанавливаем в контрол
-	Local $hBmp = _GDIPlus_BitmapCreateHBITMAPFromBitmap($hCanvas)
-	_GDIPlus_GraphicsDispose($hGfx)
-	_GDIPlus_BitmapDispose($hCanvas)
-	_GDIPlus_Shutdown()
-	If Not $hBmp Then Return
-
-	Local $hWnd = GUICtrlGetHandle($g_iLogoPic)
-	Local Const $STM_SETIMAGE = 0x0172, $IMAGE_BITMAP = 0
-	Local $aRet = DllCall("user32.dll", "handle", "SendMessageW", "hwnd", $hWnd, _
-			"uint", $STM_SETIMAGE, "wparam", $IMAGE_BITMAP, "lparam", $hBmp)
-	If Not @error And IsArray($aRet) And $aRet[0] Then _WinAPI_DeleteObject($aRet[0])
-	$g_hLogoBitmap = $hBmp
+	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sLogoPath, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0)
 EndFunc   ;==>_RenderHeader
 
 
@@ -1230,14 +1231,22 @@ Func _SetButtonIcon($iCtrl, $sDllPath, $iIconIndex, $iIconSize)
 	Local $aIcons = DllCall("user32.dll", "uint", "PrivateExtractIconsW", _
 			"wstr", $sDllPath, "int", $iIconIndex, "int", $iIconSize, "int", $iIconSize, _
 			"handle*", 0, "uint*", 0, "uint", 1, "uint", 0)
-	If @error Or $aIcons[0] = 0 Then Return
-	Local $hIcon = $aIcons[5]
+	If @error Or $aIcons[0] = 0 Then Return 0
+	Return _ApplyHIconToButton($iCtrl, $aIcons[5], $iIconSize)
+EndFunc   ;==>_SetButtonIcon
 
-	; Создаём ImageList
+
+; Оборачивает HICON в новый HIMAGELIST и назначает его кнопке.
+; HICON уничтожается после добавления в имидж-лист. Возвращает HIMAGELIST
+; (вызывающий ответственен за ImageList_Destroy старого списка при замене).
+Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize)
 	Local Const $ILC_COLOR32 = 0x00000020
 	Local $aImgList = DllCall("comctl32.dll", "handle", "ImageList_Create", _
 			"int", $iIconSize, "int", $iIconSize, "uint", $ILC_COLOR32, "int", 1, "int", 0)
-	If @error Then Return
+	If @error Then
+		DllCall("user32.dll", "bool", "DestroyIcon", "handle", $hIcon)
+		Return 0
+	EndIf
 	Local $hImgList = $aImgList[0]
 
 	DllCall("comctl32.dll", "int", "ImageList_ReplaceIcon", _
@@ -1256,15 +1265,57 @@ Func _SetButtonIcon($iCtrl, $sDllPath, $iIconIndex, $iIconSize)
 	Local Const $BCM_SETIMAGELIST = 0x1602
 	DllCall("user32.dll", "lresult", "SendMessageW", "hwnd", GUICtrlGetHandle($iCtrl), _
 			"uint", $BCM_SETIMAGELIST, "wparam", 0, "struct*", $tBIL)
-EndFunc   ;==>_SetButtonIcon
+
+	Return $hImgList
+EndFunc   ;==>_ApplyHIconToButton
 
 
-Func _DisposeLogo()
-	If $g_hLogoBitmap Then
-		_WinAPI_DeleteObject($g_hLogoBitmap)
-		$g_hLogoBitmap = 0
+; Загружает PNG в HICON квадратного размера $iIconSize через GDI+.
+Func _LoadHIconFromPng($sPngPath, $iIconSize)
+	If Not FileExists($sPngPath) Then Return 0
+
+	_GDIPlus_Startup()
+	Local $hSrc = _GDIPlus_ImageLoadFromFile($sPngPath)
+	If @error Or Not $hSrc Then
+		_GDIPlus_Shutdown()
+		Return 0
 	EndIf
-EndFunc   ;==>_DisposeLogo
+
+	Local $hScaled = _GDIPlus_ImageResize($hSrc, $iIconSize, $iIconSize)
+	_GDIPlus_ImageDispose($hSrc)
+	If @error Or Not $hScaled Then
+		_GDIPlus_Shutdown()
+		Return 0
+	EndIf
+
+	Local $hIcon = _GDIPlus_HICONCreateFromBitmap($hScaled)
+	_GDIPlus_BitmapDispose($hScaled)
+	_GDIPlus_Shutdown()
+
+	If @error Or Not $hIcon Then Return 0
+	Return $hIcon
+EndFunc   ;==>_LoadHIconFromPng
+
+
+; Устанавливает иконку кнопки «Сравнить» согласно выбранному режиму радио.
+Func _UpdateCompareButtonIcon()
+	Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
+	Local $sIconName = $bIsVertical ? "CompareVstack.png" : "CompareDirect.png"
+	Local $sPath = @ScriptDir & "\Assets\CompareIcons\" & $sIconName
+	Local Const $iIconSize = 32
+
+	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize)
+	If Not $hIcon Then Return
+
+	Local $hNew = _ApplyHIconToButton($g_iButtonCompare, $hIcon, $iIconSize)
+	If Not $hNew Then Return
+
+	; Освобождаем предыдущий imagelist после замены
+	If $g_hCompareImgList Then
+		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $g_hCompareImgList)
+	EndIf
+	$g_hCompareImgList = $hNew
+EndFunc   ;==>_UpdateCompareButtonIcon
 
 
 Func _RestoreControlsStyle()
@@ -1358,11 +1409,12 @@ Func _EnsureIniDefaults()
 			"Video2=" & @CRLF & _
 			"[Tools]" & @CRLF & _
 			"VideoCompare=video-compare.exe" & @CRLF & _
-			"Sync=sync\dist\sync.exe" & @CRLF & _
-			"FFmpeg=sync\dist\ffmpeg-mini.exe" & @CRLF & _
+			"Sync=Sync\dist\Sync.exe" & @CRLF & _
+			"FFmpeg=Sync\dist\FFmpeg.exe" & @CRLF & _
 			"[Settings]" & @CRLF & _
-			"SyncSkipSec=120" & @CRLF & _
-			"SyncTimeoutSec=60" & @CRLF
+			"SyncSkipSec=300" & @CRLF & _
+			"SyncTimeoutSec=60" & @CRLF & _
+			"SyncMethod=audio" & @CRLF
 	_EnsureUtf16File($gc_sPathIni, $sContent)
 EndFunc   ;==>_EnsureIniDefaults
 
@@ -1478,10 +1530,10 @@ Func _ApplyLanguage()
 	GUICtrlSetData($g_iRadioDirect, Lang("GUI", "CompareDirect", "Direct"))
 	GUICtrlSetData($g_iRadioVertical, Lang("GUI", "CompareVertical", "Vertical"))
 	GUICtrlSetData($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
+	GUICtrlSetData($g_iButtonClearCache, Lang("GUI", "ClearCache", "Clear cache"))
 	GUICtrlSetData($g_iLabelOffset, Lang("GUI", "Offset", "Offset:"))
 	GUICtrlSetData($g_iRadioOffsetAuto, Lang("GUI", "OffsetAuto", "Automatically"))
 	GUICtrlSetData($g_iRadioOffsetManual, Lang("GUI", "OffsetManual", "Set manually"))
-	GUICtrlSetData($g_iLabelOffsetMs, Lang("GUI", "OffsetMs", "ms"))
 	GUICtrlSetData($g_iLabelCommand, Lang("GUI", "TabCommand", "Command"))
 	GUICtrlSetData($g_iLabelSettings, Lang("GUI", "TabSettings", "Settings:"))
 	GUICtrlSetData($g_iLabelLang, Lang("GUI", "Language", "Language:"))
@@ -1582,6 +1634,9 @@ Func _ApplyTheme()
 	; Горизонтальный разделитель
 	GUICtrlSetBkColor($g_iSeparator, $g_iClrSep)
 	GUICtrlSetBkColor($g_iSeparator2, $g_iClrSep)
+
+	; Иконки подсказок должны соответствовать выбранной теме (Dark/Light)
+	If $bPrevDark <> $g_bDarkMode Then _RenderHeader()
 
 	; Финальная полная перерисовка окна
 	; RDW_INVALIDATE=0x1, RDW_UPDATENOW=0x100, RDW_ALLCHILDREN=0x80
