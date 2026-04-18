@@ -22,6 +22,10 @@ ThemeSystem=Системная
 ThemeLight=Светлая
 ThemeDark=Тёмная
 ClearCache=Сбросить кеш
+Settings=Настройки
+OK=ОК
+Cancel=Отмена
+CacheClearedMsg=Кеш успешно сброшен.
 
 [Dialogs]
 SelectVideo1=Выберите видео 1

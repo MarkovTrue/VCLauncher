@@ -22,6 +22,10 @@ ThemeSystem=System
 ThemeLight=Light
 ThemeDark=Dark
 ClearCache=Clear cache
+Settings=Settings
+OK=OK
+Cancel=Cancel
+CacheClearedMsg=Cache cleared successfully.
 
 [Dialogs]
 SelectVideo1=Select video 1

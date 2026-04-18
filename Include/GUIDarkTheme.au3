@@ -616,8 +616,14 @@ Func __GUIDarkTheme_WM_CTLCOLOR($hWnd, $iMsg, $wParam, $lParam)
 		Case 'Static', 'Button'
 			__WinAPI_SetBkMode($hDC, $TRANSPARENT)
 			__WinAPI_SetTextColor($hDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_TEXT_LIGHT))
-			Local $hNull = __WinAPI_GetStockObject(5) ; 5 = NULL_BRUSH
-			If $hNull Then Return $hNull
+			; Проверка размера для разделителей (узкие полосы высотой ≤ 3px) —
+			; они должны быть видны, поэтому не используем NULL_BRUSH
+			Local $tRect = __WinAPI_GetClientRect($hCtrl)
+			Local $iHeight = $tRect.Bottom - $tRect.Top
+			If $iHeight > 3 Then
+				Local $hNull = __WinAPI_GetStockObject(5) ; 5 = NULL_BRUSH
+				If $hNull Then Return $hNull
+			EndIf
 			Return $GUI_RUNDEFMSG
 	EndSwitch
 

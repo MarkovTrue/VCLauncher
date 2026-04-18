@@ -6,12 +6,22 @@
 
 #include <GUIConstantsEx.au3>
 #include <WindowsConstants.au3>
+#include <WindowsNotifsConstants.au3>
 #include <FileConstants.au3>
 #include <WinAPI.au3>
 #include <Math.au3>
 #include <ColorConstants.au3>
 #include <EditConstants.au3>
 #include <ComboConstants.au3>
+#include <ButtonConstants.au3>
+#include <APIProcConstants.au3>
+#include <APISysConstants.au3>
+#include <APIGdiConstants.au3>
+#include <ProcessConstants.au3>
+#include <SecurityConstants.au3>
+#include <ImageListConstants.au3>
+#include <AutoItConstants.au3>
+
 #include "Include\GUIDarkTheme.au3"
 #include "Include\FontHelper.au3"
 #include "Include\HeaderHelper.au3"
@@ -23,9 +33,9 @@ Global Const $gc_sAppName = "VCLauncher 1.04"
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
 Global Const $gc_aSupportedExtensions[] = ["mp4", "avi", "mkv", "mov", "wmv", "webm", "mpg", "mpeg"]
-Global Const $gc_iGuiWidth = 490
+Global Const $gc_iGuiWidth = 500
 Global Const $gc_iHeaderH = 90 ; высота шапки с логотипом
-Global Const $gc_iGuiHeight = $gc_iHeaderH + 314
+Global Const $gc_iGuiHeight = $gc_iHeaderH + 285 ; высота клиента: низ блока команды (171+70) + 42px запас
 
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
@@ -43,24 +53,27 @@ _EnsureIniDefaults()
 _EnsureUtf16File($gc_sPathCache)
 
 ; Ссылки на элементы GUI
-Global $g_hGui, $g_iInput1, $g_iInput2, $g_iButtonChoose1, $g_iButtonChoose2, $g_iButtonSwap, $g_iButtonCompare, $g_iButtonClearCache, $g_iRadioDirect, $g_iRadioVertical
+Global $g_hGui, $g_iInput1, $g_iInput2, $g_iButtonChoose1, $g_iButtonChoose2, $g_iButtonSwap, $g_iButtonCompare, $g_iRadioDirect, $g_iRadioVertical
 Global $g_iLogoPic, $g_hLogoBitmap = 0 ; картинка-логотип в шапке и её HBITMAP для освобождения
 Global $g_hCompareImgList = 0 ; HIMAGELIST иконки кнопки «Сравнить» для освобождения при замене
 Global $g_sAppFont = "MS Shell Dlg 2", $g_iAppFontSize = 9
 ; Кеш в памяти: разрешения видео и сдвиги sync. Ключ включает mtime —
 ; автоматически инвалидируется, если файл на диске заменён.
-Global $g_oCache = ObjCreate("Scripting.Dictionary")
+Global $g_oCache[]
 Global $g_iLabel1, $g_iLabel2, $g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelCompare, $g_iLabelCommand
-Global $g_iEditCommand, $g_iComboLang, $g_iLabelSettings, $g_iLabelLang, $g_iLabelTheme, $g_iComboTheme
-Global $g_iSeparator, $g_iSeparator2
+Global $g_iEditCommand, $g_iButtonSettings ; кнопка настроек в шапке
+Global $g_iSeparator
+Global $g_hSettingsGui = 0, $g_iSettingsComboLang, $g_iSettingsComboTheme
+Global $g_iSettingsLabelLang, $g_iSettingsLabelTheme
 Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iProgressSync, $g_iInputOffset
 
-Global $g_sLangFile = "", $g_sCurrentLang = "", $g_oLangDict = Null
+Global $g_sLangFile = "", $g_sCurrentLang = "", $g_mLang[]
 
 ; Тема оформления
 Global $g_sTheme = "System" ; System | Light | Dark
 Global $g_bDarkMode = False
 Global $g_bThemeInitialized = False ; флаг: применяли ли уже UDF-тему
+Global $g_bAppliedDark = False ; тема, реально применённая к GUI (для отслеживания смены)
 Global $g_iClrBg, $g_iClrFg, $g_iClrInfo, $g_iClrInput, $g_iClrSep
 ; Остальные переменные (чтение и нормализация путей; относительные пути считаем от папки скрипта)
 Global $g_sVideoFile1 = _NormalizePath(IniRead($gc_sPathIni, "LastDirs", "Video1", ""))
@@ -74,6 +87,8 @@ _InitTheme()
 _CheckToolExists($g_sPathVideoCompare, "video-compare.exe")
 _CheckToolExists($g_sPathSync, "Sync.exe")
 
+OnAutoItExitRegister("_Cleanup")
+
 _MainGUI()
 _DefineEvents()
 
@@ -82,10 +97,25 @@ While 1
 WEnd
 
 
+; Освобождение GDI/HIMAGELIST handle'ов — срабатывает при любом пути выхода.
+Func _Cleanup()
+	_HeaderDisposeBitmap($g_hLogoBitmap)
+	If $g_hCompareImgList Then
+		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $g_hCompareImgList)
+		$g_hCompareImgList = 0
+	EndIf
+EndFunc   ;==>_Cleanup
+
+
 Func _MainGUI()
 	$g_hGui = GUICreate($gc_sAppName, $gc_iGuiWidth, $gc_iGuiHeight, -1, -1, $WS_SIZEBOX + $WS_SYSMENU + $WS_MINIMIZEBOX, $WS_EX_ACCEPTFILES)
 
 	_ApplyAppFont()
+
+	; Кнопка настроек — создаётся ДО LogoPic, чтобы не оказаться под ним в z-order
+	$g_iButtonSettings = GUICtrlCreateButton("⚙", $gc_iGuiWidth - 32, 8, 24, 24)
+	GUICtrlSetFont($g_iButtonSettings, 12, 400)
+	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 
 	; Шапка: логотип слева + шпаргалка горячих клавиш справа (рисуется в _RenderHeader)
 	$g_iLogoPic = GUICtrlCreatePic("", 0, 0, $gc_iGuiWidth, $gc_iHeaderH)
@@ -132,50 +162,31 @@ Func _MainGUI()
 	GUICtrlSetBkColor($g_iSeparator, 0xC0C0C0)
 
 	; --- Режим сравнения ---
-	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 137, 74, 20)
+	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 143, 74, 20)
 	GUIStartGroup()
-	$g_iRadioDirect = GUICtrlCreateRadio(Lang("GUI", "CompareDirect", "Direct"), 90, $iY + 135, 130, 20)
-	$g_iRadioVertical = GUICtrlCreateRadio(Lang("GUI", "CompareVertical", "Vertical"), 230, $iY + 135, 160, 20)
+	$g_iRadioDirect = GUICtrlCreateRadio(Lang("GUI", "CompareDirect", "Direct"), 90, $iY + 141, 130, 20)
+	$g_iRadioVertical = GUICtrlCreateRadio(Lang("GUI", "CompareVertical", "Vertical"), 230, $iY + 141, 160, 20)
 	GUICtrlSetState($g_iRadioDirect, $GUI_CHECKED)
 
 	; --- Синхронизация ---
-	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 112, 74, 20)
+	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 115, 74, 20)
 	GUIStartGroup()
-	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Automatically"), 90, $iY + 110, 120, 20)
-	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Set manually"), 230, $iY + 110, 105, 20)
+	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Automatically"), 90, $iY + 113, 120, 20)
+	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Set manually"), 230, $iY + 113, 105, 20)
 	GUICtrlSetState($g_iRadioOffsetAuto, $GUI_CHECKED)
-	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 110, 60, 20)
+	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 113, 60, 20)
 	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
-	$g_iProgressSync = GUICtrlCreateProgress($gc_iGuiWidth - 150, $iY + 110, 60, 20)
+	$g_iProgressSync = GUICtrlCreateProgress($gc_iGuiWidth - 150, $iY + 113, 60, 20)
 	GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
 
 	; --- Команда ---
-	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 166, 74, 20)
-
-	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 163, $gc_iGuiWidth - 180, 70, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $WS_VSCROLL))
+	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 172, 70, 20)
+	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 171, $gc_iGuiWidth - 180, 70, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $WS_VSCROLL))
 
 	; --- Кнопка «Сравнить» ---
 	Local Const $BS_MULTILINE = 0x2000
-	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 163, 70, 70, $BS_MULTILINE)
+	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 171, 70, 70, $BS_MULTILINE)
 	_UpdateCompareButtonIcon()
-
-	; --- Разделитель 2 ---
-	$g_iSeparator2 = GUICtrlCreateLabel("", 0, $iY + 242, $gc_iGuiWidth, 1)
-	GUICtrlSetBkColor($g_iSeparator2, 0xC0C0C0)
-
-	; --- Настройки: язык, тема и сброс кеша (в одну строку) ---
-	$g_iLabelSettings = GUICtrlCreateLabel(Lang("GUI", "TabSettings", "Settings:"), 10, $iY + 253, 74, 20)
-	$g_iLabelLang = GUICtrlCreateLabel(Lang("GUI", "Language", "Language:"), 90, $iY + 253, 40, 20)
-	$g_iComboLang = GUICtrlCreateCombo("", 130, $iY + 253, 90, 200, $CBS_DROPDOWNLIST)
-	GUICtrlSetData($g_iComboLang, "English|Русский", ($g_sCurrentLang = "Russian") ? "Русский" : "English")
-	_SetComboItemHeight($g_iComboLang, 17)
-
-	$g_iLabelTheme = GUICtrlCreateLabel(Lang("GUI", "Theme", "Theme:"), 230, $iY + 253, 40, 20)
-	$g_iComboTheme = GUICtrlCreateCombo("", 270, $iY + 253, 90, 200, $CBS_DROPDOWNLIST)
-	_PopulateComboTheme()
-	_SetComboItemHeight($g_iComboTheme, 17)
-
-	$g_iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), $gc_iGuiWidth - 102, $iY + 253, 94, 23)
 
 	_SetCtrlResizing()
 	_RenderHeader()
@@ -194,35 +205,35 @@ Func _DefineEvents()
 	GUICtrlSetOnEvent($g_iButtonChoose2, "_OnEvent_ButtonChoose")
 	GUICtrlSetOnEvent($g_iButtonSwap, "_OnEvent_ButtonSwap")
 	GUICtrlSetOnEvent($g_iButtonCompare, "_OnEvent_ButtonCompare")
-	GUICtrlSetOnEvent($g_iButtonClearCache, "_OnEvent_ButtonClearCache")
+	GUICtrlSetOnEvent($g_iButtonSettings, "_OnEvent_ButtonSettings")
 	GUICtrlSetOnEvent($g_iRadioOffsetAuto, "_OnEvent_RadioOffsetModeChanged")
 	GUICtrlSetOnEvent($g_iRadioOffsetManual, "_OnEvent_RadioOffsetModeChanged")
 	GUICtrlSetOnEvent($g_iRadioDirect, "_OnEvent_RadioChanged")
 	GUICtrlSetOnEvent($g_iRadioVertical, "_OnEvent_RadioChanged")
-	GUICtrlSetOnEvent($g_iComboLang, "_OnEvent_ComboLang")
-	GUICtrlSetOnEvent($g_iComboTheme, "_OnEvent_ComboTheme")
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_GUI_EVENT_CLOSE")
 	GUISetOnEvent($GUI_EVENT_DROPPED, "_OnEvent_GUI_EVENT_DROPPED")
 
 	GUIRegisterMsg($WM_GETMINMAXINFO, "_OnEvent_WM_GETMINMAXINFO")
 	GUIRegisterMsg($WM_COMMAND, "_OnEvent_WM_COMMAND")
-	GUIRegisterMsg(0x0233, "_OnEvent_WM_DROPFILES") ; WM_DROPFILES
+	GUIRegisterMsg($WM_DROPFILES, "_OnEvent_WM_DROPFILES")
 EndFunc   ;==>_DefineEvents
 
 
 Func _OnEvent_WM_GETMINMAXINFO($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $iMsg, $wParam
-	If $hWnd = $g_hGui Then
-		Local $tMINMAXINFO = DllStructCreate("int;int;" & _
-				"int MaxSizeX; int MaxSizeY;" & _
-				"int MaxPositionX;int MaxPositionY;" & _
-				"int MinTrackSizeX; int MinTrackSizeY;" & _
-				"int MaxTrackSizeX; int MaxTrackSizeY", _
-				$lParam)
-		DllStructSetData($tMINMAXINFO, "MinTrackSizeX", $gc_iGuiWidth) ; минимальная ширина окна
-		DllStructSetData($tMINMAXINFO, "MinTrackSizeY", $gc_iGuiHeight) ; минимальная высота окна
-	EndIf
-	Return $GUI_RUNDEFMSG
+	If $hWnd <> $g_hGui Then Return $GUI_RUNDEFMSG
+
+	Local $tMMI = DllStructCreate( _
+			"int reserved1;int reserved2;" & _
+			"int MaxSizeX;int MaxSizeY;" & _
+			"int MaxPositionX;int MaxPositionY;" & _
+			"int MinTrackSizeX;int MinTrackSizeY;" & _
+			"int MaxTrackSizeX;int MaxTrackSizeY", $lParam)
+	DllStructSetData($tMMI, "MinTrackSizeX", $gc_iGuiWidth)
+	DllStructSetData($tMMI, "MinTrackSizeY", $gc_iGuiHeight)
+
+	; WM_GETMINMAXINFO требует Return 0 — $GUI_RUNDEFMSG перезапишет заполненную структуру
+	Return 0
 EndFunc   ;==>_OnEvent_WM_GETMINMAXINFO
 
 
@@ -292,20 +303,23 @@ EndFunc   ;==>_OnEvent_ButtonCompare
 
 
 Func _OnEvent_ButtonClearCache()
-	; Очищаем кеш в памяти
-	$g_oCache.RemoveAll()
+	Local $mEmpty[]
+	$g_oCache = $mEmpty
 
 	; Удаляем файл кеша на диске и пересоздаём пустой с BOM
 	FileDelete($gc_sPathCache)
 	_EnsureUtf16File($gc_sPathCache)
 
-	; Очищаем поле сдвига и статус
 	GUICtrlSetData($g_iInputOffset, "")
 	_UpdateSyncStatusTip("")
-
-	; Обновляем поле команды
 	_UpdateCommandField()
 EndFunc   ;==>_OnEvent_ButtonClearCache
+
+
+Func _OnEvent_ButtonSettings()
+	If $g_hSettingsGui <> 0 Then Return
+	_SettingsWindow()
+EndFunc   ;==>_OnEvent_ButtonSettings
 
 
 Func _OnEvent_ButtonSwap()
@@ -348,17 +362,13 @@ EndFunc   ;==>_OnEvent_RadioOffsetModeChanged
 
 
 Func _OnEvent_GUI_EVENT_CLOSE()
-	_HeaderDisposeBitmap($g_hLogoBitmap)
-	If $g_hCompareImgList Then
-		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $g_hCompareImgList)
-		$g_hCompareImgList = 0
-	EndIf
 	Exit
 EndFunc   ;==>_OnEvent_GUI_EVENT_CLOSE
 
 
 Func _OnEvent_WM_DROPFILES($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $hWnd, $iMsg, $wParam, $lParam
+	#forceref $iMsg, $wParam, $lParam
+	If $hWnd <> $g_hGui Then Return $GUI_RUNDEFMSG
 
 	; Определяем над каким элементом находится курсор
 	Local $aCursorInfo = GUIGetCursorInfo($g_hGui)
@@ -463,32 +473,6 @@ Func _OnEvent_WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 	_SetVideoFile($iID, $sFullPath)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>_OnEvent_WM_COMMAND
-
-
-Func _OnEvent_ComboLang()
-	Local $sSelected = GUICtrlRead($g_iComboLang)
-	Local $sNewLang = "Russian"
-	If $sSelected = "English" Then $sNewLang = "English"
-	If $sNewLang = $g_sCurrentLang Then Return
-	$g_sCurrentLang = $sNewLang
-	$g_sLangFile = @ScriptDir & "\Lang\" & $g_sCurrentLang & ".lng"
-	IniWrite($gc_sPathIni, "Settings", "Language", $g_sCurrentLang)
-	_LoadLangFile()
-	_ApplyLanguage()
-EndFunc   ;==>_OnEvent_ComboLang
-
-
-Func _OnEvent_ComboTheme()
-	Local $sSelected = GUICtrlRead($g_iComboTheme)
-	Local $sNew = $g_sTheme
-	If $sSelected = Lang("GUI", "ThemeSystem", "System") Then $sNew = "System"
-	If $sSelected = Lang("GUI", "ThemeLight", "Light") Then $sNew = "Light"
-	If $sSelected = Lang("GUI", "ThemeDark", "Dark") Then $sNew = "Dark"
-	If $sNew = $g_sTheme Then Return
-	$g_sTheme = $sNew
-	IniWrite($gc_sPathIni, "Settings", "Theme", $sNew)
-	_ApplyTheme()
-EndFunc   ;==>_OnEvent_ComboTheme
 
 
 Func _UpdateFilesInfo()
@@ -713,8 +697,8 @@ Func _LookupSyncCache($sFile1, $sFile2)
 	Local $sMemKey = _BuildPairKey($sFile1, $sFile2)
 
 	; Кеш в памяти (прямая пара)
-	If $g_oCache.Exists($sMemKey) Then
-		Local $vVal = $g_oCache.Item($sMemKey)
+	If MapExists($g_oCache, $sMemKey) Then
+		Local $vVal = $g_oCache[$sMemKey]
 		$aResult[0] = True
 		If _IsSyncMarker($vVal) Then
 			$aResult[1] = 0
@@ -728,17 +712,17 @@ Func _LookupSyncCache($sFile1, $sFile2)
 
 	; Кеш в памяти (обратная пара — инвертируем сдвиг для OK, маркер копируем)
 	Local $sMemKeyRev = _BuildPairKey($sFile2, $sFile1)
-	If $g_oCache.Exists($sMemKeyRev) Then
-		Local $vVal = $g_oCache.Item($sMemKeyRev)
+	If MapExists($g_oCache, $sMemKeyRev) Then
+		Local $vVal = $g_oCache[$sMemKeyRev]
 		$aResult[0] = True
 		If _IsSyncMarker($vVal) Then
 			$aResult[1] = 0
 			$aResult[2] = $vVal
-			$g_oCache.Item($sMemKey) = $vVal
+			$g_oCache[$sMemKey] = $vVal
 		Else
 			$aResult[1] = -Int($vVal)
 			$aResult[2] = "OK"
-			$g_oCache.Item($sMemKey) = $aResult[1]
+			$g_oCache[$sMemKey] = $aResult[1]
 		EndIf
 		Return $aResult
 	EndIf
@@ -755,11 +739,11 @@ Func _LookupSyncCache($sFile1, $sFile2)
 		If _IsSyncMarker($sSyncVal) Then
 			$aResult[1] = 0
 			$aResult[2] = $sSyncVal
-			$g_oCache.Item($sMemKey) = $sSyncVal
+			$g_oCache[$sMemKey] = $sSyncVal
 		Else
 			$aResult[1] = Int($sSyncVal)
 			$aResult[2] = "OK"
-			$g_oCache.Item($sMemKey) = $aResult[1]
+			$g_oCache[$sMemKey] = $aResult[1]
 		EndIf
 		Return $aResult
 	EndIf
@@ -771,11 +755,11 @@ Func _LookupSyncCache($sFile1, $sFile2)
 		If _IsSyncMarker($sSyncValRev) Then
 			$aResult[1] = 0
 			$aResult[2] = $sSyncValRev
-			$g_oCache.Item($sMemKey) = $sSyncValRev
+			$g_oCache[$sMemKey] = $sSyncValRev
 		Else
 			$aResult[1] = -Int($sSyncValRev)
 			$aResult[2] = "OK"
-			$g_oCache.Item($sMemKey) = $aResult[1]
+			$g_oCache[$sMemKey] = $aResult[1]
 		EndIf
 		Return $aResult
 	EndIf
@@ -791,11 +775,11 @@ Func _SaveSyncCache($sFile1, $sFile2, $vValue)
 	Local $sMemKeyRev = _BuildPairKey($sFile2, $sFile1)
 
 	If _IsSyncMarker($vValue) Then
-		$g_oCache.Item($sMemKey) = $vValue
-		$g_oCache.Item($sMemKeyRev) = $vValue
+		$g_oCache[$sMemKey] = $vValue
+		$g_oCache[$sMemKeyRev] = $vValue
 	Else
-		$g_oCache.Item($sMemKey) = $vValue
-		$g_oCache.Item($sMemKeyRev) = -$vValue
+		$g_oCache[$sMemKey] = $vValue
+		$g_oCache[$sMemKeyRev] = -$vValue
 	EndIf
 
 	; Получаем/создаём индексы файлов в [Info]
@@ -841,7 +825,7 @@ EndFunc   ;==>_GetSyncOffset
 Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 	Local $sCmdLine = '"' & $g_sPathSync & '" sync --method ' & $g_sSyncMethod & ' --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
 	Local $iPid = Run($sCmdLine, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
-	Local $hProcess = _WinAPI_OpenProcess(0x00100000 + 0x00000400, False, $iPid) ; SYNCHRONIZE | QUERY_INFORMATION — для GetExitCodeProcess после ProcessClose/ExitLoop
+	Local $hProcess = _WinAPI_OpenProcess($STANDARD_RIGHTS_SYNCHRONIZE + $PROCESS_QUERY_INFORMATION, False, $iPid)
 	Local $hTimer = TimerInit()
 	Local $iTimeoutMs = $iTimeoutSec * 1000
 	Local $sOutput = ""
@@ -987,10 +971,6 @@ EndFunc   ;==>_ShouldUseFullscreen
 Func _RunVideoCompare($sCmdLine)
 	ConsoleWrite($sCmdLine & @CRLF)
 
-	Local Const $CREATE_NO_WINDOW = 0x08000000
-	Local Const $STARTF_USESTDHANDLES = 0x00000100
-	Local Const $HANDLE_FLAG_INHERIT = 0x00000001
-
 	Local $tSA = DllStructCreate("dword nLength;ptr lpSD;bool bInherit")
 	DllStructSetData($tSA, "nLength", DllStructGetSize($tSA))
 	DllStructSetData($tSA, "bInherit", True)
@@ -1116,12 +1096,12 @@ Func _GetVideoResolution($sVideoPath)
 	Local $sMemKey = _BuildFileId($sVideoPath) & "|" & $sMtime
 
 	; Кеш в памяти
-	If $g_oCache.Exists($sMemKey) Then Return $g_oCache.Item($sMemKey)
+	If MapExists($g_oCache, $sMemKey) Then Return $g_oCache[$sMemKey]
 
 	; Кеш на диске [Info]: ключ name|size, значение idx|mtime|resolution
 	Local $aInfo = _GetCacheInfo($sVideoPath)
 	If $aInfo[1] <> "" Then
-		$g_oCache.Item($sMemKey) = $aInfo[1]
+		$g_oCache[$sMemKey] = $aInfo[1]
 		Return $aInfo[1]
 	EndIf
 
@@ -1134,7 +1114,7 @@ Func _GetVideoResolution($sVideoPath)
 
 	; Сохраняем в оба кеша
 	If $sOutput <> "" Then
-		$g_oCache.Item($sMemKey) = $sOutput
+		$g_oCache[$sMemKey] = $sOutput
 		_SaveCacheInfo($sVideoPath, $sOutput)
 	EndIf
 
@@ -1172,7 +1152,6 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iInput2, $iDockStretchH)
 	GUICtrlSetResizing($g_iLabelInfo2, $iDockStretchH)
 	GUICtrlSetResizing($g_iSeparator, $iDockStretchH)
-	GUICtrlSetResizing($g_iSeparator2, $iDockStretchH_B)
 	GUICtrlSetResizing($g_iEditCommand, $iDockStretchHV)
 	GUICtrlSetResizing($g_iProgressSync, $iDockStretchH)
 
@@ -1186,18 +1165,12 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iRadioDirect, $iDockFixed)
 	GUICtrlSetResizing($g_iRadioVertical, $iDockFixed)
 	GUICtrlSetResizing($g_iLabelCommand, $iDockFixed)
-	GUICtrlSetResizing($g_iLabelSettings, $iDockFixedBL)
-	GUICtrlSetResizing($g_iLabelLang, $iDockFixedBL)
-	GUICtrlSetResizing($g_iComboLang, $iDockFixedBL)
-	GUICtrlSetResizing($g_iLabelTheme, $iDockFixedBL)
-	GUICtrlSetResizing($g_iComboTheme, $iDockFixedBL)
 
 	; Фиксированные справа
 	GUICtrlSetResizing($g_iButtonChoose1, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonSwap, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonChoose2, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonCompare, $iDockFixedBR)
-	GUICtrlSetResizing($g_iButtonClearCache, $iDockFixedBR)
 	GUICtrlSetResizing($g_iInputOffset, $iDockFixedRight)
 EndFunc   ;==>_SetCtrlResizing
 
@@ -1240,7 +1213,6 @@ EndFunc   ;==>_SetButtonIcon
 ; HICON уничтожается после добавления в имидж-лист. Возвращает HIMAGELIST
 ; (вызывающий ответственен за ImageList_Destroy старого списка при замене).
 Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize)
-	Local Const $ILC_COLOR32 = 0x00000020
 	Local $aImgList = DllCall("comctl32.dll", "handle", "ImageList_Create", _
 			"int", $iIconSize, "int", $iIconSize, "uint", $ILC_COLOR32, "int", 1, "int", 0)
 	If @error Then
@@ -1262,7 +1234,6 @@ Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize)
 	DllStructSetData($tBIL, "b", 0)
 	DllStructSetData($tBIL, "uAlign", 2)
 
-	Local Const $BCM_SETIMAGELIST = 0x1602
 	DllCall("user32.dll", "lresult", "SendMessageW", "hwnd", GUICtrlGetHandle($iCtrl), _
 			"uint", $BCM_SETIMAGELIST, "wparam", 0, "struct*", $tBIL)
 
@@ -1341,7 +1312,6 @@ EndFunc   ;==>_GetVideoExtensionsFilter
 
 
 Func _SetComboItemHeight($iCtrl, $iItemHeight)
-	Local Const $CB_SETITEMHEIGHT = 0x0153
 	Local $hWnd = GUICtrlGetHandle($iCtrl)
 	If Not $hWnd Then Return
 	; wParam = -1 → «поле выбора» комбобокса (selection field)
@@ -1369,8 +1339,7 @@ EndFunc   ;==>_GetFileName
 
 
 Func _ResetInputCaret($iCtrlID)
-	; EM_SETSEL = 0x00B1 — ставим каретку в начало, чтобы текст выравнивался по левому краю
-	GUICtrlSendMsg($iCtrlID, 0x00B1, 0, 0)
+	GUICtrlSendMsg($iCtrlID, $EM_SETSEL, 0, 0)
 EndFunc   ;==>_ResetInputCaret
 
 
@@ -1469,9 +1438,8 @@ EndFunc   ;==>_ResolveToolPaths
 ; === Система локализации ===
 
 Func Lang($sSection, $sKey, $sDefault = "")
-	If Not IsObj($g_oLangDict) Then Return $sDefault
 	Local $sFullKey = $sSection & "." & $sKey
-	If $g_oLangDict.Exists($sFullKey) Then Return $g_oLangDict.Item($sFullKey)
+	If MapExists($g_mLang, $sFullKey) Then Return $g_mLang[$sFullKey]
 	Return $sDefault
 EndFunc   ;==>Lang
 
@@ -1496,7 +1464,8 @@ EndFunc   ;==>_InitLanguage
 
 
 Func _LoadLangFile()
-	$g_oLangDict = ObjCreate("Scripting.Dictionary")
+	Local $mEmpty[]
+	$g_mLang = $mEmpty
 	If $g_sLangFile = "" Or Not FileExists($g_sLangFile) Then Return
 	Local $hFile = FileOpen($g_sLangFile, $FO_UTF8_NOBOM)
 	If $hFile = -1 Then Return
@@ -1515,7 +1484,7 @@ Func _LoadLangFile()
 		If $iEq > 0 And $sSection <> "" Then
 			Local $sK = StringStripWS(StringLeft($sLine, $iEq - 1), 3)
 			Local $sV = StringMid($sLine, $iEq + 1)
-			$g_oLangDict($sSection & "." & $sK) = $sV
+			$g_mLang[$sSection & "." & $sK] = $sV
 		EndIf
 	Next
 EndFunc   ;==>_LoadLangFile
@@ -1530,15 +1499,10 @@ Func _ApplyLanguage()
 	GUICtrlSetData($g_iRadioDirect, Lang("GUI", "CompareDirect", "Direct"))
 	GUICtrlSetData($g_iRadioVertical, Lang("GUI", "CompareVertical", "Vertical"))
 	GUICtrlSetData($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
-	GUICtrlSetData($g_iButtonClearCache, Lang("GUI", "ClearCache", "Clear cache"))
 	GUICtrlSetData($g_iLabelOffset, Lang("GUI", "Offset", "Offset:"))
 	GUICtrlSetData($g_iRadioOffsetAuto, Lang("GUI", "OffsetAuto", "Automatically"))
 	GUICtrlSetData($g_iRadioOffsetManual, Lang("GUI", "OffsetManual", "Set manually"))
 	GUICtrlSetData($g_iLabelCommand, Lang("GUI", "TabCommand", "Command"))
-	GUICtrlSetData($g_iLabelSettings, Lang("GUI", "TabSettings", "Settings:"))
-	GUICtrlSetData($g_iLabelLang, Lang("GUI", "Language", "Language:"))
-	GUICtrlSetData($g_iLabelTheme, Lang("GUI", "Theme", "Theme:"))
-	_PopulateComboTheme()
 	_RenderHeader()
 	_UpdateFilesInfo()
 	_ApplyTheme()
@@ -1593,15 +1557,18 @@ EndFunc   ;==>_SetPalette
 
 
 Func _ApplyTheme()
-	Local $bPrevDark = $g_bDarkMode
 	_ResolveDarkMode()
+
+	; Сравниваем с реально применённой к GUI темой, а не с $g_bDarkMode до вызова:
+	; _InitTheme() может быть вызван выше по стеку и уже обновить $g_bDarkMode.
+	Local $bNeedSwitch = (Not $g_bThemeInitialized) Or ($g_bAppliedDark <> $g_bDarkMode)
 
 	; Применяем UDF-тему ко всему GUI. Не используем _GUIDarkTheme_SwitchTheme —
 	; он определяет направление по системной теме, а не по нашему выбору.
 	; Важно: _GUIDarkTheme_ApplyLight меняет внутренние UDF-глобалы на светлые значения,
 	; но _GUIDarkTheme_ApplyDark их обратно не восстанавливает. Поэтому перед переключением
 	; в тёмную тему явно возвращаем тёмную палитру UDF (те же значения, что задаёт _SwitchTheme).
-	If Not $g_bThemeInitialized Or $bPrevDark <> $g_bDarkMode Then
+	If $bNeedSwitch Then
 		If $g_bThemeInitialized Then __GUIDarkTheme_SubclassCleanup()
 		If $g_bDarkMode Then
 			$g_iBkColor = 0x1C1C1C
@@ -1615,6 +1582,7 @@ Func _ApplyTheme()
 			_GUIDarkTheme_ApplyLight($g_hGui)
 		EndIf
 		$g_bThemeInitialized = True
+		$g_bAppliedDark = $g_bDarkMode
 	EndIf
 
 	; Палитра для кастомных элементов
@@ -1633,24 +1601,137 @@ Func _ApplyTheme()
 
 	; Горизонтальный разделитель
 	GUICtrlSetBkColor($g_iSeparator, $g_iClrSep)
-	GUICtrlSetBkColor($g_iSeparator2, $g_iClrSep)
 
 	; Иконки подсказок должны соответствовать выбранной теме (Dark/Light)
-	If $bPrevDark <> $g_bDarkMode Then _RenderHeader()
+	If $bNeedSwitch Then _RenderHeader()
 
 	; Финальная полная перерисовка окна
 	; RDW_INVALIDATE=0x1, RDW_UPDATENOW=0x100, RDW_ALLCHILDREN=0x80
-	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", 0x181)
+	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
 EndFunc   ;==>_ApplyTheme
 
 
-Func _PopulateComboTheme()
+
+
+Func _SettingsWindow()
+	$g_hSettingsGui = GUICreate(Lang("GUI", "Settings", "Settings"), 320, 145, -1, -1, _
+			$WS_CAPTION + $WS_SYSMENU, $WS_EX_DLGMODALFRAME, $g_hGui)
+
+	Local $iY = 20
+
+	; Язык
+	$g_iSettingsLabelLang = GUICtrlCreateLabel(Lang("GUI", "Language", "Language:"), 16, $iY + 3, 75, 20)
+	$g_iSettingsComboLang = GUICtrlCreateCombo("", 96, $iY, 190, 200, $CBS_DROPDOWNLIST)
+	GUICtrlSetData($g_iSettingsComboLang, "English|Русский", ($g_sCurrentLang = "Russian") ? "Русский" : "English")
+	_SetComboItemHeight($g_iSettingsComboLang, 17)
+
+	$iY += 38
+
+	; Тема
+	$g_iSettingsLabelTheme = GUICtrlCreateLabel(Lang("GUI", "Theme", "Theme:"), 16, $iY + 3, 75, 20)
+	$g_iSettingsComboTheme = GUICtrlCreateCombo("", 96, $iY, 190, 200, $CBS_DROPDOWNLIST)
 	Local $sSystem = Lang("GUI", "ThemeSystem", "System")
 	Local $sLight = Lang("GUI", "ThemeLight", "Light")
 	Local $sDark = Lang("GUI", "ThemeDark", "Dark")
 	Local $sCurrent = $sSystem
 	If $g_sTheme = "Light" Then $sCurrent = $sLight
 	If $g_sTheme = "Dark" Then $sCurrent = $sDark
-	GUICtrlSetData($g_iComboTheme, "")
-	GUICtrlSetData($g_iComboTheme, $sSystem & "|" & $sLight & "|" & $sDark, $sCurrent)
-EndFunc   ;==>_PopulateComboTheme
+	GUICtrlSetData($g_iSettingsComboTheme, $sSystem & "|" & $sLight & "|" & $sDark, $sCurrent)
+	_SetComboItemHeight($g_iSettingsComboTheme, 17)
+
+	$iY += 48
+
+	; Сброс кеша и Закрыть в одну строку
+	Local $iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), 16, $iY, 120, 26)
+	Local $iButtonClose      = GUICtrlCreateButton(Lang("GUI", "OK", "OK"), 214, $iY, 90, 26)
+
+	GUICtrlSetOnEvent($iButtonClose,       "_OnEvent_SettingsOk")
+	GUICtrlSetOnEvent($iButtonClearCache,  "_OnEvent_SettingsClearCache")
+	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_SettingsClose", $g_hSettingsGui)
+
+	_ApplyThemeToSettingsGui()
+
+	GUISetState(@SW_SHOW, $g_hSettingsGui)
+EndFunc   ;==>_SettingsWindow
+
+
+Func _ApplyThemeToSettingsGui()
+	If $g_hSettingsGui = 0 Then Return
+
+	; ВАЖНО: _GUIDarkTheme_GUISetDarkTheme внутри перезаписывает глобал $g_hGui UDF'а
+	; на переданный $hWnd. Сохраняем и восстанавливаем наш главный handle.
+	Local $hMainSaved = $g_hGui
+	_GUIDarkTheme_GUISetDarkTheme($g_hSettingsGui, $g_bDarkMode)
+	_GUIDarkTheme_GUICtrlAllSetDarkTheme($g_hSettingsGui, $g_bDarkMode, True)
+	$g_hGui = $hMainSaved
+
+	GUISetBkColor($g_iClrBg, $g_hSettingsGui)
+
+	; Лейблы — прозрачный фон + цвет текста по палитре
+	GUICtrlSetBkColor($g_iSettingsLabelLang,  $GUI_BKCOLOR_TRANSPARENT)
+	GUICtrlSetBkColor($g_iSettingsLabelTheme, $GUI_BKCOLOR_TRANSPARENT)
+	GUICtrlSetColor($g_iSettingsLabelLang,  $g_iClrFg)
+	GUICtrlSetColor($g_iSettingsLabelTheme, $g_iClrFg)
+EndFunc   ;==>_ApplyThemeToSettingsGui
+
+
+Func _OnEvent_SettingsClose()
+	If $g_hSettingsGui = 0 Then Return
+	GUIDelete($g_hSettingsGui)
+	$g_hSettingsGui = 0
+EndFunc   ;==>_OnEvent_SettingsClose
+
+
+Func _OnEvent_SettingsOk()
+	If $g_hSettingsGui = 0 Then Return
+
+	; Язык
+	Local $sSelectedLang = GUICtrlRead($g_iSettingsComboLang)
+	Local $sLangCode = ($sSelectedLang = "Русский") ? "Russian" : "English"
+	Local $bLangChanged = ($sLangCode <> $g_sCurrentLang)
+	If $bLangChanged Then IniWrite($gc_sPathIni, "Settings", "Language", $sLangCode)
+
+	; Тема
+	Local $sSelectedTheme = GUICtrlRead($g_iSettingsComboTheme)
+	Local $sTheme = "System"
+	If $sSelectedTheme = Lang("GUI", "ThemeLight", "Light") Then $sTheme = "Light"
+	If $sSelectedTheme = Lang("GUI", "ThemeDark", "Dark") Then $sTheme = "Dark"
+	Local $bThemeChanged = ($sTheme <> $g_sTheme)
+	If $bThemeChanged Then
+		$g_sTheme = $sTheme
+		IniWrite($gc_sPathIni, "Settings", "Theme", $sTheme)
+	EndIf
+
+	_OnEvent_SettingsClose()
+
+	If $bLangChanged Then
+		_InitLanguage()
+		_ApplyLanguage() ; ставит тексты + внутри зовёт _ApplyTheme и _RenderHeader
+	EndIf
+	If $bThemeChanged Then
+		_InitTheme()
+		If Not $bLangChanged Then
+			_ApplyTheme()
+			_RenderHeader()
+		EndIf
+	EndIf
+	If $bLangChanged Or $bThemeChanged Then _
+		DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
+EndFunc   ;==>_OnEvent_SettingsOk
+
+
+Func _OnEvent_SettingsClearCache()
+	Local $mEmpty[]
+	$g_oCache = $mEmpty
+	FileDelete($gc_sPathCache)
+	_EnsureUtf16File($gc_sPathCache)
+	MsgBox(64, Lang("GUI", "Settings", "Settings"), Lang("GUI", "CacheClearedMsg", "Cache cleared"))
+EndFunc   ;==>_OnEvent_SettingsClearCache
+
+
+Func _MainGUI_Refresh()
+	_ApplyTheme()
+	_RenderHeader()
+	; Перерисовка окна
+	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
+EndFunc   ;==>_MainGUI_Refresh
