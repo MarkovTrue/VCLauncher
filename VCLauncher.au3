@@ -32,11 +32,12 @@ Opt("GUIOnEventMode", 1)
 Global Const $gc_sAppName = "VCLauncher 1.04"
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
-Global Const $gc_aSupportedExtensions[] = ["mp4", "avi", "mkv", "mov", "wmv", "webm", "mpg", "mpeg"]
+Global Const $gc_aSupportedExtensions[] = [ _
+        "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "asf", "flv", "f4v", "mpg", "mpeg", "mp2", "m2v", _
+        "ts", "m2ts", "mts", "mxf", "vob", "3gp", "3g2", "ogv", "ogg", "dv", "divx", "rm", "rmvb", "gif", "vpy"]
 Global Const $gc_iGuiWidth = 500
 Global Const $gc_iHeaderH = 90 ; высота шапки с логотипом
-Global Const $gc_iGuiHeight = $gc_iHeaderH + 285 ; высота клиента: низ блока команды (171+70) + 42px запас
-
+Global Const $gc_iGuiHeight = $gc_iHeaderH + 285 ; высота клиента
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
 Global $g_sPathSync = @ScriptDir & '\Sync\dist\Sync.exe'
@@ -65,6 +66,7 @@ Global $g_iEditCommand, $g_iButtonSettings ; кнопка настроек в ш
 Global $g_iSeparator
 Global $g_hSettingsGui = 0, $g_iSettingsComboLang, $g_iSettingsComboTheme
 Global $g_iSettingsLabelLang, $g_iSettingsLabelTheme
+Global $g_iSettingsButtonClearCache = 0
 Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iProgressSync, $g_iInputOffset
 
 Global $g_sLangFile = "", $g_sCurrentLang = "", $g_mLang[]
@@ -113,8 +115,8 @@ Func _MainGUI()
 	_ApplyAppFont()
 
 	; Кнопка настроек — создаётся ДО LogoPic, чтобы не оказаться под ним в z-order
-	$g_iButtonSettings = GUICtrlCreateButton("⚙", $gc_iGuiWidth - 32, 8, 24, 24)
-	GUICtrlSetFont($g_iButtonSettings, 12, 400)
+	$g_iButtonSettings = GUICtrlCreateButton("⚙", $gc_iGuiWidth - 40, 8, 32, 32)
+	GUICtrlSetFont($g_iButtonSettings, 14, 400)
 	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 
 	; Шапка: логотип слева + шпаргалка горячих клавиш справа (рисуется в _RenderHeader)
@@ -1194,8 +1196,9 @@ Func _RenderHeader()
 	Local $sLogoPath = @ScriptDir & "\Assets\Logo.png"
 	Local $sIconsRoot = @ScriptDir & "\Assets\KeyIcons"
 	Local $sKeyTheme = $g_bDarkMode ? "Dark" : "Light"
+	Local $sHeaderIcon = @ScriptDir & "\Assets\Icon.ico"
 
-	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sLogoPath, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0)
+	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sLogoPath, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0, -1, $sHeaderIcon)
 EndFunc   ;==>_RenderHeader
 
 
@@ -1642,11 +1645,11 @@ Func _SettingsWindow()
 	$iY += 48
 
 	; Сброс кеша и Закрыть в одну строку
-	Local $iButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), 16, $iY, 120, 26)
-	Local $iButtonClose      = GUICtrlCreateButton(Lang("GUI", "OK", "OK"), 214, $iY, 90, 26)
+	$g_iSettingsButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), 16, $iY, 120, 26)
+	Local $iButtonClose          = GUICtrlCreateButton(Lang("GUI", "OK", "OK"), 214, $iY, 90, 26)
 
-	GUICtrlSetOnEvent($iButtonClose,       "_OnEvent_SettingsOk")
-	GUICtrlSetOnEvent($iButtonClearCache,  "_OnEvent_SettingsClearCache")
+	GUICtrlSetOnEvent($iButtonClose,                "_OnEvent_SettingsOk")
+	GUICtrlSetOnEvent($g_iSettingsButtonClearCache, "_OnEvent_SettingsClearCache")
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_SettingsClose", $g_hSettingsGui)
 
 	_ApplyThemeToSettingsGui()
@@ -1679,6 +1682,7 @@ Func _OnEvent_SettingsClose()
 	If $g_hSettingsGui = 0 Then Return
 	GUIDelete($g_hSettingsGui)
 	$g_hSettingsGui = 0
+	$g_iSettingsButtonClearCache = 0
 EndFunc   ;==>_OnEvent_SettingsClose
 
 
@@ -1725,7 +1729,7 @@ Func _OnEvent_SettingsClearCache()
 	$g_oCache = $mEmpty
 	FileDelete($gc_sPathCache)
 	_EnsureUtf16File($gc_sPathCache)
-	MsgBox(64, Lang("GUI", "Settings", "Settings"), Lang("GUI", "CacheClearedMsg", "Cache cleared"))
+	GUICtrlSetState($g_iSettingsButtonClearCache, $GUI_DISABLE)
 EndFunc   ;==>_OnEvent_SettingsClearCache
 
 

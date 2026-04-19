@@ -12,8 +12,8 @@ Global Const $gc_sHeaderKeyFontFamily = "Kenney Input Keyboard & Mouse"
 
 ; Рендерит шапку и устанавливает результат в GUI Pic-контрол.
 ; $hBitmapPrev передаётся ByRef для корректного освобождения старого HBITMAP.
-Func _HeaderRenderToPic($iPicCtrl, ByRef $hBitmapPrev, $sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1)
-	Local $hBmp = _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, $aHintRows, $iIconSizeDelta, $nFontSize, $iFontStyle, $iBackColorArgb)
+Func _HeaderRenderToPic($iPicCtrl, ByRef $hBitmapPrev, $sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "")
+	Local $hBmp = _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, $aHintRows, $iIconSizeDelta, $nFontSize, $iFontStyle, $iBackColorArgb, $sLeftIconPath)
 	If Not $hBmp Then Return False
 
 	Local $hWnd = GUICtrlGetHandle($iPicCtrl)
@@ -43,7 +43,7 @@ EndFunc   ;==>_HeaderDisposeBitmap
 
 
 ; Создаёт HBITMAP шапки (логотип + подсказки), но не назначает его контролу.
-Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1)
+Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "")
 	If Not FileExists($sLogoPath) Then Return 0
 	If Not IsArray($aHintRows) Then Return 0
 
@@ -74,6 +74,20 @@ Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDst
 	; Логотип рисуется 1:1 без растяжения.
 	_GDIPlus_GraphicsDrawImageRect($hGfx, $hImage, 0, 0, $iSrcW, $iSrcH)
 	_GDIPlus_ImageDispose($hImage)
+
+	; Иконка слева поверх логотипа, максимальный размер из .ico без растяжения.
+	If $sLeftIconPath <> "" And FileExists($sLeftIconPath) Then
+		Local $hIconBmp = __HeaderLoadIcoMaxBitmap($sLeftIconPath, $iDstH)
+		If $hIconBmp Then
+			Local $iIcoW = _GDIPlus_ImageGetWidth($hIconBmp)
+			Local $iIcoH = _GDIPlus_ImageGetHeight($hIconBmp)
+			Local $iIcoX = 16
+			Local $iIcoY = Int(($iDstH - $iIcoH) / 2)
+			If $iIcoY < 0 Then $iIcoY = 0
+			__HeaderDrawImageAlpha($hGfx, $hIconBmp, $iIcoX, $iIcoY, $iIcoW, $iIcoH, 0.85)
+			_GDIPlus_ImageDispose($hIconBmp)
+		EndIf
+	EndIf
 
 	__HeaderEnsureKeyFontCollection()
 
@@ -268,6 +282,82 @@ Func __HeaderResolveIconPath($sIconsRootPath, $sTheme, $sToken)
 
 	Return $sPrimaryPath
 EndFunc   ;==>__HeaderResolveIconPath
+
+
+; Рисует GDI+-изображение с заданной альфой через ColorMatrix.
+Func __HeaderDrawImageAlpha($hGfx, $hImage, $iX, $iY, $iW, $iH, $nAlpha)
+	Local $tCM = DllStructCreate("float[25]")
+	DllStructSetData($tCM, 1, 1.0, 1)  ; [0][0]
+	DllStructSetData($tCM, 1, 1.0, 7)  ; [1][1]
+	DllStructSetData($tCM, 1, 1.0, 13) ; [2][2]
+	DllStructSetData($tCM, 1, $nAlpha, 19) ; [3][3]
+	DllStructSetData($tCM, 1, 1.0, 25) ; [4][4]
+
+	Local $aAttr = DllCall("gdiplus.dll", "int", "GdipCreateImageAttributes", "ptr*", 0)
+	If @error Or Not IsArray($aAttr) Or $aAttr[0] <> 0 Then Return False
+	Local $hAttr = $aAttr[1]
+
+	Local Const $ColorAdjustTypeBitmap = 1
+	DllCall("gdiplus.dll", "int", "GdipSetImageAttributesColorMatrix", _
+			"ptr", $hAttr, "int", $ColorAdjustTypeBitmap, "bool", True, _
+			"ptr", DllStructGetPtr($tCM), "ptr", 0, "int", 0)
+
+	Local Const $UnitPixel = 2
+	DllCall("gdiplus.dll", "int", "GdipDrawImageRectRectI", _
+			"handle", $hGfx, "handle", $hImage, _
+			"int", $iX, "int", $iY, "int", $iW, "int", $iH, _
+			"int", 0, "int", 0, "int", $iW, "int", $iH, _
+			"int", $UnitPixel, "ptr", $hAttr, "ptr", 0, "ptr", 0)
+
+	DllCall("gdiplus.dll", "int", "GdipDisposeImageAttributes", "ptr", $hAttr)
+	Return True
+EndFunc   ;==>__HeaderDrawImageAlpha
+
+
+; Загружает из .ico кадр с максимальным доступным размером и возвращает GDI+ Bitmap.
+; $iHintSize — подсказка желаемого размера (Windows выберет ближайший большой).
+Func __HeaderLoadIcoMaxBitmap($sIcoPath, $iHintSize = 256)
+	Local $iMax = __HeaderIcoMaxSize($sIcoPath)
+	If $iMax <= 0 Then $iMax = $iHintSize
+
+	Local Const $IMAGE_ICON = 1
+	Local Const $LR_LOADFROMFILE = 0x00000010
+	Local $aLoad = DllCall("user32.dll", "handle", "LoadImageW", _
+			"ptr", 0, "wstr", $sIcoPath, "uint", $IMAGE_ICON, _
+			"int", $iMax, "int", $iMax, "uint", $LR_LOADFROMFILE)
+	If @error Or Not IsArray($aLoad) Or $aLoad[0] = 0 Then Return 0
+
+	Local $hIcon = $aLoad[0]
+	Local $aCreate = DllCall("gdiplus.dll", "int", "GdipCreateBitmapFromHICON", "handle", $hIcon, "ptr*", 0)
+	DllCall("user32.dll", "bool", "DestroyIcon", "handle", $hIcon)
+	If @error Or Not IsArray($aCreate) Or $aCreate[0] <> 0 Then Return 0
+	Return $aCreate[2]
+EndFunc   ;==>__HeaderLoadIcoMaxBitmap
+
+
+; Разбирает заголовок .ico и возвращает максимальную ширину среди записей.
+Func __HeaderIcoMaxSize($sIcoPath)
+	Local $hFile = FileOpen($sIcoPath, 16) ; binary
+	If $hFile = -1 Then Return 0
+
+	Local $bHeader = FileRead($hFile, 6)
+	If @error Or BinaryLen($bHeader) < 6 Then
+		FileClose($hFile)
+		Return 0
+	EndIf
+
+	Local $iCount = Dec(Hex(BinaryMid($bHeader, 5, 1)), 2) + Dec(Hex(BinaryMid($bHeader, 6, 1)), 2) * 256
+	Local $iMax = 0
+	For $i = 1 To $iCount
+		Local $bEntry = FileRead($hFile, 16)
+		If @error Or BinaryLen($bEntry) < 2 Then ExitLoop
+		Local $iW = Dec(Hex(BinaryMid($bEntry, 1, 1)), 2)
+		If $iW = 0 Then $iW = 256
+		If $iW > $iMax Then $iMax = $iW
+	Next
+	FileClose($hFile)
+	Return $iMax
+EndFunc   ;==>__HeaderIcoMaxSize
 
 
 Func __HeaderEnsureKeyFontCollection()
