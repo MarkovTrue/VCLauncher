@@ -21,6 +21,7 @@
 #include <SecurityConstants.au3>
 #include <ImageListConstants.au3>
 #include <AutoItConstants.au3>
+#include <StaticConstants.au3>
 
 #include "Include\GUIDarkTheme.au3"
 #include "Include\FontHelper.au3"
@@ -29,7 +30,7 @@
 Opt("GUIOnEventMode", 1)
 
 ; Константы приложения
-Global Const $gc_sAppName = "VCLauncher 1.04"
+Global Const $gc_sAppName = "VCLauncher 1.05"
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
 Global Const $gc_aSupportedExtensions[] = [ _
@@ -67,7 +68,17 @@ Global $g_iSeparator
 Global $g_hSettingsGui = 0, $g_iSettingsComboLang, $g_iSettingsComboTheme
 Global $g_iSettingsLabelLang, $g_iSettingsLabelTheme
 Global $g_iSettingsButtonClearCache = 0
-Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iProgressSync, $g_iInputOffset
+Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iLabelSyncStatus, $g_iInputOffset
+
+; Состояние последнего sync-запуска (для статус-иконки и MsgBox с деталями)
+Global $g_sLastSyncStatus = ""    ; "" | WORKING | OK | NOMATCH | TIMEOUT | ERROR
+Global $g_iLastSyncOffset = 0
+Global $g_sLastSyncCmd = ""
+Global $g_sLastSyncOutput = ""    ; stdout + stderr дочернего Sync.exe
+
+; Кадры спиннера статус-иконки. ChrW для гарантированно UTF-16 в исходнике.
+Global Const $gc_aSpinnerFrames[4] = [ChrW(0x25D0), ChrW(0x25D3), ChrW(0x25D1), ChrW(0x25D2)]
+Global $g_iSpinnerIdx = 0
 
 Global $g_sLangFile = "", $g_sCurrentLang = "", $g_mLang[]
 
@@ -173,13 +184,14 @@ Func _MainGUI()
 	; --- Синхронизация ---
 	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 115, 74, 20)
 	GUIStartGroup()
-	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Automatically"), 90, $iY + 113, 120, 20)
-	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Set manually"), 230, $iY + 113, 105, 20)
+	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Auto"), 90, $iY + 113, 80, 20)
 	GUICtrlSetState($g_iRadioOffsetAuto, $GUI_CHECKED)
+	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Manual"), 174, $iY + 113, 80, 20)
+	; Статус-иконка sync — Unicode-символ в Label. SS_NOTIFY чтобы Label принимал клики.
+	$g_iLabelSyncStatus = GUICtrlCreateLabel("", $gc_iGuiWidth - 174, $iY + 113, 18, 20, BitOR($SS_NOTIFY, $SS_CENTER))
+	GUICtrlSetFont($g_iLabelSyncStatus, $g_iAppFontSize + 3, 700, 0, $g_sAppFont)
 	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 113, 60, 20)
 	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
-	$g_iProgressSync = GUICtrlCreateProgress($gc_iGuiWidth - 150, $iY + 113, 60, 20)
-	GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
 
 	; --- Команда ---
 	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 172, 70, 20)
@@ -208,8 +220,9 @@ Func _DefineEvents()
 	GUICtrlSetOnEvent($g_iButtonSwap, "_OnEvent_ButtonSwap")
 	GUICtrlSetOnEvent($g_iButtonCompare, "_OnEvent_ButtonCompare")
 	GUICtrlSetOnEvent($g_iButtonSettings, "_OnEvent_ButtonSettings")
-	GUICtrlSetOnEvent($g_iRadioOffsetAuto, "_OnEvent_RadioOffsetModeChanged")
-	GUICtrlSetOnEvent($g_iRadioOffsetManual, "_OnEvent_RadioOffsetModeChanged")
+	GUICtrlSetOnEvent($g_iRadioOffsetAuto, "_OnEvent_RadioOffsetMode")
+	GUICtrlSetOnEvent($g_iRadioOffsetManual, "_OnEvent_RadioOffsetMode")
+	GUICtrlSetOnEvent($g_iLabelSyncStatus, "_OnEvent_LabelSyncStatusClick")
 	GUICtrlSetOnEvent($g_iRadioDirect, "_OnEvent_RadioChanged")
 	GUICtrlSetOnEvent($g_iRadioVertical, "_OnEvent_RadioChanged")
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_GUI_EVENT_CLOSE")
@@ -231,13 +244,11 @@ Func _OnEvent_WM_GETMINMAXINFO($hWnd, $iMsg, $wParam, $lParam)
 			"int MaxPositionX;int MaxPositionY;" & _
 			"int MinTrackSizeX;int MinTrackSizeY;" & _
 			"int MaxTrackSizeX;int MaxTrackSizeY", $lParam)
-	DllStructSetData($tMMI, "MinTrackSizeX", $gc_iGuiWidth)
-	DllStructSetData($tMMI, "MinTrackSizeY", $gc_iGuiHeight)
+	DllStructSetData($tMMI, "MinTrackSizeX", $gc_iGuiWidth + 14)
+	DllStructSetData($tMMI, "MinTrackSizeY", $gc_iGuiHeight + 14)
 
-	; WM_GETMINMAXINFO требует Return 0 — $GUI_RUNDEFMSG перезапишет заполненную структуру
 	Return 0
 EndFunc   ;==>_OnEvent_WM_GETMINMAXINFO
-
 
 
 Func _OnEvent_ButtonChoose()
@@ -281,16 +292,10 @@ Func _OnEvent_ButtonCompare()
 
 	; Синхронизация в автоматическом режиме
 	If GUICtrlRead($g_iRadioOffsetAuto) = $GUI_CHECKED Then
-		GUICtrlSetState($g_iInputOffset, $GUI_HIDE)
-		GUICtrlSetState($g_iProgressSync, $GUI_SHOW)
-		GUICtrlSetData($g_iProgressSync, 0)
+		_SetSyncStatus("WORKING")
 		Local $aSync = _GetSyncOffset($g_sVideoFile1, $g_sVideoFile2)
-		GUICtrlSetData($g_iProgressSync, 100)
-		Sleep(100)
 		GUICtrlSetData($g_iInputOffset, ($aSync[0] = "OK") ? $aSync[1] : "")
-		GUICtrlSetState($g_iProgressSync, $GUI_HIDE)
-		GUICtrlSetState($g_iInputOffset, $GUI_SHOW)
-		_UpdateSyncStatusTip($aSync[0])
+		_SetSyncStatus($aSync[0], $aSync[1])
 		_UpdateCommandField()
 	EndIf
 
@@ -313,7 +318,7 @@ Func _OnEvent_ButtonClearCache()
 	_EnsureUtf16File($gc_sPathCache)
 
 	GUICtrlSetData($g_iInputOffset, "")
-	_UpdateSyncStatusTip("")
+	_SetSyncStatus("")
 	_UpdateCommandField()
 EndFunc   ;==>_OnEvent_ButtonClearCache
 
@@ -352,15 +357,16 @@ Func _OnEvent_RadioChanged()
 EndFunc   ;==>_OnEvent_RadioChanged
 
 
-Func _OnEvent_RadioOffsetModeChanged()
+Func _OnEvent_RadioOffsetMode()
 	If GUICtrlRead($g_iRadioOffsetAuto) = $GUI_CHECKED Then
 		GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
 		_TryFillCachedOffset()
 	Else
 		GUICtrlSetState($g_iInputOffset, $GUI_ENABLE)
+		_SetSyncStatus("")
 	EndIf
 	_UpdateCommandField()
-EndFunc   ;==>_OnEvent_RadioOffsetModeChanged
+EndFunc   ;==>_OnEvent_RadioOffsetMode
 
 
 Func _OnEvent_GUI_EVENT_CLOSE()
@@ -650,7 +656,7 @@ Func _GetCacheInfo($sFile)
 	If $sCached = "" Then Return $aEmpty
 
 	Local $aParts = StringSplit($sCached, "|")
-	If $aParts[0] < 3 Then Return $aEmpty
+	If $aParts[0] < 4 Then Return $aEmpty
 
 	Local $sMtime = FileGetTime($sFile, $FT_MODIFIED, 1)
 	If $aParts[2] <> $sMtime Then Return $aEmpty
@@ -826,11 +832,15 @@ EndFunc   ;==>_GetSyncOffset
 ;   ["ERROR", 0]      — прочие сбои (exit 0, но stdout без числа)
 Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 	Local $sCmdLine = '"' & $g_sPathSync & '" sync --method ' & $g_sSyncMethod & ' --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
+	; Сохраняем для click-details в статус-иконке
+	$g_sLastSyncCmd = $sCmdLine
+	$g_sLastSyncOutput = ""
+
 	Local $iPid = Run($sCmdLine, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
 	Local $hProcess = _WinAPI_OpenProcess($STANDARD_RIGHTS_SYNCHRONIZE + $PROCESS_QUERY_INFORMATION, False, $iPid)
 	Local $hTimer = TimerInit()
 	Local $iTimeoutMs = $iTimeoutSec * 1000
-	Local $sOutput = ""
+	Local $sStdout = "", $sStderr = ""
 	Local $aTimeout[2] = ["TIMEOUT", 0]
 	Local $aError[2] = ["ERROR", 0]
 
@@ -839,26 +849,31 @@ Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 
 		If $iElapsed >= $iTimeoutMs Then
 			ProcessClose($iPid)
-			   ConsoleWrite("Sync.exe: таймаут (" & $iTimeoutSec & " сек)" & @CRLF)
+			ConsoleWrite("Sync.exe: таймаут (" & $iTimeoutSec & " сек)" & @CRLF)
 			If $hProcess Then _WinAPI_CloseHandle($hProcess)
+			$g_sLastSyncOutput = _ComposeSyncOutput($sStdout, $sStderr)
 			Return $aTimeout
 		EndIf
 
-		; Обновляем прогрессбар (0–95% за $iTimeoutSec секунд)
-		Local $iPct = Int(($iElapsed / $iTimeoutMs) * 95)
-		GUICtrlSetData($g_iProgressSync, $iPct)
-
-		; Читаем stdout неблокирующе
-		$sOutput &= StdoutRead($iPid)
+		; Неблокирующее чтение обоих потоков
+		$sStdout &= StdoutRead($iPid)
+		$sStderr &= StderrRead($iPid)
 		Sleep(100)
 	WEnd
 
-	; Дочитываем остатки stdout
+	; Дочитываем остатки
 	While 1
 		Local $sLine = StdoutRead($iPid)
 		If @error Then ExitLoop
-		$sOutput &= $sLine
+		$sStdout &= $sLine
 	WEnd
+	While 1
+		Local $sLine = StderrRead($iPid)
+		If @error Then ExitLoop
+		$sStderr &= $sLine
+	WEnd
+
+	$g_sLastSyncOutput = _ComposeSyncOutput($sStdout, $sStderr)
 
 	; Читаем код выхода процесса (0 — успех, 2 — NOMATCH)
 	Local $iExitCode = 0
@@ -874,7 +889,7 @@ Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 	EndIf
 
 	; Exit 0 — в stdout должно быть число
-	Local $sTrim = StringStripWS($sOutput, 3)
+	Local $sTrim = StringStripWS($sStdout, 3)
 	If Not StringRegExp($sTrim, "^-?\d+$") Then Return $aError
 
 	Local $aOk[2] = ["OK", Int($sTrim)]
@@ -882,16 +897,30 @@ Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
 EndFunc   ;==>_RunSyncWithTimeout
 
 
+; Склеивает stdout/stderr с заголовками в один текст для click-details.
+Func _ComposeSyncOutput($sStdout, $sStderr)
+	Local $sOut = ""
+	Local $sStdoutTrim = StringStripWS($sStdout, 3)
+	Local $sStderrTrim = StringStripWS($sStderr, 3)
+	If $sStdoutTrim <> "" Then $sOut &= "[stdout]" & @CRLF & $sStdoutTrim
+	If $sStderrTrim <> "" Then
+		If $sOut <> "" Then $sOut &= @CRLF & @CRLF
+		$sOut &= "[stderr]" & @CRLF & $sStderrTrim
+	EndIf
+	Return $sOut
+EndFunc   ;==>_ComposeSyncOutput
+
+
 Func _TryFillCachedOffset()
 	If GUICtrlRead($g_iRadioOffsetAuto) <> $GUI_CHECKED Then Return
 	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then
-		_UpdateSyncStatusTip("")
+		_SetSyncStatus("")
 		Return
 	EndIf
 
 	Local $aCached = _LookupSyncCache($g_sVideoFile1, $g_sVideoFile2)
 	If Not $aCached[0] Then
-		_UpdateSyncStatusTip("")
+		_SetSyncStatus("")
 		Return
 	EndIf
 
@@ -900,31 +929,95 @@ Func _TryFillCachedOffset()
 	Else
 		GUICtrlSetData($g_iInputOffset, "")
 	EndIf
-	_UpdateSyncStatusTip($aCached[2])
+	_SetSyncStatus($aCached[2], $aCached[1])
 EndFunc   ;==>_TryFillCachedOffset
 
 
-; Обновляет подпись/tooltip статуса sync-кеша рядом с полем Offset.
-; Пустая строка статуса — сбрасывает подпись.
-Func _UpdateSyncStatusTip($sStatus)
-	Local $sKey = ""
-	Switch $sStatus
-		Case "TIMEOUT"
-			$sKey = "StatusTimeout"
-		Case "NOMATCH"
-			$sKey = "StatusNoMatch"
-		Case "ERROR"
-			$sKey = "StatusError"
-	EndSwitch
+; Единая точка обновления статус-иконки sync. $sStatus: "" | WORKING | OK | NOMATCH | TIMEOUT | ERROR.
+; $iOffset используется только для OK — выводится в tooltip.
+Func _SetSyncStatus($sStatus, $iOffset = 0)
+	_SyncSpinnerStop()
+	$g_sLastSyncStatus = $sStatus
+	$g_iLastSyncOffset = $iOffset
 
-	If $sKey = "" Then
-		GUICtrlSetTip($g_iInputOffset, "")
+	If $sStatus = "" Then
+		GUICtrlSetData($g_iLabelSyncStatus, "")
+		GUICtrlSetTip($g_iLabelSyncStatus, "")
 		Return
 	EndIf
 
-	Local $sTip = Lang("Sync", $sKey, $sStatus)
-	GUICtrlSetTip($g_iInputOffset, $sTip)
-EndFunc   ;==>_UpdateSyncStatusTip
+	Local $sIcon = "", $iColor = 0, $sTipKey = ""
+	Switch $sStatus
+		Case "WORKING"
+			$sIcon = $gc_aSpinnerFrames[0]
+			$iColor = $g_bDarkMode ? 0x4FC3F7 : 0x0066CC
+			$sTipKey = "StatusWorking"
+			_SyncSpinnerStart()
+		Case "OK"
+			$sIcon = ChrW(0x25CF) ; ●
+			$iColor = $g_bDarkMode ? 0x66BB6A : 0x2E7D32
+			$sTipKey = "StatusOk"
+		Case "NOMATCH"
+			$sIcon = ChrW(0x25B2) ; ▲
+			$iColor = $g_bDarkMode ? 0xFFCA28 : 0xC68400
+			$sTipKey = "StatusNoMatch"
+		Case "TIMEOUT"
+			$sIcon = ChrW(0x25A0) ; ■
+			$iColor = $g_bDarkMode ? 0xFFA726 : 0xC85A00
+			$sTipKey = "StatusTimeout"
+		Case "ERROR"
+			$sIcon = ChrW(0x2715) ; ✕
+			$iColor = $g_bDarkMode ? 0xEF5350 : 0xC0392B
+			$sTipKey = "StatusError"
+		Case Else
+			Return
+	EndSwitch
+
+	GUICtrlSetData($g_iLabelSyncStatus, $sIcon)
+	GUICtrlSetColor($g_iLabelSyncStatus, $iColor)
+
+	; Шаблон вида "Статус: ОК, смещение %d мс" — %d подставляем для OK
+	Local $sTip = Lang("Sync", $sTipKey, $sStatus)
+	$sTip = StringReplace($sTip, "%d", $iOffset)
+	GUICtrlSetTip($g_iLabelSyncStatus, $sTip)
+EndFunc   ;==>_SetSyncStatus
+
+
+Func _SyncSpinnerStart()
+	$g_iSpinnerIdx = 0
+	AdlibRegister("_SyncSpinnerTick", 120)
+EndFunc   ;==>_SyncSpinnerStart
+
+
+Func _SyncSpinnerStop()
+	AdlibUnRegister("_SyncSpinnerTick")
+EndFunc   ;==>_SyncSpinnerStop
+
+
+Func _SyncSpinnerTick()
+	$g_iSpinnerIdx = Mod($g_iSpinnerIdx + 1, UBound($gc_aSpinnerFrames))
+	GUICtrlSetData($g_iLabelSyncStatus, $gc_aSpinnerFrames[$g_iSpinnerIdx])
+EndFunc   ;==>_SyncSpinnerTick
+
+
+; Клик по статус-иконке для NOMATCH/TIMEOUT/ERROR — MsgBox с командой и stdout/stderr.
+Func _OnEvent_LabelSyncStatusClick()
+	If $g_sLastSyncStatus <> "NOMATCH" And $g_sLastSyncStatus <> "TIMEOUT" And $g_sLastSyncStatus <> "ERROR" Then Return
+
+	Local $sBody = ""
+	If $g_sLastSyncCmd <> "" Then $sBody &= "[command]" & @CRLF & $g_sLastSyncCmd & @CRLF & @CRLF
+	If $g_sLastSyncOutput <> "" Then $sBody &= $g_sLastSyncOutput
+	If $sBody = "" Then $sBody = Lang("Sync", "NoDetails", "No details available.")
+
+	; MsgBox обрезает очень длинные строки — ограничим, остальное в консоль
+	Local Const $iMaxLen = 4000
+	If StringLen($sBody) > $iMaxLen Then
+		ConsoleWrite($sBody & @CRLF)
+		$sBody = StringLeft($sBody, $iMaxLen) & @CRLF & @CRLF & "... (truncated, see console)"
+	EndIf
+
+	MsgBox(64, $gc_sAppName & " — sync details", $sBody)
+EndFunc   ;==>_OnEvent_LabelSyncStatusClick
 
 
 Func _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical, $iOffsetMs = 0)
@@ -956,8 +1049,8 @@ EndFunc   ;==>_BuildVideoCompareCommand
 
 Func _ShouldUseFullscreen($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical)
 	Local $tDesktopRect = _WinAPI_GetWorkArea()
-	Local $iDesktopWidth = DllStructGetData($tDesktopRect, "Right")
-	Local $iDesktopHeight = DllStructGetData($tDesktopRect, "Bottom")
+	Local $iDesktopWidth  = DllStructGetData($tDesktopRect, "Right")  - DllStructGetData($tDesktopRect, "Left")
+	Local $iDesktopHeight = DllStructGetData($tDesktopRect, "Bottom") - DllStructGetData($tDesktopRect, "Top")
 
 	Local $iMaxWidth = _Max($aVideo1Info[0], $aVideo2Info[0])
 	Local $iMaxHeight = _Max($aCropArgs[2], $aCropArgs[3])
@@ -1155,7 +1248,6 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iLabelInfo2, $iDockStretchH)
 	GUICtrlSetResizing($g_iSeparator, $iDockStretchH)
 	GUICtrlSetResizing($g_iEditCommand, $iDockStretchHV)
-	GUICtrlSetResizing($g_iProgressSync, $iDockStretchH)
 
 	; Фиксированные слева
 	GUICtrlSetResizing($g_iLabel1, $iDockFixed)
@@ -1173,6 +1265,7 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iButtonSwap, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonChoose2, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonCompare, $iDockFixedBR)
+	GUICtrlSetResizing($g_iLabelSyncStatus, $iDockFixedRight)
 	GUICtrlSetResizing($g_iInputOffset, $iDockFixedRight)
 EndFunc   ;==>_SetCtrlResizing
 
@@ -1406,7 +1499,7 @@ Func _NormalizePath($sValue)
 	; Абсолютный путь: диск:\ или UNC \\ или корень /\
 	If StringRegExp($sValue, "^(?:[A-Za-z]:\\|\\\\|/)") Then Return $sValue
 	; Иначе считаем относительным к папке скрипта
-	Return @ScriptDir & "\\" & $sValue
+	Return @ScriptDir & "\" & $sValue
 EndFunc   ;==>_NormalizePath
 
 
@@ -1503,8 +1596,8 @@ Func _ApplyLanguage()
 	GUICtrlSetData($g_iRadioVertical, Lang("GUI", "CompareVertical", "Vertical"))
 	GUICtrlSetData($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
 	GUICtrlSetData($g_iLabelOffset, Lang("GUI", "Offset", "Offset:"))
-	GUICtrlSetData($g_iRadioOffsetAuto, Lang("GUI", "OffsetAuto", "Automatically"))
-	GUICtrlSetData($g_iRadioOffsetManual, Lang("GUI", "OffsetManual", "Set manually"))
+	GUICtrlSetData($g_iRadioOffsetAuto, Lang("GUI", "OffsetAuto", "Auto"))
+	GUICtrlSetData($g_iRadioOffsetManual, Lang("GUI", "OffsetManual", "Manual"))
 	GUICtrlSetData($g_iLabelCommand, Lang("GUI", "TabCommand", "Command"))
 	_RenderHeader()
 	_UpdateFilesInfo()
@@ -1601,6 +1694,11 @@ Func _ApplyTheme()
 	; Поле ввода сдвига
 	GUICtrlSetColor($g_iInputOffset, $g_iClrFg)
 	GUICtrlSetBkColor($g_iInputOffset, $g_iClrInput)
+
+	; Статус-иконка sync — прозрачный фон. Цвет символа задаётся в _SetSyncStatus.
+	GUICtrlSetBkColor($g_iLabelSyncStatus, $GUI_BKCOLOR_TRANSPARENT)
+	; При смене темы пересчитываем цвет под текущий статус
+	If $g_sLastSyncStatus <> "" Then _SetSyncStatus($g_sLastSyncStatus, $g_iLastSyncOffset)
 
 	; Горизонтальный разделитель
 	GUICtrlSetBkColor($g_iSeparator, $g_iClrSep)

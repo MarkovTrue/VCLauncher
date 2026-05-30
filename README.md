@@ -2,19 +2,26 @@
 
 [![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/latest/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
 
-Удобный GUI лончер для [video-compare](https://github.com/pixop/video-compare), миллионы загрузок не могут ошибаться.
+Удобный GUI-лаунчер для [Video Compare](https://github.com/pixop/video-compare). Помогает наглядно сравнить две версии фильма и решить, какая лучше подойдёт для коллекции. Также можно быстро определить рассинхрон и использовать его для переноса аудиодорожек между релизами.
 
-![Preview](Assets/prevew.png)
+
+![Preview](Assets/Preview.png)
 
 ### Возможности
 
-- ✂️ Автоматический расчет подрезки высоты, для сравнения видео с разными пропорциями
-- 🖥️ Автоматическое масштабирование, если видео выходит за пределы экрана
-- ↔️ Быстрое переключение между режимами сравнения
-- 🎯 Поддержка Drag-and-drop
-- 💾 Автосохранение последних выбранных файлов
+- ✂️ Автоматический расчет подрезки высоты для сравнения видео с разными пропорциями
+- ↔️ Быстрый поиск временной задержки между видеофайлами
+- Автомасштабирование окна, если видео выходит за пределы экрана
+- Быстрое переключение между режимами сравнения
+- Поддержка перетаскивания drag-and-drop
+- Возможность ручного редактирования команды запуска `video-compare`
+- Шпаргалка с некоторыми часто используемыми хоткеями `video-compare`
+- Кеширование и автосохранение
+- Поддержка темы и локализации
+- Скрывается консоль `video-compare`
 
 ### VCLauncher использует (уже включено в релиз)
 
-- [FFmpeg](https://github.com/FFmpeg/FFmpeg) - ffprobe.exe
-- [Video-compare](https://github.com/pixop/video-compare)
+- `Video-compare` - сам движок сравнения
+- `FFmpeg.exe` - [FFmpeg](https://github.com/FFmpeg/FFmpeg) для извлечения аудио/видео потоков
+- `Sync.exe` - собственная утилита детекции временного сдвига

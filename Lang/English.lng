@@ -11,8 +11,8 @@ Running=Running
 SwapTip=Swap files
 Offset=Delay
 SyncVideo=Synchronize video
-OffsetAuto=Automatically
-OffsetManual=Set manually ms
+OffsetAuto=Auto
+OffsetManual=Manual
 TabHotkeys=Hotkeys
 TabCommand=Command
 TabSettings=Settings
@@ -62,6 +62,9 @@ Video=Video
 12={ALT}{PLUS}{MINUS} Shift ±100 frames
 
 [Sync]
-StatusTimeout=sync: timeout (Clear cache to retry)
-StatusNoMatch=sync: no matches found (Clear cache to retry)
-StatusError=sync: error
+StatusWorking=Status: searching…
+StatusOk=Status: OK, offset %d ms
+StatusNoMatch=Status: no matches found
+StatusTimeout=Status: timeout
+StatusError=Status: error
+NoDetails=No details available.
