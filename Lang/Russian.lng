@@ -23,6 +23,7 @@ ThemeLight=Светлая
 ThemeDark=Тёмная
 ClearCache=Сбросить кеш
 Settings=Настройки
+CardParams=Параметры
 OK=ОК
 Cancel=Отмена
 
@@ -56,15 +57,16 @@ Video=Видео
 6={PGUP}{PGDOWN} Перемотка ±10 мин
 7={3} Показать/скрыть HUD
 8={0} Режим видео/вычитания
-9={Y} Переключить режим вычитания
+9={Y} Сменить режим вычитания
 10={PLUS}{MINUS} Сдвиг ±1 кадр
 11={CTRL}{PLUS}{MINUS} Сдвиг ±10 кадров
 12={ALT}{PLUS}{MINUS} Сдвиг ±100 кадров
 
 [Sync]
+StatusNotRun=Статус: поиск не запускался
 StatusWorking=Статус: поиск…
 StatusOk=Статус: ОК, смещение %d мс
 StatusNoMatch=Статус: совпадений не найдено
-StatusTimeout=Статус: таймаут
+StatusTimeout=Статус: выход по таймауту
 StatusError=Статус: ошибка
 NoDetails=Деталей нет.

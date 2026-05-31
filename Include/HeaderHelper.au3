@@ -2,9 +2,6 @@
 #include <GDIPlus.au3>
 #include <WinAPI.au3>
 
-Global $g_hHeaderPrivateFontCollection = 0
-Global Const $gc_sHeaderKeyFontFamily = "Kenney Input Keyboard & Mouse"
-
 ; ============================================================
 ; HeaderHelper.au3 — переиспользуемый рендер шапки окна
 ; ============================================================
@@ -12,8 +9,8 @@ Global Const $gc_sHeaderKeyFontFamily = "Kenney Input Keyboard & Mouse"
 
 ; Рендерит шапку и устанавливает результат в GUI Pic-контрол.
 ; $hBitmapPrev передаётся ByRef для корректного освобождения старого HBITMAP.
-Func _HeaderRenderToPic($iPicCtrl, ByRef $hBitmapPrev, $sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "")
-	Local $hBmp = _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, $aHintRows, $iIconSizeDelta, $nFontSize, $iFontStyle, $iBackColorArgb, $sLeftIconPath)
+Func _HeaderRenderToPic($iPicCtrl, ByRef $hBitmapPrev, $sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "", $sTitleApp = "", $sTitleVc = "", $sTitleRight = "", $sTitleVcVer = "")
+	Local $hBmp = _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, $aHintRows, $iIconSizeDelta, $nFontSize, $iFontStyle, $iBackColorArgb, $sLeftIconPath, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
 	If Not $hBmp Then Return False
 
 	Local $hWnd = GUICtrlGetHandle($iPicCtrl)
@@ -42,115 +39,106 @@ Func _HeaderDisposeBitmap(ByRef $hBitmap)
 EndFunc   ;==>_HeaderDisposeBitmap
 
 
-; Создаёт HBITMAP шапки (логотип + подсказки), но не назначает его контролу.
-Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "")
-	If Not FileExists($sLogoPath) Then Return 0
+; Создаёт HBITMAP шапки (логотип + два заголовка + подсказки), но не назначает его контролу.
+; Раскладка: слева логотип и две строки заголовка, вертикальный разделитель,
+; справа заголовок и две колонки подсказок. Фон — сплошной цвет темы, без тени текста.
+Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "", $sTitleApp = "", $sTitleVc = "", $sTitleRight = "", $sTitleVcVer = "")
+	#forceref $sLogoPath
 	If Not IsArray($aHintRows) Then Return 0
-
 	Local $iHintsCount = UBound($aHintRows)
 	If $iHintsCount < 1 Then Return 0
 
 	_GDIPlus_Startup()
-	Local $hImage = _GDIPlus_ImageLoadFromFile($sLogoPath)
-	If @error Or Not $hImage Then
-		_GDIPlus_Shutdown()
-		Return 0
-	EndIf
-
-	Local $iSrcW = _GDIPlus_ImageGetWidth($hImage)
-	Local $iSrcH = _GDIPlus_ImageGetHeight($hImage)
 
 	Local $hCanvas = _GDIPlus_BitmapCreateFromScan0($iDstW, $iDstH)
 	Local $hGfx = _GDIPlus_ImageGetGraphicsContext($hCanvas)
 	_GDIPlus_GraphicsSetInterpolationMode($hGfx, 7) ; HighQualityBicubic
 	_GDIPlus_GraphicsSetTextRenderingHint($hGfx, 5) ; AntiAliasGridFit
+	_GDIPlus_GraphicsSetSmoothingMode($hGfx, 2) ; HighQuality
+	DllCall("gdiplus.dll", "int", "GdipSetPixelOffsetMode", "handle", $hGfx, "int", 2) ; HighQuality
 
 	Local $bDarkSkin = (StringLower($sTheme) = "dark")
-	If $iBackColorArgb = -1 Then $iBackColorArgb = ($bDarkSkin ? 0xFF121212 : 0xFFF2F2F2)
+	If $iBackColorArgb = -1 Then $iBackColorArgb = ($bDarkSkin ? 0xFF1E1E1E : 0xFFF2F2F2)
 	Local $hBackBrush = _GDIPlus_BrushCreateSolid($iBackColorArgb)
 	_GDIPlus_GraphicsFillRect($hGfx, 0, 0, $iDstW, $iDstH, $hBackBrush)
 	_GDIPlus_BrushDispose($hBackBrush)
 
-	; Логотип рисуется 1:1 без растяжения.
-	_GDIPlus_GraphicsDrawImageRect($hGfx, $hImage, 0, 0, $iSrcW, $iSrcH)
-	_GDIPlus_ImageDispose($hImage)
+	Local $iColText = $bDarkSkin ? 0xFFF0F0F0 : 0xFF1A1A1A
+	Local $iColSub  = $bDarkSkin ? 0xFF969AA2 : 0xFF6E6E6E
+	Local $iColSep  = $bDarkSkin ? 0xFF484C54 : 0xFFD0D0D0
+	Local $sIconTheme = $bDarkSkin ? "Light" : "Dark"
 
-	; Иконка слева поверх логотипа, максимальный размер из .ico без растяжения.
+	; --- логотип слева, прижат к верху ---
+	Local Const $iIcoTarget = 36
+	Local $iIcoX = 14
+	Local $iIcoY = 14
 	If $sLeftIconPath <> "" And FileExists($sLeftIconPath) Then
-		Local $hIconBmp = __HeaderLoadIcoMaxBitmap($sLeftIconPath, $iDstH)
+		Local $hIconBmp = __HeaderLoadHeaderIcon($sLeftIconPath, $iIcoTarget)
 		If $hIconBmp Then
-			Local $iIcoW = _GDIPlus_ImageGetWidth($hIconBmp)
-			Local $iIcoH = _GDIPlus_ImageGetHeight($hIconBmp)
-			Local $iIcoX = 16
-			Local $iIcoY = Int(($iDstH - $iIcoH) / 2)
-			If $iIcoY < 0 Then $iIcoY = 0
-			__HeaderDrawImageAlpha($hGfx, $hIconBmp, $iIcoX, $iIcoY, $iIcoW, $iIcoH, 0.85)
+			__HeaderDrawImageAlpha($hGfx, $hIconBmp, $iIcoX, $iIcoY, $iIcoTarget, $iIcoTarget, 1.0)
 			_GDIPlus_ImageDispose($hIconBmp)
 		EndIf
 	EndIf
 
-	__HeaderEnsureKeyFontCollection()
-
+	; --- шрифты и кисти ---
 	Local $hFamily = _GDIPlus_FontFamilyCreate($sFontName)
 	Local $hFont = _GDIPlus_FontCreate($hFamily, $nFontSize, $iFontStyle)
-	Local $hKeyFamily = __HeaderCreateKeyFontFamily()
-	If @error Or Not $hKeyFamily Then $hKeyFamily = $hFamily
-	Local $hKeyFont = _GDIPlus_FontCreate($hKeyFamily, 26, $iFontStyle)
-	Local $hBrush = _GDIPlus_BrushCreateSolid($bDarkSkin ? 0xFFF5F5F5 : 0xFF111111)
-	Local $hBrushShadow = _GDIPlus_BrushCreateSolid($bDarkSkin ? 0xAA000000 : 0xAAFFFFFF)
-	Local $sIconTheme = $bDarkSkin ? "Light" : "Dark"
+	Local $hTitleFont = _GDIPlus_FontCreate($hFamily, 10, 1) ; заголовок приложения, bold
+	Local $hVcFont = _GDIPlus_FontCreate($hFamily, 10, 0)    ; "Video-compare" + версия
+	Local $hRightTitleFont = _GDIPlus_FontCreate($hFamily, 10, 1) ; заголовок колонки клавиш
+	Local $hBrush = _GDIPlus_BrushCreateSolid($iColText)
+	Local $hSubBrush = _GDIPlus_BrushCreateSolid($iColSub)
 	Local $hFormat = _GDIPlus_StringFormatCreate()
 
+	; --- заголовок под иконкой: VCLauncher (жирный), затем Video-compare и версия
+	; двумя строками (обычный, приглушённый). Блок прижат к левому краю под иконкой. ---
+	Local $iTitleX = $iIcoX
+	Local $iTitleY = $iIcoY + $iIcoTarget + 6
+	Local $iLineStep = 17
+	__HeaderDrawText($hGfx, $sTitleApp, $hTitleFont, $hBrush, $hFormat, $iTitleX, $iTitleY, 130)
+	__HeaderDrawText($hGfx, $sTitleVc, $hVcFont, $hSubBrush, $hFormat, $iTitleX, $iTitleY + $iLineStep, 130)
+	__HeaderDrawText($hGfx, $sTitleVcVer, $hVcFont, $hSubBrush, $hFormat, $iTitleX, $iTitleY + $iLineStep * 2, 130)
+
+	; --- вертикальный разделитель (заголовок теперь под иконкой, блок ужат влево) ---
+	Local $iSepX = 148
+	Local $hPen = _GDIPlus_PenCreate($iColSep, 1)
+	_GDIPlus_GraphicsDrawLine($hGfx, $iSepX, 14, $iSepX, $iDstH - 14, $hPen)
+	_GDIPlus_PenDispose($hPen)
+
+	; --- правый заголовок ---
+	Local $iRightX = 162
+	__HeaderDrawText($hGfx, $sTitleRight, $hRightTitleFont, $hBrush, $hFormat, $iRightX, 11, $iDstW - $iRightX - 8)
+
+	; --- подсказки: две ровные колонки под правым заголовком ---
+	; Ширина колонок адаптивна: половина зоны от $iRightX до правого края.
+	; Так вторая колонка ($iRightX + $iColGap) не выходит за край при любой ширине окна.
 	Local $iRowsPerCol = Int(($iHintsCount + 1) / 2)
-	Local $iCol1X = Int($iDstW * 0.2) - 12
-	Local $iColW = Int(($iDstW - $iCol1X - 8) / 2)
-	Local $iCol2X = $iCol1X + $iColW
-
-	; Шахматный порядок в пределах двух колонок: X-сдвиг по строкам
-	; + небольшой вертикальный сдвиг правой колонки.
-	Local $iTopPad = 4
-	Local $iBottomPad = 4
-	Local $iAvailH = $iDstH - $iTopPad - $iBottomPad
-	Local $iLineH = 16
-	If $iAvailH < $iLineH Then $iLineH = $iAvailH
-
-	Local $iRowStep = 0
-	If $iRowsPerCol > 1 Then
-		$iRowStep = Int(($iAvailH - $iLineH) / ($iRowsPerCol - 1))
-		If $iRowStep < 11 Then $iRowStep = 11
-	EndIf
-
-	Local $iBlockH = (($iRowsPerCol - 1) * $iRowStep) + $iLineH
-	Local $iTextY = Int(($iDstH - $iBlockH) / 2)
-	If $iTextY < $iTopPad Then $iTextY = $iTopPad
-
-	Local $iChessShiftX = 8
-	Local $iRightYOffset = 0 ; убираем вертикальный сдвиг для выравнивания колонок
-	Local $iDrawW = $iColW - $iChessShiftX - 2
-	If $iDrawW < 40 Then $iDrawW = $iColW - 2
+	Local $iColGap = Int(($iDstW - $iRightX - 8) / 2)
+	Local $iColW = $iColGap - 8
+	Local $iKeysY0 = 36
+	Local $iLineH = 15
+	Local $iBottomPad = 6
+	Local $nRowStep = $iLineH + 3
+	If $iRowsPerCol > 1 Then $nRowStep = ($iDstH - $iKeysY0 - $iLineH - $iBottomPad) / ($iRowsPerCol - 1)
 
 	For $i = 0 To $iRowsPerCol - 1
+		Local $iRowY = $iKeysY0 + Int($i * $nRowStep)
 		If $i < $iHintsCount Then
-			Local $iLeftX = $iCol1X + (Mod($i, 2) = 1 ? $iChessShiftX : 0)
-			Local $iLeftY = $iTextY + ($i * $iRowStep)
-			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$i], $hKeyFont, $hFont, $hFormat, $hBrushShadow, $hBrush, $iLeftX, $iLeftY, $iDrawW, $iLineH, $iIconSizeDelta)
+			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$i], $hFont, $hFormat, $hBrush, $iRightX, $iRowY, $iColW, $iLineH, $iIconSizeDelta)
 		EndIf
-
 		Local $iRight = $i + $iRowsPerCol
 		If $iRight < $iHintsCount Then
-			   Local $iRightX = $iCol2X + (Mod($i, 2) = 0 ? $iChessShiftX : 0)
-			   Local $iRightY = $iTextY + ($i * $iRowStep) ; без сдвига
-			If ($iRightY + $iLineH) > ($iDstH - $iBottomPad) Then $iRightY = $iDstH - $iBottomPad - $iLineH
-			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$iRight], $hKeyFont, $hFont, $hFormat, $hBrushShadow, $hBrush, $iRightX, $iRightY, $iDrawW, $iLineH, $iIconSizeDelta)
+			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$iRight], $hFont, $hFormat, $hBrush, $iRightX + $iColGap, $iRowY, $iColW, $iLineH, $iIconSizeDelta)
 		EndIf
 	Next
 
-	_GDIPlus_FontDispose($hKeyFont)
-	If $hKeyFamily <> $hFamily Then _GDIPlus_FontFamilyDispose($hKeyFamily)
 	_GDIPlus_FontDispose($hFont)
+	_GDIPlus_FontDispose($hTitleFont)
+	_GDIPlus_FontDispose($hVcFont)
+	_GDIPlus_FontDispose($hRightTitleFont)
 	_GDIPlus_FontFamilyDispose($hFamily)
-	_GDIPlus_BrushDispose($hBrushShadow)
 	_GDIPlus_BrushDispose($hBrush)
+	_GDIPlus_BrushDispose($hSubBrush)
 	_GDIPlus_StringFormatDispose($hFormat)
 
 	Local $hBmp = _GDIPlus_BitmapCreateHBITMAPFromBitmap($hCanvas)
@@ -161,10 +149,18 @@ Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDst
 EndFunc   ;==>_HeaderCreateBitmap
 
 
-Func __HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sTheme, $sRawLine, $hKeyFont, $hTextFont, $hFormat, $hBrushShadow, $hBrush, $iX, $iY, $iW, $iH, $iIconSizeDelta)
+; Рисует строку текста в заданной точке (левое выравнивание, фикс. ширина layout).
+Func __HeaderDrawText($hGfx, $sText, $hFont, $hBrush, $hFormat, $iX, $iY, $iW = 300)
+	If $sText = "" Then Return
+	Local $tLayout = _GDIPlus_RectFCreate($iX, $iY, $iW, 22)
+	_GDIPlus_GraphicsDrawStringEx($hGfx, $sText, $hFont, $tLayout, $hFormat, $hBrush)
+EndFunc   ;==>__HeaderDrawText
+
+
+Func __HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sTheme, $sRawLine, $hTextFont, $hFormat, $hBrush, $iX, $iY, $iW, $iH, $iIconSizeDelta)
 	Local $sIcons = __HeaderHotkeyIconsFromTags($sRawLine)
 	Local $sText = __HeaderHotkeyTextFromTags($sRawLine)
-	__HeaderDrawHotkeyHintRow($hGfx, $sIconsRootPath, $sTheme, $sIcons, $sText, $hKeyFont, $hTextFont, $hFormat, $hBrushShadow, $hBrush, $iX, $iY, $iW, $iH, $iIconSizeDelta)
+	__HeaderDrawHotkeyHintRow($hGfx, $sIconsRootPath, $sTheme, $sIcons, $sText, $hTextFont, $hFormat, $hBrush, $iX, $iY, $iW, $iH, $iIconSizeDelta)
 EndFunc   ;==>__HeaderDrawHotkeyHintRowLocalized
 
 
@@ -187,8 +183,7 @@ Func __HeaderHotkeyTextFromTags($sLine)
 EndFunc   ;==>__HeaderHotkeyTextFromTags
 
 
-Func __HeaderDrawHotkeyHintRow($hGfx, $sIconsRootPath, $sTheme, $sIcons, $sText, $hKeyFont, $hTextFont, $hFormat, $hBrushShadow, $hBrush, $iX, $iY, $iW, $iH, $iIconSizeDelta)
-	#forceref $hKeyFont
+Func __HeaderDrawHotkeyHintRow($hGfx, $sIconsRootPath, $sTheme, $sIcons, $sText, $hTextFont, $hFormat, $hBrush, $iX, $iY, $iW, $iH, $iIconSizeDelta)
 	Local $aTokens = StringSplit($sIcons, "+", 2)
 	Local $iCurX = $iX
 	Local $iIconSize = 14
@@ -212,9 +207,8 @@ Func __HeaderDrawHotkeyHintRow($hGfx, $sIconsRootPath, $sTheme, $sIcons, $sText,
 	Local $iTextW = $iW - ($iTextX - $iX)
 	If $iTextW < 8 Then Return
 
-	Local $tLayoutShadow = _GDIPlus_RectFCreate($iTextX + 1, $iY, $iTextW, $iH)
+	; Текст без тени (полупрозрачная подложка убрана).
 	Local $tLayout = _GDIPlus_RectFCreate($iTextX, $iY - 1, $iTextW, $iH)
-	_GDIPlus_GraphicsDrawStringEx($hGfx, $sText, $hTextFont, $tLayoutShadow, $hFormat, $hBrushShadow)
 	_GDIPlus_GraphicsDrawStringEx($hGfx, $sText, $hTextFont, $tLayout, $hFormat, $hBrush)
 EndFunc   ;==>__HeaderDrawHotkeyHintRow
 
@@ -302,11 +296,21 @@ Func __HeaderDrawImageAlpha($hGfx, $hImage, $iX, $iY, $iW, $iH, $nAlpha)
 			"ptr", $hAttr, "int", $ColorAdjustTypeBitmap, "bool", True, _
 			"ptr", DllStructGetPtr($tCM), "ptr", 0, "int", 0)
 
+	; Clamp по краям — без полупрозрачной каймы при бикубическом уменьшении.
+	Local Const $WrapModeTileFlipXY = 3
+	DllCall("gdiplus.dll", "int", "GdipSetImageAttributesWrapMode", _
+			"ptr", $hAttr, "int", $WrapModeTileFlipXY, "uint", 0, "bool", False)
+
+	; Исходный прямоугольник — натуральный размер изображения; целевой — заданный.
+	; Масштаб выполняется с InterpolationMode контекста (HighQualityBicubic).
+	Local $iSrcW = _GDIPlus_ImageGetWidth($hImage)
+	Local $iSrcH = _GDIPlus_ImageGetHeight($hImage)
+
 	Local Const $UnitPixel = 2
 	DllCall("gdiplus.dll", "int", "GdipDrawImageRectRectI", _
 			"handle", $hGfx, "handle", $hImage, _
 			"int", $iX, "int", $iY, "int", $iW, "int", $iH, _
-			"int", 0, "int", 0, "int", $iW, "int", $iH, _
+			"int", 0, "int", 0, "int", $iSrcW, "int", $iSrcH, _
 			"int", $UnitPixel, "ptr", $hAttr, "ptr", 0, "ptr", 0)
 
 	DllCall("gdiplus.dll", "int", "GdipDisposeImageAttributes", "ptr", $hAttr)
@@ -314,17 +318,31 @@ Func __HeaderDrawImageAlpha($hGfx, $hImage, $iX, $iY, $iW, $iH, $nAlpha)
 EndFunc   ;==>__HeaderDrawImageAlpha
 
 
-; Загружает из .ico кадр с максимальным доступным размером и возвращает GDI+ Bitmap.
-; $iHintSize — подсказка желаемого размера (Windows выберет ближайший большой).
-Func __HeaderLoadIcoMaxBitmap($sIcoPath, $iHintSize = 256)
+; Загружает логотип шапки. PNG читается напрямую через GDI+ (полная 8-бит альфа,
+; сглаженные края); .ico — через кадр нужного размера. Масштаб делает вызывающий код.
+Func __HeaderLoadHeaderIcon($sPath, $iTargetSize = 48)
+	If StringRight(StringLower($sPath), 4) = ".png" Then
+		Local $hImg = _GDIPlus_ImageLoadFromFile($sPath)
+		If @error Or Not $hImg Then Return 0
+		Return $hImg
+	EndIf
+	Return __HeaderLoadIcoBitmap($sPath, $iTargetSize)
+EndFunc   ;==>__HeaderLoadHeaderIcon
+
+
+; Загружает из .ico кадр заданного целевого размера и возвращает GDI+ Bitmap.
+; Рисуется 1:1, поэтому размер фиксирован и не зависит от крупных кадров в .ico
+; (256px и т.п. нужны для иконки exe/проводника, но в шапке были бы огромными).
+Func __HeaderLoadIcoBitmap($sIcoPath, $iTargetSize = 48)
 	Local $iMax = __HeaderIcoMaxSize($sIcoPath)
-	If $iMax <= 0 Then $iMax = $iHintSize
+	Local $iLoad = $iTargetSize
+	If $iMax > 0 And $iMax < $iTargetSize Then $iLoad = $iMax ; не растягивать сверх доступного кадра
 
 	Local Const $IMAGE_ICON = 1
 	Local Const $LR_LOADFROMFILE = 0x00000010
 	Local $aLoad = DllCall("user32.dll", "handle", "LoadImageW", _
 			"ptr", 0, "wstr", $sIcoPath, "uint", $IMAGE_ICON, _
-			"int", $iMax, "int", $iMax, "uint", $LR_LOADFROMFILE)
+			"int", $iLoad, "int", $iLoad, "uint", $LR_LOADFROMFILE)
 	If @error Or Not IsArray($aLoad) Or $aLoad[0] = 0 Then Return 0
 
 	Local $hIcon = $aLoad[0]
@@ -332,7 +350,7 @@ Func __HeaderLoadIcoMaxBitmap($sIcoPath, $iHintSize = 256)
 	DllCall("user32.dll", "bool", "DestroyIcon", "handle", $hIcon)
 	If @error Or Not IsArray($aCreate) Or $aCreate[0] <> 0 Then Return 0
 	Return $aCreate[2]
-EndFunc   ;==>__HeaderLoadIcoMaxBitmap
+EndFunc   ;==>__HeaderLoadIcoBitmap
 
 
 ; Разбирает заголовок .ico и возвращает максимальную ширину среди записей.
@@ -358,41 +376,6 @@ Func __HeaderIcoMaxSize($sIcoPath)
 	FileClose($hFile)
 	Return $iMax
 EndFunc   ;==>__HeaderIcoMaxSize
-
-
-Func __HeaderEnsureKeyFontCollection()
-	If $g_hHeaderPrivateFontCollection Then Return True
-
-	Local $sFontPath = @ScriptDir & "\Assets\Fonts\kenney_input_keyboard_&_mouse.ttf"
-	If Not FileExists($sFontPath) Then Return False
-
-	; Загружаем шрифт в приватную коллекцию GDI+, доступную только процессу.
-	Local $aNew = DllCall("gdiplus.dll", "int", "GdipNewPrivateFontCollection", "ptr*", 0)
-	If @error Or Not IsArray($aNew) Or $aNew[0] <> 0 Or $aNew[1] = 0 Then Return False
-
-	Local $hCollection = $aNew[1]
-	Local $aAdd = DllCall("gdiplus.dll", "int", "GdipPrivateAddFontFile", "ptr", $hCollection, "wstr", $sFontPath)
-	If @error Or Not IsArray($aAdd) Or $aAdd[0] <> 0 Then
-		Return False
-	EndIf
-
-	$g_hHeaderPrivateFontCollection = $hCollection
-	Return True
-EndFunc   ;==>__HeaderEnsureKeyFontCollection
-
-
-Func __HeaderCreateKeyFontFamily()
-	If __HeaderEnsureKeyFontCollection() Then
-		Local $aCreate = DllCall("gdiplus.dll", "int", "GdipCreateFontFamilyFromName", _
-				"wstr", $gc_sHeaderKeyFontFamily, _
-				"ptr", $g_hHeaderPrivateFontCollection, _
-				"ptr*", 0)
-		If Not @error And IsArray($aCreate) And $aCreate[0] = 0 And $aCreate[3] <> 0 Then Return $aCreate[3]
-	EndIf
-
-	; Fallback на системный поиск, если приватная загрузка недоступна.
-	Return _GDIPlus_FontFamilyCreate($gc_sHeaderKeyFontFamily)
-EndFunc   ;==>__HeaderCreateKeyFontFamily
 
 
 Func __HeaderGetHotkeyGlyph($sToken)

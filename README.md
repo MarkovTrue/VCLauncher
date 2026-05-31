@@ -1,4 +1,6 @@
-# <img src="https://github.com/user-attachments/assets/da615466-683e-4cc5-8380-32a98d743ba0" alt="Logo" width="24"/>&nbsp; VCLauncher
+[Русский](README.md) | [English](README.en.md)
+
+# <img src="Assets/Icon/HeaderIcon.png" alt="Logo" width="28" align="absmiddle"/>&nbsp; VCLauncher
 
 [![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/latest/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
 
@@ -6,6 +8,8 @@
 
 
 ![Preview](Assets/Preview.png)
+
+![Preview](Assets/PreviewCompare.png)
 
 ### Возможности
 
@@ -18,7 +22,7 @@
 - Шпаргалка с некоторыми часто используемыми хоткеями `video-compare`
 - Кеширование и автосохранение
 - Поддержка темы и локализации
-- Скрывается консоль `video-compare`
+- Скрытие консоли `video-compare`
 
 ### VCLauncher использует (уже включено в релиз)
 

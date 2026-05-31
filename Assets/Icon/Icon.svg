@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+<clipPath id="card"><rect x="8" y="8" width="496" height="496" rx="72"/></clipPath>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2B2F3A"/><stop offset="1" stop-color="#171A22"/></linearGradient>
+<filter id="sc" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000000" flood-opacity="0.50"/></filter>
+<filter id="so" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="9" stdDeviation="10" flood-color="#000000" flood-opacity="0.55"/></filter>
+</defs>
+<g clip-path="url(#card)">
+<rect width="512" height="512" fill="url(#bg)"/>
+<g transform="translate(256 256) scale(1.34) translate(-256 -256)">
+<!-- cyan-слой целиком, с тенью -->
+<g filter="url(#sc)">
+<rect x="103" y="143" width="272" height="192" rx="20" fill="none" stroke="#22D3EE" stroke-width="11" opacity="1.0"/>
+<path d="M176.22 163.32 L176.22 314.68 L301.78 239 Z" fill="#22D3EE" stroke="#22D3EE" stroke-width="6" stroke-linejoin="round" opacity="1.0"/>
+</g>
+<!-- orange-слой целиком поверх cyan, с более глубокой тенью -->
+<g filter="url(#so)">
+<rect x="137" y="177" width="272" height="192" rx="20" fill="none" stroke="#FB923C" stroke-width="11" opacity="0.9"/>
+<path d="M210.22 197.32 L210.22 348.68 L335.78 273 Z" fill="#FB923C" stroke="#FB923C" stroke-width="6" stroke-linejoin="round" opacity="0.85"/>
+</g>
+</g>
+</g>
+<rect x="10" y="10" width="492" height="492" rx="70" fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="6"/>
+</svg>

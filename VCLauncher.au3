@@ -1,5 +1,5 @@
 #pragma compile(Out, VCLauncher.exe)
-#pragma compile(Icon, Assets\icon.ico)
+#pragma compile(Icon, Assets\Icon\Icon.ico)
 
 #NoTrayIcon
 #RequireAdmin
@@ -30,15 +30,16 @@
 Opt("GUIOnEventMode", 1)
 
 ; Константы приложения
-Global Const $gc_sAppName = "VCLauncher 1.05"
+Global Const $gc_sAppName = "VCLauncher 1.06"
+Global Const $gc_sVcVersion = '20260502 "valencia"' ; версия video-compare, отображается в шапке
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
 Global Const $gc_aSupportedExtensions[] = [ _
         "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "asf", "flv", "f4v", "mpg", "mpeg", "mp2", "m2v", _
         "ts", "m2ts", "mts", "mxf", "vob", "3gp", "3g2", "ogv", "ogg", "dv", "divx", "rm", "rmvb", "gif", "vpy"]
-Global Const $gc_iGuiWidth = 500
-Global Const $gc_iHeaderH = 90 ; высота шапки с логотипом
-Global Const $gc_iGuiHeight = $gc_iHeaderH + 285 ; высота клиента
+Global Const $gc_iGuiWidth = 558
+Global Const $gc_iHeaderH = 120 ; высота шапки с логотипом
+Global Const $gc_iGuiHeight = $gc_iHeaderH + 289 ; высота клиента (+4px воздуха после полоски)
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
 Global $g_sPathSync = @ScriptDir & '\Sync\dist\Sync.exe'
@@ -49,6 +50,10 @@ Global $g_iSyncSkipSec = Int(IniRead($gc_sPathIni, "Settings", "SyncSkipSec", 30
 Global $g_sSyncMethod = IniRead($gc_sPathIni, "Settings", "SyncMethod", "audio") ; audio | video
 ; Максимальное время работы Sync.exe в секундах — по истечении процесс убивается
 Global $g_iSyncTimeoutSec = Int(IniRead($gc_sPathIni, "Settings", "SyncTimeoutSec", 60))
+; Подозрительно большой сдвиг (мс): свыше — перепроверяем встречным методом по видео
+Global $g_iSyncSuspectMs = Int(IniRead($gc_sPathIni, "Settings", "SyncSuspectMs", 10000))
+; Допуск совпадения audio и video при перепроверке (мс)
+Global $g_iSyncVerifyTolMs = Int(IniRead($gc_sPathIni, "Settings", "SyncVerifyTolMs", 500))
 
 ; Создание ini и cache по умолчанию, если отсутствуют
 _EnsureIniDefaults()
@@ -58,13 +63,14 @@ _EnsureUtf16File($gc_sPathCache)
 Global $g_hGui, $g_iInput1, $g_iInput2, $g_iButtonChoose1, $g_iButtonChoose2, $g_iButtonSwap, $g_iButtonCompare, $g_iRadioDirect, $g_iRadioVertical
 Global $g_iLogoPic, $g_hLogoBitmap = 0 ; картинка-логотип в шапке и её HBITMAP для освобождения
 Global $g_hCompareImgList = 0 ; HIMAGELIST иконки кнопки «Сравнить» для освобождения при замене
+Global $g_hSettingsImgList = 0, $g_hSwapImgList = 0 ; HIMAGELIST иконок кнопок настроек/свопа
 Global $g_sAppFont = "MS Shell Dlg 2", $g_iAppFontSize = 9
 ; Кеш в памяти: разрешения видео и сдвиги sync. Ключ включает mtime —
 ; автоматически инвалидируется, если файл на диске заменён.
 Global $g_oCache[]
 Global $g_iLabel1, $g_iLabel2, $g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelCompare, $g_iLabelCommand
 Global $g_iEditCommand, $g_iButtonSettings ; кнопка настроек в шапке
-Global $g_iSeparator
+Global $g_iSeparator, $g_iSeparatorTop
 Global $g_hSettingsGui = 0, $g_iSettingsComboLang, $g_iSettingsComboTheme
 Global $g_iSettingsLabelLang, $g_iSettingsLabelTheme
 Global $g_iSettingsButtonClearCache = 0
@@ -113,11 +119,19 @@ WEnd
 ; Освобождение GDI/HIMAGELIST handle'ов — срабатывает при любом пути выхода.
 Func _Cleanup()
 	_HeaderDisposeBitmap($g_hLogoBitmap)
-	If $g_hCompareImgList Then
-		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $g_hCompareImgList)
-		$g_hCompareImgList = 0
-	EndIf
+	_DestroyImgList($g_hCompareImgList)
+	_DestroyImgList($g_hSettingsImgList)
+	_DestroyImgList($g_hSwapImgList)
 EndFunc   ;==>_Cleanup
+
+
+; Освобождает HIMAGELIST и обнуляет переменную (ByRef).
+Func _DestroyImgList(ByRef $hList)
+	If $hList Then
+		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $hList)
+		$hList = 0
+	EndIf
+EndFunc   ;==>_DestroyImgList
 
 
 Func _MainGUI()
@@ -125,15 +139,20 @@ Func _MainGUI()
 
 	_ApplyAppFont()
 
-	; Кнопка настроек — создаётся ДО LogoPic, чтобы не оказаться под ним в z-order
-	$g_iButtonSettings = GUICtrlCreateButton("⚙", $gc_iGuiWidth - 40, 8, 32, 32)
-	GUICtrlSetFont($g_iButtonSettings, 14, 400)
-	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
-
 	; Шапка: логотип слева + шпаргалка горячих клавиш справа (рисуется в _RenderHeader)
 	$g_iLogoPic = GUICtrlCreatePic("", 0, 0, $gc_iGuiWidth, $gc_iHeaderH)
 
-	Local $iY = $gc_iHeaderH + 12 ; отступ от нижнего края шапки
+	; Кнопка настроек перекрывает LogoPic. В AutoIt перекрытие Pic и кнопки
+	; разрешается по z-order сразу и для отрисовки, и для кликов. Z-order
+	; принудительно выставляется через SetWindowPos в конце _MainGUI.
+	$g_iButtonSettings = GUICtrlCreateButton("", $gc_iGuiWidth - 40, 8, 30, 30) ; иконка-шестерёнка ставится ниже (PNG)
+	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
+
+	; Разделитель сразу под шапкой (как перед блоком «Смещение»)
+	$g_iSeparatorTop = GUICtrlCreateLabel("", 0, $gc_iHeaderH, $gc_iGuiWidth, 1)
+	GUICtrlSetBkColor($g_iSeparatorTop, 0xC0C0C0)
+
+	Local $iY = $gc_iHeaderH + 16 ; отступ от нижнего края шапки (+4px воздуха после полоски)
 
 	; --- Видео 1 ---
 	$g_iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 10, $iY + 3, 74, 20)
@@ -166,9 +185,8 @@ Func _MainGUI()
 	GUICtrlSetColor($g_iLabelInfo2, 0x808080)
 
 	; --- Поменять местами ---
-	$g_iButtonSwap = GUICtrlCreateButton(ChrW(0x21C5), $gc_iGuiWidth - 82, $iY + 25, 70, 23)
+	$g_iButtonSwap = GUICtrlCreateButton("", $gc_iGuiWidth - 60, $iY + 24, 26, 26) ; иконка-свап ставится ниже (PNG)
 	GUICtrlSetTip($g_iButtonSwap, Lang("GUI", "SwapTip", "Swap files"))
-	GUICtrlSetFont($g_iButtonSwap, $g_iAppFontSize + 1, 700, 0, $g_sAppFont)
 
 	; --- Разделитель ---
 	$g_iSeparator = GUICtrlCreateLabel("", 0, $iY + 100, $gc_iGuiWidth, 1)
@@ -184,12 +202,13 @@ Func _MainGUI()
 	; --- Синхронизация ---
 	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset:"), 10, $iY + 115, 74, 20)
 	GUIStartGroup()
-	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Auto"), 90, $iY + 113, 80, 20)
+	$g_iRadioOffsetAuto = GUICtrlCreateRadio(Lang("GUI", "OffsetAuto", "Auto"), 90, $iY + 113, 50, 20)
 	GUICtrlSetState($g_iRadioOffsetAuto, $GUI_CHECKED)
-	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Manual"), 174, $iY + 113, 80, 20)
-	; Статус-иконка sync — Unicode-символ в Label. SS_NOTIFY чтобы Label принимал клики.
-	$g_iLabelSyncStatus = GUICtrlCreateLabel("", $gc_iGuiWidth - 174, $iY + 113, 18, 20, BitOR($SS_NOTIFY, $SS_CENTER))
-	GUICtrlSetFont($g_iLabelSyncStatus, $g_iAppFontSize + 3, 700, 0, $g_sAppFont)
+	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Manual"), $gc_iGuiWidth - 228, $iY + 113, 72, 20)
+	; Статус sync — цветной текст рядом с «Авто»: смещение при OK, краткое слово иначе.
+	; SS_NOTIFY чтобы Label принимал клики (детали ошибки).
+	$g_iLabelSyncStatus = GUICtrlCreateLabel("", 142, $iY + 115, $gc_iGuiWidth - 376, 20, $SS_NOTIFY)
+	GUICtrlSetFont($g_iLabelSyncStatus, $g_iAppFontSize, 400, 0, $g_sAppFont)
 	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 113, 60, 20)
 	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
 
@@ -200,13 +219,22 @@ Func _MainGUI()
 	; --- Кнопка «Сравнить» ---
 	Local Const $BS_MULTILINE = 0x2000
 	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 171, 70, 70, $BS_MULTILINE)
-	_UpdateCompareButtonIcon()
+	; иконки кнопок назначаются в _ApplyTheme (_ApplyButtonIcons) — зависят от темы
 
 	_SetCtrlResizing()
 	_RenderHeader()
 	_ApplyTheme()
 
 	GUISetState(@SW_SHOW)
+
+	; Кнопка настроек лежит поверх LogoPic. Поднимаем её в начало z-order:
+	; иначе Pic перехватывает и отрисовку (иконка не видна до активации окна),
+	; и клики (HWND_TOP=0, SWP_NOMOVE|SWP_NOSIZE=0x3).
+	DllCall("user32.dll", "bool", "SetWindowPos", "hwnd", GUICtrlGetHandle($g_iButtonSettings), _
+			"hwnd", 0, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0003)
+	; Образ кнопки (imagelist) не рисуется до hover — форсируем перерисовку
+	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", GUICtrlGetHandle($g_iButtonSettings), _
+			"ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW)
 
 	; Отложенная загрузка: окно уже видно, теперь подтягиваем данные
 	_TryFillCachedOffset()
@@ -309,20 +337,6 @@ Func _OnEvent_ButtonCompare()
 EndFunc   ;==>_OnEvent_ButtonCompare
 
 
-Func _OnEvent_ButtonClearCache()
-	Local $mEmpty[]
-	$g_oCache = $mEmpty
-
-	; Удаляем файл кеша на диске и пересоздаём пустой с BOM
-	FileDelete($gc_sPathCache)
-	_EnsureUtf16File($gc_sPathCache)
-
-	GUICtrlSetData($g_iInputOffset, "")
-	_SetSyncStatus("")
-	_UpdateCommandField()
-EndFunc   ;==>_OnEvent_ButtonClearCache
-
-
 Func _OnEvent_ButtonSettings()
 	If $g_hSettingsGui <> 0 Then Return
 	_SettingsWindow()
@@ -347,6 +361,8 @@ Func _OnEvent_ButtonSwap()
 	If $sOffset <> "" Then
 		GUICtrlSetData($g_iInputOffset, -Int($sOffset))
 	EndIf
+	; Статус-текст «Авто» показывает то же смещение — инвертируем и его
+	If $g_sLastSyncStatus = "OK" Then _SetSyncStatus("OK", -Int($g_iLastSyncOffset))
 	_UpdateFilesInfo()
 EndFunc   ;==>_OnEvent_ButtonSwap
 
@@ -655,8 +671,9 @@ Func _GetCacheInfo($sFile)
 	Local $sCached = IniRead($gc_sPathCache, "Info", $sDiskKey, "")
 	If $sCached = "" Then Return $aEmpty
 
+	; Формат значения: индекс|mtime|разрешение (3 поля)
 	Local $aParts = StringSplit($sCached, "|")
-	If $aParts[0] < 4 Then Return $aEmpty
+	If $aParts[0] < 3 Then Return $aEmpty
 
 	Local $sMtime = FileGetTime($sFile, $FT_MODIFIED, 1)
 	If $aParts[2] <> $sMtime Then Return $aEmpty
@@ -813,6 +830,11 @@ Func _GetSyncOffset($sFile1, $sFile2)
 	; Вызов Sync.exe с таймаутом и прогрессом
 	Local $aRun = _RunSyncWithTimeout($sFile1, $sFile2, $g_iSyncTimeoutSec)
 
+	; Подозрительно большой сдвиг перепроверяем по видео (для audio-метода)
+	If $aRun[0] = "OK" And Abs($aRun[1]) > $g_iSyncSuspectMs And $g_sSyncMethod <> "video" Then
+		$aRun = _VerifyOffsetByVideo($sFile1, $sFile2, $aRun)
+	EndIf
+
 	; Сохраняем ЛЮБОЙ исход: валидный сдвиг как число, неудачу как маркер
 	If $aRun[0] = "OK" Then
 		_SaveSyncCache($sFile1, $sFile2, $aRun[1])
@@ -824,14 +846,26 @@ Func _GetSyncOffset($sFile1, $sFile2)
 EndFunc   ;==>_GetSyncOffset
 
 
+; Перепроверяет подозрительно большой сдвиг встречным video-методом.
+; Совпало в пределах допуска — возвращаем исходный результат, иначе ["NOMATCH", 0].
+Func _VerifyOffsetByVideo($sFile1, $sFile2, $aPrimary)
+	Local $aNoMatch[2] = ["NOMATCH", 0]
+	Local $aVideo = _RunSyncWithTimeout($sFile1, $sFile2, $g_iSyncTimeoutSec, "video")
+	If $aVideo[0] <> "OK" Then Return $aNoMatch
+	If Abs($aVideo[1] - $aPrimary[1]) > $g_iSyncVerifyTolMs Then Return $aNoMatch
+	Return $aPrimary
+EndFunc   ;==>_VerifyOffsetByVideo
+
+
 ; Запускает Sync.exe и ждёт результат с таймаутом.
 ; Возвращает массив [$sStatus, $iOffset]:
 ;   ["OK", <число>]   — sync вернул валидный сдвиг (exit 0 + число в stdout)
 ;   ["TIMEOUT", 0]    — истёк $iTimeoutSec, процесс убит
 ;   ["NOMATCH", 0]    — Sync.exe завершился с ненулевым exit code (совпадений не найдено)
 ;   ["ERROR", 0]      — прочие сбои (exit 0, но stdout без числа)
-Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec)
-	Local $sCmdLine = '"' & $g_sPathSync & '" sync --method ' & $g_sSyncMethod & ' --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
+Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec, $sMethod = "")
+	If $sMethod = "" Then $sMethod = $g_sSyncMethod
+	Local $sCmdLine = '"' & $g_sPathSync & '" sync --method ' & $sMethod & ' --v1 "' & $sFile1 & '" --v2 "' & $sFile2 & '" --skip ' & $g_iSyncSkipSec & ' --ffmpeg "' & $g_sPathFFmpeg & '"'
 	; Сохраняем для click-details в статус-иконке
 	$g_sLastSyncCmd = $sCmdLine
 	$g_sLastSyncOutput = ""
@@ -914,13 +948,13 @@ EndFunc   ;==>_ComposeSyncOutput
 Func _TryFillCachedOffset()
 	If GUICtrlRead($g_iRadioOffsetAuto) <> $GUI_CHECKED Then Return
 	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then
-		_SetSyncStatus("")
+		_SetSyncStatus("NOTRUN")
 		Return
 	EndIf
 
 	Local $aCached = _LookupSyncCache($g_sVideoFile1, $g_sVideoFile2)
 	If Not $aCached[0] Then
-		_SetSyncStatus("")
+		_SetSyncStatus("NOTRUN")
 		Return
 	EndIf
 
@@ -933,8 +967,8 @@ Func _TryFillCachedOffset()
 EndFunc   ;==>_TryFillCachedOffset
 
 
-; Единая точка обновления статус-иконки sync. $sStatus: "" | WORKING | OK | NOMATCH | TIMEOUT | ERROR.
-; $iOffset используется только для OK — выводится в tooltip.
+; Единая точка обновления статус-текста sync. $sStatus: "" | NOTRUN | WORKING | OK | NOMATCH | TIMEOUT | ERROR.
+; В лейбл пишем полный текст статуса; %d (смещение) подставляется для OK.
 Func _SetSyncStatus($sStatus, $iOffset = 0)
 	_SyncSpinnerStop()
 	$g_sLastSyncStatus = $sStatus
@@ -942,49 +976,44 @@ Func _SetSyncStatus($sStatus, $iOffset = 0)
 
 	If $sStatus = "" Then
 		GUICtrlSetData($g_iLabelSyncStatus, "")
-		GUICtrlSetTip($g_iLabelSyncStatus, "")
 		Return
 	EndIf
 
-	Local $sIcon = "", $iColor = 0, $sTipKey = ""
+	Local $iColor = 0, $sTextKey = ""
 	Switch $sStatus
+		Case "NOTRUN"
+			$iColor = $g_iClrInfo ; неактивный цвет: поиск ещё не запускался
+			$sTextKey = "StatusNotRun"
 		Case "WORKING"
-			$sIcon = $gc_aSpinnerFrames[0]
-			$iColor = $g_bDarkMode ? 0x4FC3F7 : 0x0066CC
-			$sTipKey = "StatusWorking"
-			_SyncSpinnerStart()
+			$iColor = $g_iClrInfo ; неактивный цвет во время поиска
+			$sTextKey = "StatusWorking"
+			_SyncSpinnerStart() ; текст рисует _SyncSpinnerRender (спиннер + статус)
 		Case "OK"
-			$sIcon = ChrW(0x25CF) ; ●
 			$iColor = $g_bDarkMode ? 0x66BB6A : 0x2E7D32
-			$sTipKey = "StatusOk"
+			$sTextKey = "StatusOk"
 		Case "NOMATCH"
-			$sIcon = ChrW(0x25B2) ; ▲
 			$iColor = $g_bDarkMode ? 0xFFCA28 : 0xC68400
-			$sTipKey = "StatusNoMatch"
+			$sTextKey = "StatusNoMatch"
 		Case "TIMEOUT"
-			$sIcon = ChrW(0x25A0) ; ■
 			$iColor = $g_bDarkMode ? 0xFFA726 : 0xC85A00
-			$sTipKey = "StatusTimeout"
+			$sTextKey = "StatusTimeout"
 		Case "ERROR"
-			$sIcon = ChrW(0x2715) ; ✕
 			$iColor = $g_bDarkMode ? 0xEF5350 : 0xC0392B
-			$sTipKey = "StatusError"
+			$sTextKey = "StatusError"
 		Case Else
 			Return
 	EndSwitch
 
-	GUICtrlSetData($g_iLabelSyncStatus, $sIcon)
+	If $sStatus <> "WORKING" Then
+		GUICtrlSetData($g_iLabelSyncStatus, StringReplace(Lang("Sync", $sTextKey, $sStatus), "%d", $iOffset))
+	EndIf
 	GUICtrlSetColor($g_iLabelSyncStatus, $iColor)
-
-	; Шаблон вида "Статус: ОК, смещение %d мс" — %d подставляем для OK
-	Local $sTip = Lang("Sync", $sTipKey, $sStatus)
-	$sTip = StringReplace($sTip, "%d", $iOffset)
-	GUICtrlSetTip($g_iLabelSyncStatus, $sTip)
 EndFunc   ;==>_SetSyncStatus
 
 
 Func _SyncSpinnerStart()
 	$g_iSpinnerIdx = 0
+	_SyncSpinnerRender()
 	AdlibRegister("_SyncSpinnerTick", 120)
 EndFunc   ;==>_SyncSpinnerStart
 
@@ -996,8 +1025,14 @@ EndFunc   ;==>_SyncSpinnerStop
 
 Func _SyncSpinnerTick()
 	$g_iSpinnerIdx = Mod($g_iSpinnerIdx + 1, UBound($gc_aSpinnerFrames))
-	GUICtrlSetData($g_iLabelSyncStatus, $gc_aSpinnerFrames[$g_iSpinnerIdx])
+	_SyncSpinnerRender()
 EndFunc   ;==>_SyncSpinnerTick
+
+
+; Кадр спиннера плюс полный текст статуса поиска.
+Func _SyncSpinnerRender()
+	GUICtrlSetData($g_iLabelSyncStatus, $gc_aSpinnerFrames[$g_iSpinnerIdx] & " " & Lang("Sync", "StatusWorking", "searching…"))
+EndFunc   ;==>_SyncSpinnerRender
 
 
 ; Клик по статус-иконке для NOMATCH/TIMEOUT/ERROR — MsgBox с командой и stdout/stderr.
@@ -1247,13 +1282,14 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iInput2, $iDockStretchH)
 	GUICtrlSetResizing($g_iLabelInfo2, $iDockStretchH)
 	GUICtrlSetResizing($g_iSeparator, $iDockStretchH)
+	GUICtrlSetResizing($g_iSeparatorTop, $iDockStretchH)
 	GUICtrlSetResizing($g_iEditCommand, $iDockStretchHV)
 
 	; Фиксированные слева
 	GUICtrlSetResizing($g_iLabel1, $iDockFixed)
 	GUICtrlSetResizing($g_iLabelOffset, $iDockFixed)
 	GUICtrlSetResizing($g_iRadioOffsetAuto, $iDockFixed)
-	GUICtrlSetResizing($g_iRadioOffsetManual, $iDockFixed)
+	GUICtrlSetResizing($g_iLabelSyncStatus, $iDockFixed)
 	GUICtrlSetResizing($g_iLabel2, $iDockFixed)
 	GUICtrlSetResizing($g_iLabelCompare, $iDockFixed)
 	GUICtrlSetResizing($g_iRadioDirect, $iDockFixed)
@@ -1265,7 +1301,7 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iButtonSwap, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonChoose2, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonCompare, $iDockFixedBR)
-	GUICtrlSetResizing($g_iLabelSyncStatus, $iDockFixedRight)
+	GUICtrlSetResizing($g_iRadioOffsetManual, $iDockFixedRight)
 	GUICtrlSetResizing($g_iInputOffset, $iDockFixedRight)
 EndFunc   ;==>_SetCtrlResizing
 
@@ -1289,9 +1325,15 @@ Func _RenderHeader()
 	Local $sLogoPath = @ScriptDir & "\Assets\Logo.png"
 	Local $sIconsRoot = @ScriptDir & "\Assets\KeyIcons"
 	Local $sKeyTheme = $g_bDarkMode ? "Dark" : "Light"
-	Local $sHeaderIcon = @ScriptDir & "\Assets\Icon.ico"
+	Local $sHeaderIcon = @ScriptDir & "\Assets\Icon\HeaderIcon.png"
 
-	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sLogoPath, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0, -1, $sHeaderIcon)
+	; Заголовки шапки под иконкой: VCLauncher, затем Video-compare и его версия отдельной строкой.
+	Local $sTitleApp = $gc_sAppName
+	Local $sTitleVc = "Video-compare"
+	Local $sTitleVcVer = $gc_sVcVersion
+	Local $sTitleRight = Lang("Hotkeys", "1", "Горячие клавиши Video-compare")
+
+	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sLogoPath, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0, -1, $sHeaderIcon, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
 EndFunc   ;==>_RenderHeader
 
 
@@ -1308,7 +1350,8 @@ EndFunc   ;==>_SetButtonIcon
 ; Оборачивает HICON в новый HIMAGELIST и назначает его кнопке.
 ; HICON уничтожается после добавления в имидж-лист. Возвращает HIMAGELIST
 ; (вызывающий ответственен за ImageList_Destroy старого списка при замене).
-Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize)
+; $iAlign: 2 = TOP (иконка над текстом), 4 = CENTER (только иконка). $iMarginTop — верхний отступ.
+Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize, $iAlign = 2, $iMarginTop = 10)
 	Local $aImgList = DllCall("comctl32.dll", "handle", "ImageList_Create", _
 			"int", $iIconSize, "int", $iIconSize, "uint", $ILC_COLOR32, "int", 1, "int", 0)
 	If @error Then
@@ -1321,14 +1364,14 @@ Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize)
 			"handle", $hImgList, "int", -1, "handle", $hIcon)
 	DllCall("user32.dll", "bool", "DestroyIcon", "handle", $hIcon)
 
-	; BUTTON_IMAGELIST: himl, margin(l,t,r,b), uAlign=2 (BUTTON_IMAGELIST_ALIGN_TOP)
+	; BUTTON_IMAGELIST: himl, margin(l,t,r,b), uAlign
 	Local $tBIL = DllStructCreate("handle himl;int l;int t;int r;int b;uint uAlign")
 	DllStructSetData($tBIL, "himl", $hImgList)
 	DllStructSetData($tBIL, "l", 0)
-	DllStructSetData($tBIL, "t", 10)
+	DllStructSetData($tBIL, "t", $iMarginTop)
 	DllStructSetData($tBIL, "r", 0)
 	DllStructSetData($tBIL, "b", 0)
-	DllStructSetData($tBIL, "uAlign", 2)
+	DllStructSetData($tBIL, "uAlign", $iAlign)
 
 	DllCall("user32.dll", "lresult", "SendMessageW", "hwnd", GUICtrlGetHandle($iCtrl), _
 			"uint", $BCM_SETIMAGELIST, "wparam", 0, "struct*", $tBIL)
@@ -1337,8 +1380,34 @@ Func _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize)
 EndFunc   ;==>_ApplyHIconToButton
 
 
+; Цвет иконок = цвет текста кнопки текущей темы, чуть мягче (светлая — тёмно-серый, тёмная — светлый).
+Func _IconTint()
+	Return $g_bDarkMode ? 0xE6E6E6 : 0x303030
+EndFunc   ;==>_IconTint
+
+
+; Ставит PNG-иконку из Assets\Icon по центру кнопки, перекрашенную под тему. Возвращает HIMAGELIST.
+Func _SetButtonCenterIcon($iCtrl, $sPngName, $iIconSize)
+	Local $sPath = @ScriptDir & "\Assets\Icon\" & $sPngName
+	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize, _IconTint())
+	If Not $hIcon Then Return 0
+	Return _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize, 4, 0) ; 4 = BUTTON_IMAGELIST_ALIGN_CENTER
+EndFunc   ;==>_SetButtonCenterIcon
+
+
+; (Пере)назначает иконки кнопок под текущую тему. Освобождает старые imagelist'ы.
+Func _ApplyButtonIcons()
+	_DestroyImgList($g_hSettingsImgList)
+	_DestroyImgList($g_hSwapImgList)
+	$g_hSettingsImgList = _SetButtonCenterIcon($g_iButtonSettings, "Settings.png", 18)
+	$g_hSwapImgList = _SetButtonCenterIcon($g_iButtonSwap, "Swap.png", 16)
+	_UpdateCompareButtonIcon() ; сама освобождает старый $g_hCompareImgList
+EndFunc   ;==>_ApplyButtonIcons
+
+
 ; Загружает PNG в HICON квадратного размера $iIconSize через GDI+.
-Func _LoadHIconFromPng($sPngPath, $iIconSize)
+; $iTint >= 0 — перекрашивает иконку в цвет 0xRRGGBB (силуэт по альфе), сохраняя сглаживание.
+Func _LoadHIconFromPng($sPngPath, $iIconSize, $iTint = -1)
 	If Not FileExists($sPngPath) Then Return 0
 
 	_GDIPlus_Startup()
@@ -1355,6 +1424,14 @@ Func _LoadHIconFromPng($sPngPath, $iIconSize)
 		Return 0
 	EndIf
 
+	If $iTint >= 0 Then
+		Local $hTinted = __TintCopy($hScaled, $iIconSize, $iTint)
+		If $hTinted Then
+			_GDIPlus_BitmapDispose($hScaled)
+			$hScaled = $hTinted
+		EndIf
+	EndIf
+
 	Local $hIcon = _GDIPlus_HICONCreateFromBitmap($hScaled)
 	_GDIPlus_BitmapDispose($hScaled)
 	_GDIPlus_Shutdown()
@@ -1364,6 +1441,51 @@ Func _LoadHIconFromPng($sPngPath, $iIconSize)
 EndFunc   ;==>_LoadHIconFromPng
 
 
+; Возвращает копию GDI+ bitmap, перекрашенную в сплошной цвет $iColor (0xRRGGBB),
+; с сохранением альфы (силуэт). Требует уже запущенного GDI+. Возвращает 0 при ошибке.
+Func __TintCopy($hImg, $iSize, $iColor)
+	Local $hBmp = _GDIPlus_BitmapCreateFromScan0($iSize, $iSize)
+	If @error Or Not $hBmp Then Return 0
+	Local $hGfx = _GDIPlus_ImageGetGraphicsContext($hBmp)
+	_GDIPlus_GraphicsSetInterpolationMode($hGfx, 7) ; HighQualityBicubic
+
+	Local $nR = BitShift(BitAND($iColor, 0xFF0000), 16) / 255
+	Local $nG = BitShift(BitAND($iColor, 0x00FF00), 8) / 255
+	Local $nB = BitAND($iColor, 0x0000FF) / 255
+
+	; Обнуляем вклад входных RGB, альфу пропускаем, RGB задаём смещением (offset-строка)
+	Local $tCM = DllStructCreate("float[25]")
+	DllStructSetData($tCM, 1, 1.0, 19) ; A -> A
+	DllStructSetData($tCM, 1, $nR, 21) ; +R
+	DllStructSetData($tCM, 1, $nG, 22) ; +G
+	DllStructSetData($tCM, 1, $nB, 23) ; +B
+	DllStructSetData($tCM, 1, 1.0, 25)
+
+	Local $aAttr = DllCall("gdiplus.dll", "int", "GdipCreateImageAttributes", "ptr*", 0)
+	If @error Or Not IsArray($aAttr) Or $aAttr[0] <> 0 Then
+		_GDIPlus_GraphicsDispose($hGfx)
+		_GDIPlus_BitmapDispose($hBmp)
+		Return 0
+	EndIf
+	Local $hAttr = $aAttr[1]
+	Local Const $ColorAdjustTypeBitmap = 1
+	DllCall("gdiplus.dll", "int", "GdipSetImageAttributesColorMatrix", _
+			"ptr", $hAttr, "int", $ColorAdjustTypeBitmap, "bool", True, _
+			"ptr", DllStructGetPtr($tCM), "ptr", 0, "int", 0)
+
+	Local Const $UnitPixel = 2
+	DllCall("gdiplus.dll", "int", "GdipDrawImageRectRectI", _
+			"handle", $hGfx, "handle", $hImg, _
+			"int", 0, "int", 0, "int", $iSize, "int", $iSize, _
+			"int", 0, "int", 0, "int", $iSize, "int", $iSize, _
+			"int", $UnitPixel, "ptr", $hAttr, "ptr", 0, "ptr", 0)
+
+	DllCall("gdiplus.dll", "int", "GdipDisposeImageAttributes", "ptr", $hAttr)
+	_GDIPlus_GraphicsDispose($hGfx)
+	Return $hBmp
+EndFunc   ;==>__TintCopy
+
+
 ; Устанавливает иконку кнопки «Сравнить» согласно выбранному режиму радио.
 Func _UpdateCompareButtonIcon()
 	Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
@@ -1371,7 +1493,7 @@ Func _UpdateCompareButtonIcon()
 	Local $sPath = @ScriptDir & "\Assets\CompareIcons\" & $sIconName
 	Local Const $iIconSize = 32
 
-	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize)
+	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize, _IconTint()) ; перекраска под тему
 	If Not $hIcon Then Return
 
 	Local $hNew = _ApplyHIconToButton($g_iButtonCompare, $hIcon, $iIconSize)
@@ -1639,7 +1761,7 @@ Func _SetPalette()
 	If $g_bDarkMode Then
 		$g_iClrBg = $COLOR_CONTROL_BG
 		$g_iClrFg = $COLOR_TEXT_LIGHT
-		$g_iClrInfo = 0x9A9A9A
+		$g_iClrInfo = 0x969AA2 ; как подзаголовок шапки (HeaderHelper $iColSub, dark)
 		$g_iClrInput = 0x3C3C3C
 		$g_iClrSep = $COLOR_BORDER
 	Else
@@ -1700,11 +1822,21 @@ Func _ApplyTheme()
 	; При смене темы пересчитываем цвет под текущий статус
 	If $g_sLastSyncStatus <> "" Then _SetSyncStatus($g_sLastSyncStatus, $g_iLastSyncOffset)
 
+	; Иконки кнопок перекрашиваем под цвет текста темы
+	_ApplyButtonIcons()
+
 	; Горизонтальный разделитель
 	GUICtrlSetBkColor($g_iSeparator, $g_iClrSep)
+	GUICtrlSetBkColor($g_iSeparatorTop, $g_iClrSep)
 
 	; Иконки подсказок должны соответствовать выбранной теме (Dark/Light)
-	If $bNeedSwitch Then _RenderHeader()
+	If $bNeedSwitch Then
+		_RenderHeader()
+		; LogoPic перерисовался — снова поднимаем кнопку настроек над ним по z-order,
+		; иначе её иконка пропадает до наведения (Pic перехватывает отрисовку)
+		DllCall("user32.dll", "bool", "SetWindowPos", "hwnd", GUICtrlGetHandle($g_iButtonSettings), _
+				"hwnd", 0, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0003)
+	EndIf
 
 	; Финальная полная перерисовка окна
 	; RDW_INVALIDATE=0x1, RDW_UPDATENOW=0x100, RDW_ALLCHILDREN=0x80
@@ -1715,7 +1847,15 @@ EndFunc   ;==>_ApplyTheme
 
 
 Func _SettingsWindow()
-	$g_hSettingsGui = GUICreate(Lang("GUI", "Settings", "Settings"), 320, 145, -1, -1, _
+	; По центру основного окна (а не экрана)
+	Local Const $iSetW = 320, $iSetH = 145
+	Local $iSetX = -1, $iSetY = -1
+	Local $aMain = WinGetPos($g_hGui)
+	If Not @error Then
+		$iSetX = $aMain[0] + Int(($aMain[2] - $iSetW) / 2)
+		$iSetY = $aMain[1] + Int(($aMain[3] - $iSetH) / 2)
+	EndIf
+	$g_hSettingsGui = GUICreate(Lang("GUI", "Settings", "Settings"), $iSetW, $iSetH, $iSetX, $iSetY, _
 			$WS_CAPTION + $WS_SYSMENU, $WS_EX_DLGMODALFRAME, $g_hGui)
 
 	Local $iY = 20
@@ -1828,6 +1968,13 @@ Func _OnEvent_SettingsClearCache()
 	FileDelete($gc_sPathCache)
 	_EnsureUtf16File($gc_sPathCache)
 	GUICtrlSetState($g_iSettingsButtonClearCache, $GUI_DISABLE)
+
+	; В режиме «Авто» смещение бралось из кеша — очищаем поле, статус и команду
+	If GUICtrlRead($g_iRadioOffsetAuto) = $GUI_CHECKED Then
+		GUICtrlSetData($g_iInputOffset, "")
+		_SetSyncStatus("NOTRUN")
+		_UpdateCommandField()
+	EndIf
 EndFunc   ;==>_OnEvent_SettingsClearCache
 
 

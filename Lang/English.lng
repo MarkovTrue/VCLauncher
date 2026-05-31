@@ -62,6 +62,7 @@ Video=Video
 12={ALT}{PLUS}{MINUS} Shift ±100 frames
 
 [Sync]
+StatusNotRun=Status: search not started
 StatusWorking=Status: searching…
 StatusOk=Status: OK, offset %d ms
 StatusNoMatch=Status: no matches found
