@@ -13,3 +13,5 @@ Assets/KeyIcons/BuildKeyIcons.ps1
 Assets/KeyIcons/PIPELINE.md
 Assets/CompareIcons/BuildCompareIcons.ps1
 Docs/Sync.md
+.gitignore
+Assets/Icon/BuildLucideIcons.ps1
