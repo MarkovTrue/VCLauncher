@@ -10,12 +10,9 @@ Compare=Сравнить
 Running=Запущено
 SwapTip=Поменять файлы местами
 Offset=Смещение
-SyncVideo=Автоматически синхронизировать
 OffsetAuto=Авто
 OffsetManual=Вручную
-TabHotkeys=Шпаргалка
 TabCommand=Команда
-TabSettings=Настройки
 Language=Язык:
 Theme=Тема:
 ThemeSystem=Системная
@@ -23,9 +20,7 @@ ThemeLight=Светлая
 ThemeDark=Тёмная
 ClearCache=Сбросить кеш
 Settings=Настройки
-CardParams=Параметры
 OK=ОК
-Cancel=Отмена
 
 [Dialogs]
 SelectVideo1=Выберите видео 1
@@ -38,7 +33,6 @@ HeightDiff=разница высоты
 [Errors]
 ToolNotFound=Не найден "%TOOL%". Укажите полный путь в файле настроек, в секции Tools.
 SettingsWillOpen=Сейчас будет открыт файл настроек.
-Error=Ошибка
 UnsupportedFormat=Неподдерживаемый формат файла:
 SupportedFormats=Поддерживаемые форматы:
 ResolutionUnknown=Разрешение не определено

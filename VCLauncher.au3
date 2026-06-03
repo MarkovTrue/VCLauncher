@@ -810,8 +810,10 @@ Func _SaveSyncCache($sFile1, $sFile2, $vValue)
 	; Получаем/создаём индексы файлов в [Info]
 	Local $aInfo1 = _GetCacheInfo($sFile1)
 	Local $aInfo2 = _GetCacheInfo($sFile2)
-	Local $iIdx1 = ($aInfo1[0] <> "") ? Int($aInfo1[0]) : _SaveCacheInfo($sFile1, $aInfo1[1])
-	Local $iIdx2 = ($aInfo2[0] <> "") ? Int($aInfo2[0]) : _SaveCacheInfo($sFile2, $aInfo2[1])
+	; Если файла ещё нет в [Info] — определяем разрешение (из кеша или ffmpeg),
+	; чтобы не писать запись с пустым полем (иначе ffmpeg гоняется повторно).
+	Local $iIdx1 = ($aInfo1[0] <> "") ? Int($aInfo1[0]) : _SaveCacheInfo($sFile1, _GetVideoResolution($sFile1))
+	Local $iIdx2 = ($aInfo2[0] <> "") ? Int($aInfo2[0]) : _SaveCacheInfo($sFile2, _GetVideoResolution($sFile2))
 
 	IniWrite($gc_sPathCache, "Sync", $iIdx1 & "|" & $iIdx2, $vValue)
 EndFunc   ;==>_SaveSyncCache
@@ -1189,14 +1191,14 @@ EndFunc   ;==>_RunVideoCompare
 Func _ShowVideoCompareError($sOutput, $iExitCode)
 	Local $sMsg = _ExtractErrorLines($sOutput)
 	If $sMsg = "" Then $sMsg = StringStripWS($sOutput, 3)
-	If $sMsg = "" Then $sMsg = Lang("Errors", "VideoCompareNoOutput", "Нет сообщения об ошибке в выводе.")
+	If $sMsg = "" Then $sMsg = Lang("Errors", "VideoCompareNoOutput", "No error message in output.")
 
 	; Обрезаем слишком длинный вывод, чтобы MsgBox не разрастался
 	Local Const $iMaxLen = 1500
 	If StringLen($sMsg) > $iMaxLen Then $sMsg = "..." & StringRight($sMsg, $iMaxLen)
 
 	MsgBox(16, $gc_sAppName, _
-			Lang("Errors", "VideoCompareFailed", "video-compare завершился с ошибкой") & " (exit " & $iExitCode & ")" & @CRLF & @CRLF & $sMsg)
+			Lang("Errors", "VideoCompareFailed", "video-compare exited with an error") & " (exit " & $iExitCode & ")" & @CRLF & @CRLF & $sMsg)
 EndFunc   ;==>_ShowVideoCompareError
 
 
@@ -1322,7 +1324,6 @@ Func _RenderHeader()
 	$aHintRows[9] = Lang("Hotkeys", "12", "{ALT}{PLUS}{MINUS} Shift ±100 frames")
 
 
-	Local $sLogoPath = @ScriptDir & "\Assets\Logo.png"
 	Local $sIconsRoot = @ScriptDir & "\Assets\KeyIcons"
 	Local $sKeyTheme = $g_bDarkMode ? "Dark" : "Light"
 	Local $sHeaderIcon = @ScriptDir & "\Assets\Icon\HeaderIcon.png"
@@ -1331,9 +1332,9 @@ Func _RenderHeader()
 	Local $sTitleApp = $gc_sAppName
 	Local $sTitleVc = "Video-compare"
 	Local $sTitleVcVer = $gc_sVcVersion
-	Local $sTitleRight = Lang("Hotkeys", "1", "Горячие клавиши Video-compare")
+	Local $sTitleRight = Lang("Hotkeys", "1", "Video-compare hotkeys")
 
-	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sLogoPath, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0, -1, $sHeaderIcon, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
+	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0, -1, $sHeaderIcon, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
 EndFunc   ;==>_RenderHeader
 
 
@@ -1610,6 +1611,7 @@ EndFunc   ;==>_EnsureIniDefaults
 Func _EnsureUtf16File($sFilePath, $sContent = "")
 	If FileExists($sFilePath) Then Return
 	Local $hFile = FileOpen($sFilePath, $FO_OVERWRITE + $FO_UTF16_LE)
+	If $hFile = -1 Then Return
 	If $sContent <> "" Then FileWrite($hFile, $sContent)
 	FileClose($hFile)
 EndFunc   ;==>_EnsureUtf16File

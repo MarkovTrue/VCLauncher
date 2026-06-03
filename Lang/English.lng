@@ -9,13 +9,10 @@ CompareVertical=Vertical compare
 Compare=Compare
 Running=Running
 SwapTip=Swap files
-Offset=Delay
-SyncVideo=Synchronize video
+Offset=Offset
 OffsetAuto=Auto
 OffsetManual=Manual
-TabHotkeys=Hotkeys
 TabCommand=Command
-TabSettings=Settings
 Language=Language:
 Theme=Theme:
 ThemeSystem=System
@@ -24,7 +21,6 @@ ThemeDark=Dark
 ClearCache=Clear cache
 Settings=Settings
 OK=OK
-Cancel=Cancel
 
 [Dialogs]
 SelectVideo1=Select video 1
@@ -37,7 +33,6 @@ HeightDiff=height difference
 [Errors]
 ToolNotFound="%TOOL%" not found. Specify the full path in the settings file, under the Tools section.
 SettingsWillOpen=The settings file will now be opened.
-Error=Error
 UnsupportedFormat=Unsupported file format:
 SupportedFormats=Supported formats:
 ResolutionUnknown=Resolution not detected

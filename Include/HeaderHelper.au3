@@ -9,8 +9,8 @@
 
 ; Рендерит шапку и устанавливает результат в GUI Pic-контрол.
 ; $hBitmapPrev передаётся ByRef для корректного освобождения старого HBITMAP.
-Func _HeaderRenderToPic($iPicCtrl, ByRef $hBitmapPrev, $sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "", $sTitleApp = "", $sTitleVc = "", $sTitleRight = "", $sTitleVcVer = "")
-	Local $hBmp = _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, $aHintRows, $iIconSizeDelta, $nFontSize, $iFontStyle, $iBackColorArgb, $sLeftIconPath, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
+Func _HeaderRenderToPic($iPicCtrl, ByRef $hBitmapPrev, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "", $sTitleApp = "", $sTitleVc = "", $sTitleRight = "", $sTitleVcVer = "")
+	Local $hBmp = _HeaderCreateBitmap($sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, $aHintRows, $iIconSizeDelta, $nFontSize, $iFontStyle, $iBackColorArgb, $sLeftIconPath, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
 	If Not $hBmp Then Return False
 
 	Local $hWnd = GUICtrlGetHandle($iPicCtrl)
@@ -39,11 +39,10 @@ Func _HeaderDisposeBitmap(ByRef $hBitmap)
 EndFunc   ;==>_HeaderDisposeBitmap
 
 
-; Создаёт HBITMAP шапки (логотип + два заголовка + подсказки), но не назначает его контролу.
-; Раскладка: слева логотип и две строки заголовка, вертикальный разделитель,
+; Создаёт HBITMAP шапки (иконка + два заголовка + подсказки), но не назначает его контролу.
+; Раскладка: слева иконка и две строки заголовка, вертикальный разделитель,
 ; справа заголовок и две колонки подсказок. Фон — сплошной цвет темы, без тени текста.
-Func _HeaderCreateBitmap($sLogoPath, $sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "", $sTitleApp = "", $sTitleVc = "", $sTitleRight = "", $sTitleVcVer = "")
-	#forceref $sLogoPath
+Func _HeaderCreateBitmap($sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, ByRef $aHintRows, $iIconSizeDelta = 3, $nFontSize = 8.5, $iFontStyle = 1, $iBackColorArgb = -1, $sLeftIconPath = "", $sTitleApp = "", $sTitleVc = "", $sTitleRight = "", $sTitleVcVer = "")
 	If Not IsArray($aHintRows) Then Return 0
 	Local $iHintsCount = UBound($aHintRows)
 	If $iHintsCount < 1 Then Return 0
