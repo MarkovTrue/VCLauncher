@@ -1,15 +1,15 @@
 [Русский](README.md) | [English](README.en.md)
 
-# <img src="Assets/Icon/HeaderIcon.png" alt="Logo" width="28" align="absmiddle"/>&nbsp; VCLauncher
+# <img src="Assets/Icons/HeaderIcon.png" alt="Logo" width="28" align="absmiddle"/>&nbsp; VCLauncher
 
-[![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/latest/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
+[![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
 
 Удобный GUI-лаунчер для [Video Compare](https://github.com/pixop/video-compare). Помогает наглядно сравнить две версии фильма и решить, какая лучше подойдёт для коллекции. Также можно быстро определить рассинхрон и использовать его для переноса аудиодорожек между релизами.
 
 
 ![Preview](Assets/Preview.png)
 
-![Preview](Assets/PreviewCompare.png)
+![Preview](Assets/Compare.png)
 
 ### Возможности
 

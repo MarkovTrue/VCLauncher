@@ -1,15 +1,15 @@
 [Русский](README.md) | [English](README.en.md)
 
-# <img src="Assets/Icon/HeaderIcon.png" alt="Logo" width="28" align="absmiddle"/>&nbsp; VCLauncher
+# <img src="Assets/Icons/HeaderIcon.png" alt="Logo" width="28" align="absmiddle"/>&nbsp; VCLauncher
 
-[![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/latest/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
+[![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
 
 A handy GUI launcher for [Video Compare](https://github.com/pixop/video-compare). It helps you visually compare two versions of a movie and decide which one fits your collection better. You can also quickly detect a time offset and use it to transfer audio tracks between releases.
 
 
 ![Preview](Assets/Preview.en.png)
 
-![Preview](Assets/PreviewCompare.png)
+![Preview](Assets/Compare.png)
 
 ### Features
 

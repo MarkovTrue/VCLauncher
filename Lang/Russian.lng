@@ -64,3 +64,18 @@ StatusNoMatch=Статус: совпадений не найдено
 StatusTimeout=Статус: выход по таймауту
 StatusError=Статус: ошибка
 NoDetails=Деталей нет.
+
+[Updates]
+CheckLabel=Обновления:
+CheckNow=Проверить сейчас
+FreqNever=Никогда
+FreqAlways=При запуске
+FreqWeekly=Раз в неделю
+FreqMonthly=Раз в месяц
+LastCheck=Последняя проверка:
+LastCheckNever=не проверялось
+AvailableVersion=Доступна версия %s
+TitleUpdate=[Доступно обновление]
+
+[Cache]
+Desc=Кэш хранит разрешения видео и найденные сдвиги синхронизации. Сбросьте его, если данные устарели.

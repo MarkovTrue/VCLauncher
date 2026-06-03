@@ -1,5 +1,5 @@
 #pragma compile(Out, VCLauncher.exe)
-#pragma compile(Icon, Assets\Icon\Icon.ico)
+#pragma compile(Icon, Assets\Icons\Icon.ico)
 
 #NoTrayIcon
 #RequireAdmin
@@ -22,16 +22,19 @@
 #include <ImageListConstants.au3>
 #include <AutoItConstants.au3>
 #include <StaticConstants.au3>
+#include <StringConstants.au3>
+#include <InetConstants.au3>
+#include <Date.au3>
 
+#include "Include\AppConstants.au3"
 #include "Include\GUIDarkTheme.au3"
 #include "Include\FontHelper.au3"
 #include "Include\HeaderHelper.au3"
 
 Opt("GUIOnEventMode", 1)
 
-; Константы приложения
-Global Const $gc_sAppName = "VCLauncher 1.07"
-Global Const $gc_sVcVersion = '20260502 "valencia"' ; версия video-compare, отображается в шапке
+; Константы приложения ($gc_sAppName и сетевые URL - в Include\AppConstants.au3)
+Global $g_sVcVersion = "" ; версия video-compare для шапки; из ini или определяется через --version
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
 Global Const $gc_aSupportedExtensions[] = [ _
@@ -81,7 +84,14 @@ Global $g_iSeparator, $g_iSeparatorTop
 Global $g_hSettingsGui = 0, $g_iSettingsComboLang, $g_iSettingsComboTheme
 Global $g_iSettingsLabelLang, $g_iSettingsLabelTheme
 Global $g_iSettingsButtonClearCache = 0
+Global $g_iSettingsComboUpdates = 0, $g_iSettingsLabelUpdates = 0 ; combo обновлений + подпись
+Global $g_iSettingsButtonCheckNow = 0, $g_hSettingsCheckImgList = 0 ; кнопка ручной проверки + её imagelist
+Global $g_iSettingsLabelUpdateInfo = 0 ; одно поле: ссылка «Доступна версия X.XX» или дата проверки
+Global $g_hLinkSubclassCB = 0 ; callback subclass поля-ссылки (курсор-рука)
 Global $g_iLabelOffset, $g_iRadioOffsetAuto, $g_iRadioOffsetManual, $g_iLabelSyncStatus, $g_iInputOffset
+
+Global $g_sAvailableVersion = "" ; версия из проверки, если доступна новее текущей
+Global $g_bPulseActive = False, $g_bPulsePhase = False ; мигание кнопки настроек при наличии обновления
 
 ; Состояние последнего sync-запуска (для статус-иконки и MsgBox с деталями)
 Global $g_sLastSyncStatus = ""    ; "" | WORKING | OK | NOMATCH | TIMEOUT | ERROR
@@ -113,10 +123,15 @@ _InitTheme()
 _CheckToolExists($g_sPathVideoCompare, "video-compare.exe")
 _CheckToolExists($g_sPathSync, "Sync.exe")
 
+_InitVcVersion()
+
 OnAutoItExitRegister("_Cleanup")
 
 _MainGUI()
 _DefineEvents()
+
+; Фоновая проверка обновлений (окно уже показано в _MainGUI)
+_CheckUpdates()
 
 While 1
 	Sleep(50)
@@ -125,10 +140,16 @@ WEnd
 
 ; Освобождение GDI/HIMAGELIST handle'ов — срабатывает при любом пути выхода.
 Func _Cleanup()
+	If $g_bPulseActive Then AdlibUnRegister("_PulseSettingsButton")
 	_HeaderDisposeBitmap($g_hLogoBitmap)
 	_DestroyImgList($g_hCompareImgList)
 	_DestroyImgList($g_hSettingsImgList)
 	_DestroyImgList($g_hSwapImgList)
+	_DestroyImgList($g_hSettingsCheckImgList)
+	If $g_hLinkSubclassCB Then
+		DllCallbackFree($g_hLinkSubclassCB)
+		$g_hLinkSubclassCB = 0
+	EndIf
 EndFunc   ;==>_Cleanup
 
 
@@ -336,6 +357,7 @@ EndFunc   ;==>_OnEvent_ButtonCompare
 
 Func _OnEvent_ButtonSettings()
 	If $g_hSettingsGui <> 0 Then Return
+	_StopSettingsPulse() ; пользователь обратил внимание — гасим мигание
 	_SettingsWindow()
 EndFunc   ;==>_OnEvent_ButtonSettings
 
@@ -1274,6 +1296,7 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iLabelCommand, $iDockFixed)
 
 	; Фиксированные справа
+	GUICtrlSetResizing($g_iButtonSettings, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonChoose1, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonSwap, $iDockFixedRight)
 	GUICtrlSetResizing($g_iButtonChoose2, $iDockFixedRight)
@@ -1301,12 +1324,12 @@ Func _RenderHeader()
 
 	Local $sIconsRoot = @ScriptDir & "\Assets\KeyIcons"
 	Local $sKeyTheme = $g_bDarkMode ? "Dark" : "Light"
-	Local $sHeaderIcon = @ScriptDir & "\Assets\Icon\HeaderIcon.png"
+	Local $sHeaderIcon = @ScriptDir & "\Assets\Icons\HeaderIcon.png"
 
 	; Заголовки шапки под иконкой: VCLauncher, затем Video-compare и его версия отдельной строкой.
 	Local $sTitleApp = $gc_sAppName
 	Local $sTitleVc = "Video-compare"
-	Local $sTitleVcVer = $gc_sVcVersion
+	Local $sTitleVcVer = $g_sVcVersion
 	Local $sTitleRight = Lang("Hotkeys", "1", "Video-compare hotkeys")
 
 	; Фон шапки = фон GUI, чтобы полоса справа под кнопкой не отличалась по тону.
@@ -1367,10 +1390,12 @@ Func _IconTint()
 EndFunc   ;==>_IconTint
 
 
-; Ставит PNG-иконку из Assets\Icon по центру кнопки, перекрашенную под тему. Возвращает HIMAGELIST.
-Func _SetButtonCenterIcon($iCtrl, $sPngName, $iIconSize)
-	Local $sPath = @ScriptDir & "\Assets\Icon\" & $sPngName
-	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize, _IconTint())
+; Ставит PNG-иконку из Assets\Icons по центру кнопки, перекрашенную под тему. Возвращает HIMAGELIST.
+; $iTint = -1 — цвет по теме (_IconTint); иначе явный 0xRRGGBB (для пульсации кнопки).
+Func _SetButtonCenterIcon($iCtrl, $sPngName, $iIconSize, $iTint = -1)
+	If $iTint = -1 Then $iTint = _IconTint()
+	Local $sPath = @ScriptDir & "\Assets\Icons\" & $sPngName
+	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize, $iTint)
 	If Not $hIcon Then Return 0
 	Return _ApplyHIconToButton($iCtrl, $hIcon, $iIconSize, 4, 0) ; 4 = BUTTON_IMAGELIST_ALIGN_CENTER
 EndFunc   ;==>_SetButtonCenterIcon
@@ -1471,7 +1496,7 @@ EndFunc   ;==>__TintCopy
 Func _UpdateCompareButtonIcon()
 	Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
 	Local $sIconName = $bIsVertical ? "CompareVstack.png" : "CompareDirect.png"
-	Local $sPath = @ScriptDir & "\Assets\CompareIcons\" & $sIconName
+	Local $sPath = @ScriptDir & "\Assets\Icons\" & $sIconName
 	Local Const $iIconSize = 32
 
 	Local $hIcon = _LoadHIconFromPng($sPath, $iIconSize, _IconTint()) ; перекраска под тему
@@ -1582,7 +1607,10 @@ Func _EnsureIniDefaults()
 			"[Settings]" & @CRLF & _
 			"SyncSkipSec=300" & @CRLF & _
 			"SyncTimeoutSec=60" & @CRLF & _
-			"SyncMethod=audio" & @CRLF
+			"SyncMethod=audio" & @CRLF & _
+			"VcVersion=" & @CRLF & _
+			"UpdateCheckFreq=weekly" & @CRLF & _
+			"LastUpdateCheck=" & @CRLF
 	_EnsureUtf16File($gc_sPathIni, $sContent)
 EndFunc   ;==>_EnsureIniDefaults
 
@@ -1633,6 +1661,36 @@ Func _ResolveToolPaths()
 		$g_sPathFFmpeg = $sIniFFmpeg
 	EndIf
 EndFunc   ;==>_ResolveToolPaths
+
+
+; Версия video-compare для шапки. Берётся из ini; если там пусто — определяется
+; через --version и кешируется в настройки. Обновление происходит только когда
+; версия в ini не указана (по требованию).
+Func _InitVcVersion()
+	$g_sVcVersion = IniRead($gc_sPathIni, "Settings", "VcVersion", "")
+	If $g_sVcVersion <> "" Then Return
+	$g_sVcVersion = _DetectVcVersion()
+	If $g_sVcVersion <> "" Then IniWrite($gc_sPathIni, "Settings", "VcVersion", $g_sVcVersion)
+EndFunc   ;==>_InitVcVersion
+
+
+; Запрашивает версию у video-compare через "--version".
+; Вывод формата "video-compare 20260502-valencia" приводим к виду '20260502 "valencia"'.
+; Возвращает "" при ошибке запуска или нераспознанном выводе.
+Func _DetectVcVersion()
+	Local $iPid = Run('"' & $g_sPathVideoCompare & '" --version', @ScriptDir, @SW_HIDE, $STDOUT_CHILD)
+	If @error Or Not $iPid Then Return ""
+	ProcessWaitClose($iPid, 5)
+	Local $sOut = StdoutRead($iPid)
+	; Токен версии после "video-compare"
+	Local $aMatch = StringRegExp($sOut, '(?im)video-compare\s+(\S+)', 1)
+	If @error Then Return ""
+	Local $sRaw = $aMatch[0] ; напр. 20260502-valencia
+	; Дату и кодовое имя в кавычках разделяем по первому дефису
+	Local $iDash = StringInStr($sRaw, "-")
+	If $iDash > 0 Then Return StringLeft($sRaw, $iDash - 1) & ' "' & StringTrimLeft($sRaw, $iDash) & '"'
+	Return $sRaw
+EndFunc   ;==>_DetectVcVersion
 
 
 ; === Система локализации ===
@@ -1706,6 +1764,7 @@ Func _ApplyLanguage()
 	_RenderHeader()
 	_UpdateFilesInfo()
 	_ApplyTheme()
+	_ApplyUpdateNotice() ; перевести постфикс «[Доступно обновление]» в заголовке
 EndFunc   ;==>_ApplyLanguage
 
 
@@ -1824,7 +1883,7 @@ EndFunc   ;==>_ApplyTheme
 
 Func _SettingsWindow()
 	; По центру основного окна (а не экрана)
-	Local Const $iSetW = 320, $iSetH = 145
+	Local Const $iSetW = 302, $iSetH = 196 ; отступы 16px с обеих сторон (правый край контента = 286)
 	Local $iSetX = -1, $iSetY = -1
 	Local $aMain = WinGetPos($g_hGui)
 	If Not @error Then
@@ -1856,17 +1915,61 @@ Func _SettingsWindow()
 	GUICtrlSetData($g_iSettingsComboTheme, $sSystem & "|" & $sLight & "|" & $sDark, $sCurrent)
 	_SetComboItemHeight($g_iSettingsComboTheme, 17)
 
-	$iY += 48
+	$iY += 38
 
-	; Сброс кеша и Закрыть в одну строку
+	; Обновления: подпись + combo + квадратная кнопка ручной проверки.
+	; Порядок пунктов: Никогда / При запуске / Раз в неделю / Раз в месяц
+	$g_iSettingsLabelUpdates = GUICtrlCreateLabel(Lang("Updates", "CheckLabel", "Updates:"), 16, $iY + 3, 75, 20)
+	$g_iSettingsComboUpdates = GUICtrlCreateCombo("", 96, $iY, 162, 200, $CBS_DROPDOWNLIST)
+	Local $sUpdNever   = Lang("Updates", "FreqNever", "Never")
+	Local $sUpdAlways  = Lang("Updates", "FreqAlways", "At startup")
+	Local $sUpdWeekly  = Lang("Updates", "FreqWeekly", "Once a week")
+	Local $sUpdMonthly = Lang("Updates", "FreqMonthly", "Once a month")
+	Local $sFreq = IniRead($gc_sPathIni, "Settings", "UpdateCheckFreq", "weekly")
+	Local $sFreqCur = $sUpdWeekly
+	Switch $sFreq
+		Case "never"
+			$sFreqCur = $sUpdNever
+		Case "always"
+			$sFreqCur = $sUpdAlways
+		Case "monthly"
+			$sFreqCur = $sUpdMonthly
+	EndSwitch
+	GUICtrlSetData($g_iSettingsComboUpdates, $sUpdNever & "|" & $sUpdAlways & "|" & $sUpdWeekly & "|" & $sUpdMonthly, $sFreqCur)
+	_SetComboItemHeight($g_iSettingsComboUpdates, 17)
+	GUICtrlSetOnEvent($g_iSettingsComboUpdates, "_OnEvent_SettingsUpdatesCombo")
+
+	; Квадратная кнопка проверки (иконка круга со стрелками назначается после темы)
+	$g_iSettingsButtonCheckNow = GUICtrlCreateButton("", 262, $iY - 1, 24, 23)
+	GUICtrlSetTip($g_iSettingsButtonCheckNow, Lang("Updates", "CheckNow", "Check now"))
+	GUICtrlSetOnEvent($g_iSettingsButtonCheckNow, "_OnEvent_SettingsCheckNow")
+
+	$iY += 30
+
+	; Одно поле под combo (выровнено по нему): синяя ссылка «Доступна версия X.XX» либо серая дата
+	$g_iSettingsLabelUpdateInfo = GUICtrlCreateLabel("", 96, $iY, 190, 18, $SS_NOTIFY)
+	GUICtrlSetOnEvent($g_iSettingsLabelUpdateInfo, "_OnEvent_SettingsUpdateLink")
+	; Subclass для курсора-руки при наведении на ссылку
+	If $g_hLinkSubclassCB = 0 Then $g_hLinkSubclassCB = DllCallbackRegister("_LinkSubclassProc", "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+	_WinAPI_SetWindowSubclass(GUICtrlGetHandle($g_iSettingsLabelUpdateInfo), DllCallbackGetPtr($g_hLinkSubclassCB), 1, 0)
+
+	$iY += 34
+
+	; Сброс кеша и Закрыть в одну строку. Описание кэша — в подсказке кнопки.
 	$g_iSettingsButtonClearCache = GUICtrlCreateButton(Lang("GUI", "ClearCache", "Clear cache"), 16, $iY, 120, 26)
-	Local $iButtonClose          = GUICtrlCreateButton(Lang("GUI", "OK", "OK"), 214, $iY, 90, 26)
+	GUICtrlSetTip($g_iSettingsButtonClearCache, Lang("Cache", "Desc", "Stores video resolutions and detected sync offsets. Clear it if cached data looks stale."))
+	Local $iButtonClose = GUICtrlCreateButton(Lang("GUI", "OK", "OK"), 196, $iY, 90, 26)
 
 	GUICtrlSetOnEvent($iButtonClose,                "_OnEvent_SettingsOk")
 	GUICtrlSetOnEvent($g_iSettingsButtonClearCache, "_OnEvent_SettingsClearCache")
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_SettingsClose", $g_hSettingsGui)
 
 	_ApplyThemeToSettingsGui()
+	_SettingsUpdateInfoText() ; заполнить поле (ссылка/дата) с учётом темы
+
+	; Иконка кнопки проверки (круг со стрелками), перекрашена под тему
+	_DestroyImgList($g_hSettingsCheckImgList)
+	$g_hSettingsCheckImgList = _SetButtonCenterIcon($g_iSettingsButtonCheckNow, "Refresh.png", 16)
 
 	GUISetState(@SW_SHOW, $g_hSettingsGui)
 EndFunc   ;==>_SettingsWindow
@@ -1887,13 +1990,19 @@ Func _ApplyThemeToSettingsGui()
 	; Лейблы — прозрачный фон + цвет текста по палитре
 	GUICtrlSetBkColor($g_iSettingsLabelLang,  $GUI_BKCOLOR_TRANSPARENT)
 	GUICtrlSetBkColor($g_iSettingsLabelTheme, $GUI_BKCOLOR_TRANSPARENT)
+	GUICtrlSetBkColor($g_iSettingsLabelUpdates,    $GUI_BKCOLOR_TRANSPARENT)
+	GUICtrlSetBkColor($g_iSettingsLabelUpdateInfo, $GUI_BKCOLOR_TRANSPARENT)
 	GUICtrlSetColor($g_iSettingsLabelLang,  $g_iClrFg)
 	GUICtrlSetColor($g_iSettingsLabelTheme, $g_iClrFg)
+	GUICtrlSetColor($g_iSettingsLabelUpdates,   $g_iClrFg)
+	; Цвет поля обновлений (синий/серый) выставляет _SettingsUpdateInfoText
 EndFunc   ;==>_ApplyThemeToSettingsGui
 
 
 Func _OnEvent_SettingsClose()
 	If $g_hSettingsGui = 0 Then Return
+	_DestroyImgList($g_hSettingsCheckImgList) ; imagelist иконки кнопки проверки
+	If $g_hLinkSubclassCB Then _WinAPI_RemoveWindowSubclass(GUICtrlGetHandle($g_iSettingsLabelUpdateInfo), DllCallbackGetPtr($g_hLinkSubclassCB), 1)
 	GUIDelete($g_hSettingsGui)
 	$g_hSettingsGui = 0
 	$g_iSettingsButtonClearCache = 0
@@ -1919,6 +2028,14 @@ Func _OnEvent_SettingsOk()
 		$g_sTheme = $sTheme
 		IniWrite($gc_sPathIni, "Settings", "Theme", $sTheme)
 	EndIf
+
+	; Периодичность проверки обновлений (читаем до удаления окна)
+	Local $sSelectedFreq = GUICtrlRead($g_iSettingsComboUpdates)
+	Local $sFreqCode = "weekly"
+	If $sSelectedFreq = Lang("Updates", "FreqNever", "Never") Then $sFreqCode = "never"
+	If $sSelectedFreq = Lang("Updates", "FreqAlways", "At startup") Then $sFreqCode = "always"
+	If $sSelectedFreq = Lang("Updates", "FreqMonthly", "Once a month") Then $sFreqCode = "monthly"
+	IniWrite($gc_sPathIni, "Settings", "UpdateCheckFreq", $sFreqCode)
 
 	_OnEvent_SettingsClose()
 
@@ -1954,9 +2071,167 @@ Func _OnEvent_SettingsClearCache()
 EndFunc   ;==>_OnEvent_SettingsClearCache
 
 
+Func _OnEvent_SettingsUpdatesCombo()
+	_SettingsUpdateInfoText()
+EndFunc   ;==>_OnEvent_SettingsUpdatesCombo
+
+
+; Заполняет поле группы «Проверка обновлений»: синяя ссылка при наличии обновления;
+; иначе серая дата последней проверки; при «Никогда» (без обновления) поле скрыто.
+Func _SettingsUpdateInfoText()
+	If $g_hSettingsGui = 0 Then Return
+
+	If $g_sAvailableVersion <> "" Then
+		GUICtrlSetData($g_iSettingsLabelUpdateInfo, StringFormat(Lang("Updates", "AvailableVersion", "Version %s is available"), $g_sAvailableVersion))
+		GUICtrlSetColor($g_iSettingsLabelUpdateInfo, 0x0078D4) ; акцентный синий, кликабельно
+		GUICtrlSetState($g_iSettingsLabelUpdateInfo, $GUI_SHOW)
+	ElseIf GUICtrlRead($g_iSettingsComboUpdates) = Lang("Updates", "FreqNever", "Never") Then
+		GUICtrlSetState($g_iSettingsLabelUpdateInfo, $GUI_HIDE) ; проверки выключены — дата нерелевантна
+	Else
+		Local $sLast = IniRead($gc_sPathIni, "Settings", "LastUpdateCheck", "")
+		If $sLast = "" Then $sLast = Lang("Updates", "LastCheckNever", "never") ; в ini уже YYYY.MM.DD
+		GUICtrlSetData($g_iSettingsLabelUpdateInfo, Lang("Updates", "LastCheck", "Last check:") & " " & $sLast)
+		GUICtrlSetColor($g_iSettingsLabelUpdateInfo, $g_iClrInfo) ; неактивный серый
+		GUICtrlSetState($g_iSettingsLabelUpdateInfo, $GUI_SHOW)
+	EndIf
+EndFunc   ;==>_SettingsUpdateInfoText
+
+
 Func _MainGUI_Refresh()
 	_ApplyTheme()
 	_RenderHeader()
 	; Перерисовка окна
 	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
 EndFunc   ;==>_MainGUI_Refresh
+
+
+; Сравнивает версии вида "1.07" покомпонентно как числа.
+; Возвращает -1 ($s1 < $s2), 0 (равны), 1 ($s1 > $s2). Недостающие компоненты считаются нулём.
+Func _CompareVersions($s1, $s2)
+	Local $a1 = StringSplit($s1, ".", 2)
+	Local $a2 = StringSplit($s2, ".", 2)
+	Local $iMax = (UBound($a1) > UBound($a2)) ? UBound($a1) : UBound($a2)
+	For $i = 0 To $iMax - 1
+		Local $iN1 = ($i < UBound($a1)) ? Number($a1[$i]) : 0
+		Local $iN2 = ($i < UBound($a2)) ? Number($a2[$i]) : 0
+		If $iN1 < $iN2 Then Return -1
+		If $iN1 > $iN2 Then Return 1
+	Next
+	Return 0
+EndFunc   ;==>_CompareVersions
+
+
+; Качает raw Include\AppConstants.au3 из ветки main и достаёт значение $gc_sAppVersion.
+; Возвращает строку версии или "" с @error при сбое сети/парсинга.
+Func _FetchRemoteVersion()
+	Local $bData = InetRead($gc_sVerCheckUrl, $INET_FORCERELOAD)
+	If @error Or BinaryLen($bData) = 0 Then Return SetError(1, 0, "")
+
+	Local $sText = BinaryToString($bData, $SB_UTF8)
+	Local $aMatch = StringRegExp($sText, '\$gc_sAppVersion\s*=\s*"([^"]+)"', 3)
+	If Not IsArray($aMatch) Then Return SetError(2, 0, "")
+
+	Return $aMatch[0]
+EndFunc   ;==>_FetchRemoteVersion
+
+
+; Проверяет обновления согласно периодичности из ini. При наличии более новой
+; версии выставляет $g_sAvailableVersion и обновляет подвал. Без всплывающих окон.
+Func _CheckUpdates()
+	Local $sFreq = IniRead($gc_sPathIni, "Settings", "UpdateCheckFreq", "weekly")
+	If $sFreq = "never" Then Return
+
+	Local $sLast = IniRead($gc_sPathIni, "Settings", "LastUpdateCheck", "")
+	Local $bShouldCheck = True
+	If $sLast <> "" Then
+		Local $sLastSlash = StringReplace($sLast, ".", "/") ; _DateDiff требует YYYY/MM/DD
+		Switch $sFreq
+			Case "weekly"
+				$bShouldCheck = (_DateDiff("D", $sLastSlash, _NowCalc()) >= 7)
+			Case "monthly"
+				$bShouldCheck = (_DateDiff("D", $sLastSlash, _NowCalc()) >= 30)
+				; "always" - всегда True
+		EndSwitch
+	EndIf
+	If Not $bShouldCheck Then Return
+
+	Local $sRemote = _FetchRemoteVersion()
+	IniWrite($gc_sPathIni, "Settings", "LastUpdateCheck", StringReplace(_NowCalcDate(), "/", ".")) ; дата проверки даже при сбое сети
+	If @error Or $sRemote = "" Then Return
+
+	If _CompareVersions($gc_sAppVersion, $sRemote) < 0 Then
+		$g_sAvailableVersion = $sRemote
+		_ApplyUpdateNotice()
+		_StartSettingsPulse() ; мигаем шестерёнкой — обновление найдено при старте
+	EndIf
+EndFunc   ;==>_CheckUpdates
+
+
+; При наличии обновления дописывает в заголовок окна пометку «доступна X.XX».
+Func _ApplyUpdateNotice()
+	If $g_sAvailableVersion = "" Then Return
+	WinSetTitle($g_hGui, "", $gc_sAppName & " " & Lang("Updates", "TitleUpdate", "[Update available]"))
+EndFunc   ;==>_ApplyUpdateNotice
+
+
+; Запускает мигание кнопки настроек (привлечь внимание к доступному обновлению).
+Func _StartSettingsPulse()
+	If $g_bPulseActive Then Return
+	$g_bPulseActive = True
+	$g_bPulsePhase = True
+	AdlibRegister("_PulseSettingsButton", 600)
+EndFunc   ;==>_StartSettingsPulse
+
+
+; Останавливает мигание и возвращает обычную иконку шестерёнки.
+Func _StopSettingsPulse()
+	If Not $g_bPulseActive Then Return
+	AdlibUnRegister("_PulseSettingsButton")
+	$g_bPulseActive = False
+	_DestroyImgList($g_hSettingsImgList)
+	$g_hSettingsImgList = _SetButtonCenterIcon($g_iButtonSettings, "Settings.png", 18)
+EndFunc   ;==>_StopSettingsPulse
+
+
+; Тик мигания: переключает иконку шестерёнки между цветом темы и акцентным синим.
+Func _PulseSettingsButton()
+	_DestroyImgList($g_hSettingsImgList)
+	$g_hSettingsImgList = _SetButtonCenterIcon($g_iButtonSettings, "Settings.png", 18, $g_bPulsePhase ? 0x0078D4 : _IconTint())
+	$g_bPulsePhase = Not $g_bPulsePhase
+EndFunc   ;==>_PulseSettingsButton
+
+
+; Клик по ссылке обновления в настройках открывает страницу релизов.
+Func _OnEvent_SettingsUpdateLink()
+	If $g_sAvailableVersion <> "" Then ShellExecute($gc_sReleasesUrl)
+EndFunc   ;==>_OnEvent_SettingsUpdateLink
+
+
+; Subclass поля обновлений: курсор-рука при наведении, когда поле — кликабельная ссылка.
+Func _LinkSubclassProc($hWnd, $iMsg, $wParam, $lParam, $iId, $dwData)
+	#forceref $iId, $dwData
+	If $iMsg = 0x0020 And $g_sAvailableVersion <> "" Then ; WM_SETCURSOR, только для ссылки
+		_WinAPI_SetCursor(_WinAPI_LoadCursor(0, 32649)) ; IDC_HAND
+		Return 1
+	EndIf
+	Return _WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+EndFunc   ;==>_LinkSubclassProc
+
+
+; Кнопка «Проверить сейчас»: запускает проверку немедленно, минуя интервал.
+Func _OnEvent_SettingsCheckNow()
+	If $g_hSettingsGui = 0 Then Return
+
+	; Кнопка иконочная — текст не трогаем, индикация через блокировку на время запроса
+	GUICtrlSetState($g_iSettingsButtonCheckNow, $GUI_DISABLE)
+
+	Local $sRemote = _FetchRemoteVersion()
+	IniWrite($gc_sPathIni, "Settings", "LastUpdateCheck", StringReplace(_NowCalcDate(), "/", "."))
+	If Not @error And $sRemote <> "" And _CompareVersions($gc_sAppVersion, $sRemote) < 0 Then
+		$g_sAvailableVersion = $sRemote
+		_ApplyUpdateNotice()
+	EndIf
+
+	GUICtrlSetState($g_iSettingsButtonCheckNow, $GUI_ENABLE)
+	If $g_hSettingsGui <> 0 Then _SettingsUpdateInfoText() ; обновить поле (ссылка/дата)
+EndFunc   ;==>_OnEvent_SettingsCheckNow

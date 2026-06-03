@@ -64,3 +64,18 @@ StatusNoMatch=Status: no matches found
 StatusTimeout=Status: timeout
 StatusError=Status: error
 NoDetails=No details available.
+
+[Updates]
+CheckLabel=Updates:
+CheckNow=Check now
+FreqNever=Never
+FreqAlways=At startup
+FreqWeekly=Once a week
+FreqMonthly=Once a month
+LastCheck=Last check:
+LastCheckNever=never
+AvailableVersion=Version %s is available
+TitleUpdate=[Update available]
+
+[Cache]
+Desc=The cache stores video resolutions and detected sync offsets. Clear it if the data looks stale.
