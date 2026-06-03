@@ -4,7 +4,7 @@
 
 [![GitHub Release](https://img.shields.io/github/release/MarkovTrue/VCLauncher)](https://github.com/MarkovTrue/VCLauncher/releases) [![Downloads](https://img.shields.io/github/downloads/MarkovTrue/VCLauncher/total?label=downloads&color=blue)](https://github.com/MarkovTrue/VCLauncher/releases)
 
-Удобный GUI-лаунчер для [Video Compare](https://github.com/pixop/video-compare). Помогает наглядно сравнить две версии фильма и решить, какая лучше подойдёт для коллекции. Также можно быстро определить рассинхрон и использовать его для переноса аудиодорожек между релизами.
+Удобный GUI-лаунчер для [Video-compare](https://github.com/pixop/video-compare). Помогает наглядно сравнить две версии фильма и решить, какая лучше подойдёт для коллекции. Также можно быстро определить рассинхрон и использовать его для переноса аудиодорожек между релизами.
 
 
 ![Preview](Assets/Preview.png)
@@ -26,6 +26,6 @@
 
 ### VCLauncher использует (уже включено в релиз)
 
-- `Video-compare` - сам движок сравнения
-- `FFmpeg.exe` - [FFmpeg](https://github.com/FFmpeg/FFmpeg) для извлечения аудио/видео потоков
-- `Sync.exe` - собственная утилита детекции временного сдвига
+- [Video-compare](https://github.com/pixop/video-compare) - сам движок сравнения
+- [FFmpeg](https://github.com/FFmpeg/FFmpeg) - для извлечения аудио/видео потоков
+- `Sync.exe` - собственная CLI утилита для поиска временного сдвига

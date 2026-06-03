@@ -26,6 +26,6 @@ A handy GUI launcher for [Video Compare](https://github.com/pixop/video-compare)
 
 ### VCLauncher uses (already bundled in the release)
 
-- `Video-compare` - the comparison engine itself
-- `FFmpeg.exe` - [FFmpeg](https://github.com/FFmpeg/FFmpeg) for extracting audio/video streams
-- `Sync.exe` - a custom time-offset detection utility
+- [Video-compare](https://github.com/pixop/video-compare) - the comparison engine itself
+- [FFmpeg](https://github.com/FFmpeg/FFmpeg) - for extracting audio/video streams
+- `Sync.exe` - proprietary CLI utility for time shift search
