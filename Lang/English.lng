@@ -43,7 +43,7 @@ VideoCompareNoOutput=No error message in output.
 Video=Video
 
 [Hotkeys]
-1=Video Compare hotkeys
+1=Video-compare hotkeys
 2={H} Control hints
 3={Y} Video info
 4={LEFT}{RIGHT} Seek ±1 sec

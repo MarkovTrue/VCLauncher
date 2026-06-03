@@ -246,9 +246,9 @@ function Compose-Preview([string]$topLightPng, [string]$bottomDarkPng, [string]$
     $lightX = $Pad;            $lightY = $Pad
     $darkX  = $Pad + $OffsetX; $darkY  = $Pad + $OffsetY
     Draw-Shadow $g $darkX  $darkY  $dark.Width  $dark.Height 16 14
-    Draw-Shot   $g $dark   $darkX  $darkY  8
+    Draw-Shot   $g $dark   $darkX  $darkY  4
     Draw-Shadow $g $lightX $lightY $light.Width $light.Height 16 14
-    Draw-Shot   $g $light  $lightX $lightY 8
+    Draw-Shot   $g $light  $lightX $lightY 4
     $g.Dispose()
 
     New-Item -ItemType Directory -Path (Split-Path $outPng) -Force | Out-Null

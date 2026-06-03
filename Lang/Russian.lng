@@ -43,7 +43,7 @@ VideoCompareNoOutput=Нет сообщения об ошибке в выводе
 Video=Видео
 
 [Hotkeys]
-1=Горячие клавиши Video Compare
+1=Горячие клавиши Video-compare
 2={H} Подсказки управления
 3={Y} Информация о видео
 4={LEFT}{RIGHT} Перемотка ±1 сек

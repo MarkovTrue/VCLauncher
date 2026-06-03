@@ -30,7 +30,7 @@
 Opt("GUIOnEventMode", 1)
 
 ; Константы приложения
-Global Const $gc_sAppName = "VCLauncher 1.06"
+Global Const $gc_sAppName = "VCLauncher 1.07"
 Global Const $gc_sVcVersion = '20260502 "valencia"' ; версия video-compare, отображается в шапке
 Global Const $gc_sPathIni = @ScriptDir & '\VCLauncher.ini'
 Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
@@ -534,14 +534,8 @@ Func _UpdateFilesInfo()
 
 		GUICtrlSetState($g_iButtonCompare, $GUI_ENABLE)
 
-		; Читаем сдвиг из поля ввода
-		Local $sOffset = GUICtrlRead($g_iInputOffset)
-		Local $iOffsetMs = ($sOffset <> "") ? Int($sOffset) : 0
-
 		; Обновляем поле команды
-		Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
-		Local $sCmdLine = _BuildVideoCompareCommand($aInfo1, $aInfo2, $aCropArgs, $bIsVertical, $iOffsetMs)
-		GUICtrlSetData($g_iEditCommand, $sCmdLine)
+		GUICtrlSetData($g_iEditCommand, _ComputeCommand())
 	Else
 		; Показываем только разрешение без crop
 		If $bFile1Exists Then
@@ -570,24 +564,24 @@ EndFunc   ;==>_FormatInfoLabel
 
 
 Func _UpdateCommandField()
-	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then
-		GUICtrlSetData($g_iEditCommand, "")
-		Return
-	EndIf
+	GUICtrlSetData($g_iEditCommand, _ComputeCommand())
+EndFunc   ;==>_UpdateCommandField
+
+
+; Строит командную строку video-compare из текущего состояния GUI.
+; Возвращает "" если файлов нет или разрешение не определено
+; (без валидного разрешения — деление на ноль в _CalculateCropArgs).
+Func _ComputeCommand()
+	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then Return ""
 	Local $aVideo1Info = _GetVideoInfo($g_sVideoFile1)
 	Local $aVideo2Info = _GetVideoInfo($g_sVideoFile2)
-	; Без валидного разрешения команду не строим — иначе деление на ноль в _CalculateCropArgs
-	If $aVideo1Info[0] <= 0 Or $aVideo2Info[0] <= 0 Then
-		GUICtrlSetData($g_iEditCommand, "")
-		Return
-	EndIf
+	If $aVideo1Info[0] <= 0 Or $aVideo2Info[0] <= 0 Then Return ""
 	Local $aCropArgs = _CalculateCropArgs($aVideo1Info, $aVideo2Info)
 	Local $sOffset = GUICtrlRead($g_iInputOffset)
 	Local $iOffsetMs = ($sOffset <> "") ? Int($sOffset) : 0
 	Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
-	Local $sCmdLine = _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical, $iOffsetMs)
-	GUICtrlSetData($g_iEditCommand, $sCmdLine)
-EndFunc   ;==>_UpdateCommandField
+	Return _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical, $iOffsetMs)
+EndFunc   ;==>_ComputeCommand
 
 
 Func _GetVideoInfo($sVideoPath)
@@ -718,35 +712,15 @@ Func _LookupSyncCache($sFile1, $sFile2)
 	Local $aResult[3] = [False, 0, "ERROR"]
 	Local $sMemKey = _BuildPairKey($sFile1, $sFile2)
 
-	; Кеш в памяти (прямая пара)
-	If MapExists($g_oCache, $sMemKey) Then
-		Local $vVal = $g_oCache[$sMemKey]
-		$aResult[0] = True
-		If _IsSyncMarker($vVal) Then
-			$aResult[1] = 0
-			$aResult[2] = $vVal
-		Else
-			$aResult[1] = Int($vVal)
-			$aResult[2] = "OK"
-		EndIf
-		Return $aResult
-	EndIf
+	; Кеш в памяти (прямая пара) — значение уже нормализовано при записи
+	If MapExists($g_oCache, $sMemKey) Then Return __DecodeSyncVal($g_oCache[$sMemKey], False)
 
 	; Кеш в памяти (обратная пара — инвертируем сдвиг для OK, маркер копируем)
 	Local $sMemKeyRev = _BuildPairKey($sFile2, $sFile1)
 	If MapExists($g_oCache, $sMemKeyRev) Then
-		Local $vVal = $g_oCache[$sMemKeyRev]
-		$aResult[0] = True
-		If _IsSyncMarker($vVal) Then
-			$aResult[1] = 0
-			$aResult[2] = $vVal
-			$g_oCache[$sMemKey] = $vVal
-		Else
-			$aResult[1] = -Int($vVal)
-			$aResult[2] = "OK"
-			$g_oCache[$sMemKey] = $aResult[1]
-		EndIf
-		Return $aResult
+		Local $aDec = __DecodeSyncVal($g_oCache[$sMemKeyRev], True)
+		$g_oCache[$sMemKey] = ($aDec[2] = "OK") ? $aDec[1] : $aDec[2]
+		Return $aDec
 	EndIf
 
 	; Кеш на диске: находим индексы из [Info] и ищем в [Sync]
@@ -754,40 +728,39 @@ Func _LookupSyncCache($sFile1, $sFile2)
 	Local $aInfo2 = _GetCacheInfo($sFile2)
 	If $aInfo1[0] = "" Or $aInfo2[0] = "" Then Return $aResult
 
-	; Проверяем прямую пару
+	; Прямая пара
 	Local $sSyncVal = IniRead($gc_sPathCache, "Sync", $aInfo1[0] & "|" & $aInfo2[0], "")
 	If $sSyncVal <> "" Then
-		$aResult[0] = True
-		If _IsSyncMarker($sSyncVal) Then
-			$aResult[1] = 0
-			$aResult[2] = $sSyncVal
-			$g_oCache[$sMemKey] = $sSyncVal
-		Else
-			$aResult[1] = Int($sSyncVal)
-			$aResult[2] = "OK"
-			$g_oCache[$sMemKey] = $aResult[1]
-		EndIf
-		Return $aResult
+		Local $aDec = __DecodeSyncVal($sSyncVal, False)
+		$g_oCache[$sMemKey] = ($aDec[2] = "OK") ? $aDec[1] : $aDec[2]
+		Return $aDec
 	EndIf
 
 	; Обратная пара
 	Local $sSyncValRev = IniRead($gc_sPathCache, "Sync", $aInfo2[0] & "|" & $aInfo1[0], "")
 	If $sSyncValRev <> "" Then
-		$aResult[0] = True
-		If _IsSyncMarker($sSyncValRev) Then
-			$aResult[1] = 0
-			$aResult[2] = $sSyncValRev
-			$g_oCache[$sMemKey] = $sSyncValRev
-		Else
-			$aResult[1] = -Int($sSyncValRev)
-			$aResult[2] = "OK"
-			$g_oCache[$sMemKey] = $aResult[1]
-		EndIf
-		Return $aResult
+		Local $aDec = __DecodeSyncVal($sSyncValRev, True)
+		$g_oCache[$sMemKey] = ($aDec[2] = "OK") ? $aDec[1] : $aDec[2]
+		Return $aDec
 	EndIf
 
 	Return $aResult
 EndFunc   ;==>_LookupSyncCache
+
+
+; Декодирует значение кеша sync в [True, $iOffset, $sStatus].
+; Маркер неудачи → [True, 0, "TIMEOUT|NOMATCH|ERROR"], число → [True, ±сдвиг, "OK"].
+; $bReverse инвертирует знак OK-сдвига (для обратной пары файлов).
+Func __DecodeSyncVal($vVal, $bReverse)
+	Local $aOut[3] = [True, 0, "ERROR"]
+	If _IsSyncMarker($vVal) Then
+		$aOut[2] = $vVal
+	Else
+		$aOut[1] = $bReverse ? -Int($vVal) : Int($vVal)
+		$aOut[2] = "OK"
+	EndIf
+	Return $aOut
+EndFunc   ;==>__DecodeSyncVal
 
 
 ; Сохраняет результат sync в кеш (память + диск).
@@ -895,16 +868,8 @@ Func _RunSyncWithTimeout($sFile1, $sFile2, $iTimeoutSec, $sMethod = "")
 	WEnd
 
 	; Дочитываем остатки
-	While 1
-		Local $sLine = StdoutRead($iPid)
-		If @error Then ExitLoop
-		$sStdout &= $sLine
-	WEnd
-	While 1
-		Local $sLine = StderrRead($iPid)
-		If @error Then ExitLoop
-		$sStderr &= $sLine
-	WEnd
+	$sStdout &= _DrainPipe($iPid, False)
+	$sStderr &= _DrainPipe($iPid, True)
 
 	$g_sLastSyncOutput = _ComposeSyncOutput($sStdout, $sStderr)
 
@@ -942,6 +907,19 @@ Func _ComposeSyncOutput($sStdout, $sStderr)
 	EndIf
 	Return $sOut
 EndFunc   ;==>_ComposeSyncOutput
+
+
+; Неблокирующе дочитывает остаток потока процесса до @error (буфер пуст и процесс закрыт).
+; $bStderr = True — stderr, иначе stdout.
+Func _DrainPipe($iPid, $bStderr)
+	Local $sOut = "", $sLine
+	While 1
+		$sLine = $bStderr ? StderrRead($iPid) : StdoutRead($iPid)
+		If @error Then ExitLoop
+		$sOut &= $sLine
+	WEnd
+	Return $sOut
+EndFunc   ;==>_DrainPipe
 
 
 Func _TryFillCachedOffset()
@@ -1036,7 +1014,7 @@ EndFunc   ;==>_SyncSpinnerRender
 
 ; Клик по статус-иконке для NOMATCH/TIMEOUT/ERROR — MsgBox с командой и stdout/stderr.
 Func _OnEvent_LabelSyncStatusClick()
-	If $g_sLastSyncStatus <> "NOMATCH" And $g_sLastSyncStatus <> "TIMEOUT" And $g_sLastSyncStatus <> "ERROR" Then Return
+	If Not _IsSyncMarker($g_sLastSyncStatus) Then Return
 
 	Local $sBody = ""
 	If $g_sLastSyncCmd <> "" Then $sBody &= "[command]" & @CRLF & $g_sLastSyncCmd & @CRLF & @CRLF
