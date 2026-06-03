@@ -37,9 +37,16 @@ Global Const $gc_sPathCache = @ScriptDir & '\VCLauncher.cache'
 Global Const $gc_aSupportedExtensions[] = [ _
         "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "asf", "flv", "f4v", "mpg", "mpeg", "mp2", "m2v", _
         "ts", "m2ts", "mts", "mxf", "vob", "3gp", "3g2", "ogv", "ogg", "dv", "divx", "rm", "rmvb", "gif", "vpy"]
-Global Const $gc_iGuiWidth = 558
+Global Const $gc_iGuiWidth = 548
 Global Const $gc_iHeaderH = 120 ; высота шапки с логотипом
+; Картинка-шапка ýже окна на ширину кнопки настроек: кнопка ложится на фон GUI,
+; а не на Pic (иначе её иконка пропадает после перерисовки шапки).
+Global Const $gc_iHeaderW = $gc_iGuiWidth - 44
 Global Const $gc_iGuiHeight = $gc_iHeaderH + 289 ; высота клиента (+4px воздуха после полоски)
+; Фон окна по темам. Используется и в палитре (_SetPalette), и в фоне шапки (_RenderHeader),
+; чтобы полоса справа под кнопкой настроек не отличалась по тону.
+Global Const $gc_iClrBgDark = 0x202020
+Global Const $gc_iClrBgLight = 0xF0F0F0
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
 Global $g_sPathSync = @ScriptDir & '\Sync\dist\Sync.exe'
@@ -139,12 +146,11 @@ Func _MainGUI()
 
 	_ApplyAppFont()
 
-	; Шапка: логотип слева + шпаргалка горячих клавиш справа (рисуется в _RenderHeader)
-	$g_iLogoPic = GUICtrlCreatePic("", 0, 0, $gc_iGuiWidth, $gc_iHeaderH)
+	; Шапка: логотип слева + шпаргалка горячих клавиш справа (рисуется в _RenderHeader).
+	; Pic ýже окна — справа остаётся полоса фона GUI под кнопку настроек.
+	$g_iLogoPic = GUICtrlCreatePic("", 0, 0, $gc_iHeaderW, $gc_iHeaderH)
 
-	; Кнопка настроек перекрывает LogoPic. В AutoIt перекрытие Pic и кнопки
-	; разрешается по z-order сразу и для отрисовки, и для кликов. Z-order
-	; принудительно выставляется через SetWindowPos в конце _MainGUI.
+	; Кнопка настроек лежит на фоне GUI правее картинки-шапки, не перекрывая Pic.
 	$g_iButtonSettings = GUICtrlCreateButton("", $gc_iGuiWidth - 40, 8, 30, 30) ; иконка-шестерёнка ставится ниже (PNG)
 	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 
@@ -226,15 +232,6 @@ Func _MainGUI()
 	_ApplyTheme()
 
 	GUISetState(@SW_SHOW)
-
-	; Кнопка настроек лежит поверх LogoPic. Поднимаем её в начало z-order:
-	; иначе Pic перехватывает и отрисовку (иконка не видна до активации окна),
-	; и клики (HWND_TOP=0, SWP_NOMOVE|SWP_NOSIZE=0x3).
-	DllCall("user32.dll", "bool", "SetWindowPos", "hwnd", GUICtrlGetHandle($g_iButtonSettings), _
-			"hwnd", 0, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0003)
-	; Образ кнопки (imagelist) не рисуется до hover — форсируем перерисовку
-	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", GUICtrlGetHandle($g_iButtonSettings), _
-			"ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW)
 
 	; Отложенная загрузка: окно уже видно, теперь подтягиваем данные
 	_TryFillCachedOffset()
@@ -1334,7 +1331,12 @@ Func _RenderHeader()
 	Local $sTitleVcVer = $gc_sVcVersion
 	Local $sTitleRight = Lang("Hotkeys", "1", "Video-compare hotkeys")
 
-	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iGuiWidth, $gc_iHeaderH, $aHintRows, 0, 9, 0, -1, $sHeaderIcon, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
+	; Фон шапки = фон GUI, чтобы полоса справа под кнопкой не отличалась по тону.
+	; Берём от $g_bDarkMode, т.к. _SetPalette может ещё не отработать при первом
+	; рендере на старте. ARGB = непрозрачный фон GUI.
+	Local $iBackArgb = 0xFF000000 + ($g_bDarkMode ? $gc_iClrBgDark : $gc_iClrBgLight)
+
+	_HeaderRenderToPic($g_iLogoPic, $g_hLogoBitmap, $sIconsRoot, $sKeyTheme, $g_sAppFont, $gc_iHeaderW, $gc_iHeaderH, $aHintRows, 0, 9, 0, $iBackArgb, $sHeaderIcon, $sTitleApp, $sTitleVc, $sTitleRight, $sTitleVcVer)
 EndFunc   ;==>_RenderHeader
 
 
@@ -1761,13 +1763,13 @@ EndFunc   ;==>_ReadSystemDarkMode
 
 Func _SetPalette()
 	If $g_bDarkMode Then
-		$g_iClrBg = $COLOR_CONTROL_BG
+		$g_iClrBg = $gc_iClrBgDark
 		$g_iClrFg = $COLOR_TEXT_LIGHT
 		$g_iClrInfo = 0x969AA2 ; как подзаголовок шапки (HeaderHelper $iColSub, dark)
 		$g_iClrInput = 0x3C3C3C
 		$g_iClrSep = $COLOR_BORDER
 	Else
-		$g_iClrBg = 0xF0F0F0
+		$g_iClrBg = $gc_iClrBgLight
 		$g_iClrFg = 0x000000
 		$g_iClrInfo = 0x808080
 		$g_iClrInput = 0xFFFFFF
@@ -1832,13 +1834,7 @@ Func _ApplyTheme()
 	GUICtrlSetBkColor($g_iSeparatorTop, $g_iClrSep)
 
 	; Иконки подсказок должны соответствовать выбранной теме (Dark/Light)
-	If $bNeedSwitch Then
-		_RenderHeader()
-		; LogoPic перерисовался — снова поднимаем кнопку настроек над ним по z-order,
-		; иначе её иконка пропадает до наведения (Pic перехватывает отрисовку)
-		DllCall("user32.dll", "bool", "SetWindowPos", "hwnd", GUICtrlGetHandle($g_iButtonSettings), _
-				"hwnd", 0, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0003)
-	EndIf
+	If $bNeedSwitch Then _RenderHeader()
 
 	; Финальная полная перерисовка окна
 	; RDW_INVALIDATE=0x1, RDW_UPDATENOW=0x100, RDW_ALLCHILDREN=0x80
