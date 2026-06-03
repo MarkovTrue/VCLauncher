@@ -62,7 +62,7 @@ Func _HeaderCreateBitmap($sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, B
 	_GDIPlus_GraphicsFillRect($hGfx, 0, 0, $iDstW, $iDstH, $hBackBrush)
 	_GDIPlus_BrushDispose($hBackBrush)
 
-	Local $iColText = $bDarkSkin ? 0xFFF0F0F0 : 0xFF1A1A1A
+	Local $iColText = $bDarkSkin ? 0xFFCCCCCC : 0xFF1A1A1A
 	Local $iColSub  = $bDarkSkin ? 0xFF969AA2 : 0xFF6E6E6E
 	Local $iColSep  = $bDarkSkin ? 0xFF484C54 : 0xFFD0D0D0
 	Local $sIconTheme = $bDarkSkin ? "Light" : "Dark"

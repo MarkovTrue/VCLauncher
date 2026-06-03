@@ -81,12 +81,12 @@ Global $__DM_g_Version = "1.6.0.0"
 ; ===============================================================================================================================
 
 ; #GLOBAL VARIABLES# ============================================================================================================
-Global $g_iBkColor = 0x1c1c1c
-Global $COLOR_BG_DARK = 0x121212
-Global $COLOR_TEXT_LIGHT = 0xE0E0E0
-Global $COLOR_CONTROL_BG = 0x202020
-Global $COLOR_BORDER_LIGHT = 0xB0B0B0
-Global $COLOR_BORDER = 0x3F3F3F
+Global $g_iBkColor = 0x1E1E1E
+Global $COLOR_BG_DARK = 0x1E1E1E
+Global $COLOR_TEXT_LIGHT = 0xCCCCCC
+Global $COLOR_CONTROL_BG = 0x2D2D2D
+Global $COLOR_BORDER_LIGHT = 0x555555
+Global $COLOR_BORDER = 0x3C3C3C
 Global $COLOR_MENU_BG = __WinAPI_ColorAdjustLuma($COLOR_BG_DARK, 5)
 Global $COLOR_MENU_HOT = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 20)
 Global $COLOR_MENU_SEL = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 10)

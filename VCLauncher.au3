@@ -45,7 +45,7 @@ Global Const $gc_iHeaderW = $gc_iGuiWidth - 44
 Global Const $gc_iGuiHeight = $gc_iHeaderH + 289 ; высота клиента (+4px воздуха после полоски)
 ; Фон окна по темам. Используется и в палитре (_SetPalette), и в фоне шапки (_RenderHeader),
 ; чтобы полоса справа под кнопкой настроек не отличалась по тону.
-Global Const $gc_iClrBgDark = 0x202020
+Global Const $gc_iClrBgDark = 0x1E1E1E
 Global Const $gc_iClrBgLight = 0xF0F0F0
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
@@ -1385,7 +1385,7 @@ EndFunc   ;==>_ApplyHIconToButton
 
 ; Цвет иконок = цвет текста кнопки текущей темы, чуть мягче (светлая — тёмно-серый, тёмная — светлый).
 Func _IconTint()
-	Return $g_bDarkMode ? 0xE6E6E6 : 0x303030
+	Return $g_bDarkMode ? 0xCCCCCC : 0x303030
 EndFunc   ;==>_IconTint
 
 
@@ -1766,7 +1766,7 @@ Func _SetPalette()
 		$g_iClrBg = $gc_iClrBgDark
 		$g_iClrFg = $COLOR_TEXT_LIGHT
 		$g_iClrInfo = 0x969AA2 ; как подзаголовок шапки (HeaderHelper $iColSub, dark)
-		$g_iClrInput = 0x3C3C3C
+		$g_iClrInput = 0x2D2D2D
 		$g_iClrSep = $COLOR_BORDER
 	Else
 		$g_iClrBg = $gc_iClrBgLight
@@ -1793,12 +1793,12 @@ Func _ApplyTheme()
 	If $bNeedSwitch Then
 		If $g_bThemeInitialized Then __GUIDarkTheme_SubclassCleanup()
 		If $g_bDarkMode Then
-			$g_iBkColor = 0x1C1C1C
-			$COLOR_BG_DARK = 0x121212
-			$COLOR_TEXT_LIGHT = 0xE0E0E0
-			$COLOR_CONTROL_BG = 0x202020
-			$COLOR_BORDER_LIGHT = 0xB0B0B0
-			$COLOR_BORDER = 0x3F3F3F
+			$g_iBkColor = 0x1E1E1E
+			$COLOR_BG_DARK = 0x1E1E1E
+			$COLOR_TEXT_LIGHT = 0xCCCCCC
+			$COLOR_CONTROL_BG = 0x2D2D2D
+			$COLOR_BORDER_LIGHT = 0x555555
+			$COLOR_BORDER = 0x3C3C3C
 			_GUIDarkTheme_ApplyDark($g_hGui, True)
 		Else
 			_GUIDarkTheme_ApplyLight($g_hGui)
