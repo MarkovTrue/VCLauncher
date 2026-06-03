@@ -29,3 +29,7 @@
 - [Video-compare](https://github.com/pixop/video-compare) - сам движок сравнения
 - [FFmpeg](https://github.com/FFmpeg/FFmpeg) - для извлечения аудио/видео потоков
 - `Sync.exe` - собственная CLI утилита для поиска временного сдвига
+
+## 🤝 Поддержка
+Баг‑репорты и предложения приветствуются.
+Поддержка: [CloudTips](https://pay.cloudtips.ru/p/c4a97b44)
