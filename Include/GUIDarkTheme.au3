@@ -1,149 +1,183 @@
 #include-once
-#include <GuiMonthCal.au3>
-#include <GuiDateTimePicker.au3>
-#include <WindowsConstants.au3>
-#include <UpDownConstants.au3>
-#include <ButtonConstants.au3>
-#include <WinAPIConstants.au3>
-#include <GUIConstantsEx.au3>
-#include <GuiStatusBar.au3>
-#include <SliderConstants.au3>
-#include <GuiListView.au3>
-#include <TabConstants.au3>
-#include <GuiImageList.au3>
-#include <GuiTreeView.au3>
-#include <GuiMenu.au3>
-#include <GDIPlus.au3>
-#include <Timers.au3>
-#include <Misc.au3>
-#include "GUIDarkAPI.au3"
+#include "GUIDarkTheme.includes.au3"
 
 ; #INDEX# =======================================================================================================================
 ; Title .........: GUIDarkTheme UDF Library for AutoIt3
 ; AutoIt Version : 3.3.18.0
 ; Language ......: English
 ; Description ...: UDF library for applying dark theme to win32 controls
-; Author(s) .....: WildByDesign (including code from NoNameCode, argumentum, UEZ, pixelsearch, ahmet, MattyD and more)
-; Version .......: 1.6.0.0
-; Notes .........: Window messages used for controls:	WM_CTLCOLOREDIT, WM_CTLCOLORLISTBOX, WM_NOTIFY, WM_SIZE
+; Author(s) .....: WildByDesign (including code from NoNameCode, argumentum, UEZ, pixelsearch, ahmet, MattyD, ioa747, Nine and more)
+; Version .......: 3.0.0.0
+; Notes .........: This UDF is not compatible with WS_EX_COMPOSITED extended style
+; ...............: Window messages used for controls:	WM_CTLCOLOR*, WM_NOTIFY, WM_SIZE, WM_SETTINGCHANGE
 ; ...............: Window messages used for menubar:	WM_DRAWITEM, WM_ACTIVATE, WM_MEASUREITEM, WM_WINDOWPOSCHANGED
 ; ===============================================================================================================================
 
-Global $__DM_g_Version = "1.6.0.0"
+Global $__DM_g_Version = "3.0.0.0"
 
 ; #CURRENT# =====================================================================================================================
 ; _GUIDarkMenu_Register
 ; _GUIDarkMenu_SetColors
-; _GUIDarkTheme_MsgBox
-; _GUIDarkTheme_MsgBoxSet
+; _GUIDarkTheme_AccentColorSet
+; _GUIDarkTheme_ApplyAuto
 ; _GUIDarkTheme_ApplyDark
 ; _GUIDarkTheme_ApplyLight
-; _GUIDarkTheme_SwitchTheme
-; _GUIDarkTheme_ApplyMaterial
-; _GUIDarkTheme_GUISetDarkTheme
-; _GUIDarkTheme_GUICtrlSetDarkTheme
+; _GUIDarkTheme_AutoTheme
+; _GUIDarkTheme_CtrlBorderSet
 ; _GUIDarkTheme_GUICtrlAllSetDarkTheme
+; _GUIDarkTheme_GUICtrlSetDarkTheme
+; _GUIDarkTheme_GUISetDarkTheme
+; _GUIDarkTheme_MsgBox
+; _GUIDarkTheme_MsgBoxSet
+; _GUIDarkTheme_SetCornerPref
+; _GUIDarkTheme_SwitchTheme
+; _GUIDarkTheme_ToolbarSetTrans
+; _GUIDarkTheme_Version
 ; ===============================================================================================================================
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
-; __GUIDarkMenu_WM_DRAWITEM
-; __GUIDarkMenu_WM_ACTIVATE
-; __GUIDarkMenu_WM_MEASUREITEM
-; __GUIDarkMenu_WM_WINDOWPOSCHANGED
+; __GUIDarkMenu_CreateFont
 ; __GUIDarkMenu_GetTopMenuItems
-; __GUIDarkMenu_PaintWhiteLine
-; __GUIDarkMenu_MenuBarBKColor
-; __GUIDarkMenu_ColorToCOLORREF
 ; __GUIDarkMenu_GUICtrlGetFont
 ; __GUIDarkMenu_GUIGetFontSize
-; __GUIDarkMenu_CreateFont
-; __GUIDarkTheme_WM_CTLCOLOR
-; __GUIDarkTheme_WM_NOTIFY
-; __GUIDarkTheme_WM_SIZE
-; __GUIDarkTheme_OnExit
-; __GUIDarkTheme_TabProc
+; __GUIDarkMenu_MenuBarBKColor
+; __GUIDarkMenu_PaintWhiteLine
+; __GUIDarkMenu_WM_ACTIVATE
+; __GUIDarkMenu_WM_DRAWITEM
+; __GUIDarkMenu_WM_MEASUREITEM
+; __GUIDarkMenu_WM_WINDOWPOSCHANGED
+; __GUIDarkTheme_AddToSubclass
+; __GUIDarkTheme_BrushCleanup
+; __GUIDarkTheme_ButtonProc
+; __GUIDarkTheme_CheckedPNG
+; __GUIDarkTheme_CreateBrushes
+; __GUIDarkTheme_CreateDots
+; __GUIDarkTheme_CreatePens
+; __GUIDarkTheme_CreateSizebox
 ; __GUIDarkTheme_DateProc
-; __GUIDarkTheme_hWnd2Styles
-; __GUIDarkTheme_GetStyleString
+; __GUIDarkTheme_GetCtrlColors
 ; __GUIDarkTheme_GetCtrlStyleString
 ; __GUIDarkTheme_GetCtrlStyleString2
-; __GUIDarkTheme_CheckedPNG
-; __GUIDarkTheme_UncheckedPNG
 ; __GUIDarkTheme_GetImages
-; __GUIDarkTheme_UpDownProc
+; __GUIDarkTheme_GetStyleString
+; __GUIDarkTheme_GroupProc
+; __GUIDarkTheme_hWnd2Styles
+; __GUIDarkTheme_IsCtrlInTab
+; __GUIDarkTheme_OnExit
+; __GUIDarkTheme_PenCleanup
+; __GUIDarkTheme_SetBandColor
 ; __GUIDarkTheme_SizeboxProc
-; __GUIDarkTheme_SubclassProc
-; __GUIDarkTheme_CreateDots
 ; __GUIDarkTheme_StatusRatio
-; __GUIDarkTheme_CreateSizebox
-; __GUIDarkTheme_AddToSubclass
 ; __GUIDarkTheme_SubclassCleanup
+; __GUIDarkTheme_SubclassProc
+; __GUIDarkTheme_TabProc
+; __GUIDarkTheme_UncheckedPNG
+; __GUIDarkTheme_UpDownProc
+; __GUIDarkTheme_WM_CTLCOLOR
+; __GUIDarkTheme_WM_NOTIFY
+; __GUIDarkTheme_WM_SETTINGCHANGE
+; __GUIDarkTheme_WM_SIZE
 ; ===============================================================================================================================
 
 ; #GLOBAL VARIABLES# ============================================================================================================
-Global $g_iBkColor = 0x1E1E1E
-Global $COLOR_BG_DARK = 0x1E1E1E
-Global $COLOR_TEXT_LIGHT = 0xCCCCCC
-Global $COLOR_CONTROL_BG = 0x2D2D2D
-Global $COLOR_BORDER_LIGHT = 0x555555
-Global $COLOR_BORDER = 0x3C3C3C
-Global $COLOR_MENU_BG = __WinAPI_ColorAdjustLuma($COLOR_BG_DARK, 5)
-Global $COLOR_MENU_HOT = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 20)
-Global $COLOR_MENU_SEL = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 10)
-Global $COLOR_MENU_TEXT = $COLOR_TEXT_LIGHT
+;										Customize Dark Mode Colors (RGB)			Customize Light Mode Colors (RGB)
+Global $__DM_g_iGuiBkColor, 		$__DM_g_iGuiBkColorDark		= 0x202020,		$__DM_g_iGuiBkColorLight     = 0xF0F0F0
+Global $__DM_g_iTextColor,			$__DM_g_iTextColorDark		= 0xE0E0E0,		$__DM_g_iTextColorLight      = 0x000000
+Global $__DM_g_iCtrlBkColor,		$__DM_g_iCtrlBkColorDark	= 0x383838,		$__DM_g_iCtrlBkColorLight    = 0xFFFFFF
+Global $__DM_g_iTabCtrlBkColor,		$__DM_g_iTabCtrlBkColorDark	= 0x202020,		$__DM_g_iTabCtrlBkColorLight = 0xF0F0F0
+Global $__DM_g_iBorderColorSel,		$__DM_g_iBorderColorSelDark	= 0xB0B0B0,		$__DM_g_iBorderColorSelLight = 0xB0B0B0
+Global $__DM_g_iBorderColor,		$__DM_g_iBorderColorDark	= 0x6B6B6B,		$__DM_g_iBorderColorLight    = 0x3F3F3F
+Global $__DM_g_iSizeboxPaint,		$__DM_g_iSizeboxPaintDark	= 0x171717,		$__DM_g_iSizeboxPaintLight   = 0xF0F0F0
+Global $__DM_g_iMenuBkColor,		$__DM_g_iMenuBkColorDark	= 0x202020,		$__DM_g_iMenuBkColorLight    = 0xF0F0F0
+Global $__DM_g_iMenuHotColor,		$__DM_g_iMenuHotColorDark	= 0x303030,		$__DM_g_iMenuHotColorLight   = 0xE5E5E5
+Global $__DM_g_iMenuSelColor,		$__DM_g_iMenuSelColorDark	= 0x272727,		$__DM_g_iMenuSelColorLight   = 0xEFEFEF
+Global $__DM_g_iMenuTextColor,		$__DM_g_iMenuTextColorDark	= 0xE0E0E0,		$__DM_g_iMenuTextColorLight  = 0x000000
+Global $__DM_g_iStatusBkColor,		$__DM_g_iStatusBkColorDark	= 0x1C1C1C,		$__DM_g_iStatusBkColorLight  = 0x1C1C1C
+Global $__DM_g_iButtonColor,		$__DM_g_iButtonColorDark	= 0x333333,		$__DM_g_iButtonColorLight    = 0xF4F4F4
+Global $__DM_g_iButtonColorHov,		$__DM_g_iButtonColorHovDark	= 0x454545,		$__DM_g_iButtonColorHovLight = 0xE0EFF9
+Global $__DM_g_iButtonColorSel,		$__DM_g_iButtonColorSelDark = 0x666666,		$__DM_g_iButtonColorSelLight = 0xCCE4F7
+Global $__DM_g_iButtonColorBor,		$__DM_g_iButtonColorBorDark = 0x9B9B9B,		$__DM_g_iButtonColorBorLight = 0xBCBCBC
+Global $__DM_g_iTabColor,			$__DM_g_iTabColorDark 		= 0x303030,		$__DM_g_iTabColorLight       = 0xDBDBDB
+Global $__DM_g_iTabColorSel,		$__DM_g_iTabColorSelDark 	= 0x202020,		$__DM_g_iTabColorSelLight    = 0xCFCFCF
+Global $__DM_g_iExtraGray,			$__DM_g_iExtraGrayDark 		= 0x5E5E5E,		$__DM_g_iExtraGrayLight      = 0xCFCFCF
 
-Global $MSGBOX_BG_TOP = _WinAPI_SwitchColor(0x323232)
-Global $MSGBOX_BG_BOTTOM = _WinAPI_SwitchColor(0x202020)
-Global $MSGBOX_BG_BUTTON = $MSGBOX_BG_BOTTOM
-Global $MSGBOX_TEXT = _WinAPI_SwitchColor(0xFFFFFF)
+Global $__DM_g_iAccentColor = 0x0078D4
+Global $__DM_g_iMsgBoxTopColor = 0x323232
+Global $__DM_g_iMsgBoxBottomColor = 0x202020
+Global $__DM_g_iMsgBoxButtonColor = $__DM_g_iMsgBoxBottomColor
+Global $__DM_g_iMsgBoxTextColor = _WinAPI_SwitchColor(0xFFFFFF)
 
-Global $g_hMsgBoxHook, $g_idTImer
-Global $g_UseDarkMode
-Global $g_Timeout = 0, $g_hMsgBoxOldProc, $g_hMsgBoxBrush, $g_hMsgBoxBtn = 0
-Global $g_bMsgBoxClosing = False, $g_bNCLButtonDown = False, $g_bMsgBoxInitialized = False
-Global $g_hMsgBoxSubProc = 0
-Global $g_pMsgBoxSubProc = 0
-Global $g_bUseMica = False, $g_iMaterial
-Global $g_aButtonText[12]
-Global $g_bShowCount = True, $g_bShowUnderline = True
+Global $__DM_g_hMsgBoxHook
+Global $__DM_g_bUseDarkMode = _WinAPI_ShouldAppsUseDarkMode()
+Global $__DM_g_bMsgBoxInitialized = False
+Global $__DM_g_hMsgBoxSubProc = 0
+Global $__DM_g_pMsgBoxSubProc = 0
+Global $__DM_g_bShowCtrlBorder = True
+Global $__DM_g_bShowEditActive = True
 
-Global $g_aControls[150][3] = [[0, 0, 0]] ; [hWnd, pSubclassProc, idSubClass]
-Global $g_iControlCount = 0
-Global $g_pSubclassProc = 0
-Global $g_pTabProc = 0
-Global $g_pSizeboxProc = 0
-Global $g_pUpDownSub = 0
+Global $__DM_g_aControls[150][4] = [[0, 0, 0, 0]] ; [hWnd, hSubclassProc, pSubclassProc, idSubClass]
+Global $__DM_g_iControlCount = 0
+Global $__DM_g_hSubclassProc = 0, $__DM_g_pSubclassProc = 0
+Global $__DM_g_hTabProc = 0, $__DM_g_pTabProc = 0
+Global $__DM_g_hSizeboxProc = 0, $__DM_g_pSizeboxProc = 0
+Global $__DM_g_hUpDownSub = 0, $__DM_g_pUpDownSub = 0
+Global $__DM_g_hButtonProc = 0, $__DM_g_pButtonProc = 0
+Global $__DM_g_hGroupProc = 0, $__DM_g_pGroupProc = 0
+Global $__DM_g_aButtonSub[1][3]
+Global $__DM_g_iButtonCount = 0
 
-Global $g_iMsgBoxDpi = Round(__WinAPI_GetDPI() / 96, 2)
-If @error Then $g_iMsgBoxDpi = 1
+Global $__DM_g_iMsgBoxDpi = Round(_WinAPI_GetDPI() / 96, 2)
+If @error Then $__DM_g_iMsgBoxDpi = 1
 ; ===============================================================================================================================
 
 ; #INTERNAL_USE_ONLY GLOBAL VARIABLES # =========================================================================================
-Global $g_iRevision = RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
-Global $g_b24H2Plus = False
-If @OSBuild >= 26100 And $g_iRevision >= 6899 Then $g_b24H2Plus = True
-Global $g_hGui
-Global $g_hBrushEdit = 0
-Global $g_hDateProc_CB, $g_pDateProc_CB, $g_hDateOldProc, $g_hDate
-Global $g_bHover = False
-Global $g_iGripPos = 1
-Global $g_bSizeboxCreated = False
-Global $g_hStatus, $g_hGripSize, $g_hSizebox, $g_hDots, $g_iHeight, $g_aRatioW, $g_hCursor
-Global $g_hStatusBrush = __WinAPI_CreateSolidBrush(0x000000)
-Global $g_aMenuText = []
-Global $g_iDpiScale = 1
-Global $g_iDpi = 100
-Global $g_hMenuFont = 0
+Global $__DM_g_b24H2Plus = __DM_DarkThemeAvailability()
+;$__DM_g_b24H2Plus = False ; just for debugging, simulating older OS during testing
+Global $__DM_g_hDateProc, $__DM_g_pDateProc, $__DM_g_hDateProcOld
+Global $__DM_g_bHover = False
+Global $__DM_g_iGripPos = 1
+Global $__DM_g_hStatus, $__DM_g_hGripSize, $__DM_g_hSizebox, $__DM_g_hDots, $__DM_g_iHeight, $__DM_g_aRatioW, $__DM_g_hCursor
+Global $__DM_g_aMenuText = []
+Global $__DM_g_iDpiScale = 1
+Global $__DM_g_iDpi = 100
+Global $__DM_g_hMenuFont = 0
+Global $__DM_g_aGroupInTab[0]
+Global $__DM_g_a_hDateTime[0]
+Global $__DM_g_iTimerCycles = 0
+
+Global $__DM_g_hBrushCtrl = 0, $__DM_g_hBrushGui = 0, $__DM_g_hBrushSizebox = 0
+Global $__DM_g_hBrushBtn = 0, $__DM_g_hBrushBtnHov = 0, $__DM_g_hBrushBtnSel = 0
+Global $__DM_g_hBrushMenuBk = 0, $__DM_g_hBrushMenuSel = 0, $__DM_g_hBrushMenuHot = 0
+Global $__DM_g_hBrushAccent = 0, $__DM_g_hBrushAccentHot = 0
+Global $__DM_g_hBrushTab = 0, $__DM_g_hBrushTabSel = 0, $__DM_g_hBrushTabBk = 0
+Global $__DM_g_hBrushGray = 0
+Global $__DM_g_hBrushMsgBoxTop = 0, $__DM_g_hBrushMsgBoxBottom = 0
+Global $__DM_g_iBrushHdr = 0, $__DM_g_iBrushHdrHot = 0, $__DM_g_iBrushHdrSel = 0
+Global $__DM_g_iBrushBorder = 0
+
+Global $__DM_g_hPenBtnBor = 0, $__DM_g_hPenGui = 0, $__DM_g_hPenBorder = 0, $__DM_g_hPenBorderSel = 0
+Global $__DM_g_hPenAccent = 0, $__DM_g_hPenBlack = 0
+Global $__DM_g_hPen2Accent = 0, $__DM_g_hPen2Border = 0, $__DM_g_hPen2BorderSel = 0
 ; ===============================================================================================================================
 
 ; #GLOBAL CONSTANTS# ============================================================================================================
 Global Const $TVS_EX_DOUBLEBUFFER = 0x0004
 
-Global Const $DWMSBT_AUTO = 0               ; Default (Auto)
-Global Const $DWMSBT_NONE = 1               ; None
-Global Const $DWMSBT_MAINWINDOW = 2         ; Mica
-Global Const $DWMSBT_TRANSIENTWINDOW = 3    ; Acrylic
-Global Const $DWMSBT_TABBEDWINDOW = 4       ; Mica Alt (Tabbed)
+Global Const $DWMWCP_DEFAULT = 0
+Global Const $DWMWCP_DONOTROUND = 1
+Global Const $DWMWCP_ROUND = 2
+Global Const $DWMWCP_ROUNDSMALL = 3
+
+Global Const $BP_RADIOBUTTON = 2
+Global Const $BP_CHECKBOX = 3
+Global Const $BP_GROUPBOX = 4
+
+Global Const $GBS_NORMAL = 1
+Global Const $GBS_DISABLED = 2
+
+Global Const $PBST_NORMAL = 0x0001
+Global Const $PBST_ERROR  = 0x0002
+Global Const $PBST_PAUSED = 0x0003
 
 Global Const $HCBT_MOVESIZE = 0
 Global Const $HCBT_MINMAX = 1
@@ -156,15 +190,43 @@ Global Const $HCBT_KEYSKIPPED = 7
 Global Const $HCBT_SYSCOMMAND = 8
 Global Const $HCBT_SETFOCUS = 9
 
+Global Const $CBS_UNCHECKEDNORMAL = 1
+Global Const $CBS_UNCHECKEDHOT = 2
+Global Const $CBS_UNCHECKEDPRESSED = 3
+Global Const $CBS_UNCHECKEDDISABLED = 4
+Global Const $CBS_CHECKEDNORMAL = 5
+Global Const $CBS_CHECKEDHOT = 6
+Global Const $CBS_CHECKEDPRESSED = 7
+Global Const $CBS_CHECKEDDISABLED = 8
+Global Const $CBS_MIXEDNORMAL = 9
+Global Const $CBS_MIXEDHOT = 10
+Global Const $CBS_MIXEDPRESSED = 11
+Global Const $CBS_MIXEDDISABLED = 12
+
+Global Const $RBS_UNCHECKEDNORMAL = 1
+Global Const $RBS_UNCHECKEDHOT = 2
+Global Const $RBS_UNCHECKEDPRESSED = 3
+Global Const $RBS_UNCHECKEDDISABLED = 4
+Global Const $RBS_CHECKEDNORMAL = 5
+Global Const $RBS_CHECKEDHOT = 6
+Global Const $RBS_CHECKEDPRESSED = 7
+Global Const $RBS_CHECKEDDISABLED = 8
+
 Global Const $ODT_MENU = 1
 Global Const $ODS_SELECTED = 0x0001
 Global Const $ODS_DISABLED = 0x0004
 Global Const $ODS_HOTLIGHT = 0x0040
-Global Const $PRF_CLIENT = 0x0004, $DTP_BORDER = 0x404040, $DTP_BG_DARK = $COLOR_CONTROL_BG, $DTP_TEXT_LIGHT = $COLOR_TEXT_LIGHT, $DTP_BORDER_LIGHT = 0xD8D8D8
+Global Const $PRF_CLIENT = 0x0004
 
-Global Const $tagNMCUSTOMDRAWINFO = $tagNMHDR & ";dword DrawStage;handle hdc;" & $tagRECT & ";dword_ptr ItemSpec;uint ItemState;lparam lItemParam;"
+Global Const $TBCDRF_USECDCOLORS = 0x800000
+Global Const $TBCDRF_NOBACKGROUND = 0x400000
+Global Const $TBCDRF_HILITEHOTTRACK = 0x20000
 
-Global Const $tagNMCUSTOMDRAW = _
+Global Const $tagNMTBCUSTOMDRAW = $tagNMHDR & ";dword dwDrawStage;handle hdc;" & $tagRECT & ";dword_ptr dwItemSpec;uint uItemState;lparam lItemlParam;" & _
+		"ptr hbrMonoDither;ptr hbrLines;ptr hpenLines;dword clrText;dword clrMark;dword clrTextHighlight;dword clrBtnFace;dword clrBtnHighlight;dword clrHighlightHotTrack;" & _
+		"long TextLeft;long TextTop;long TextRight;long TextBottom;int nStringBkMode;int nHLStringBkMode;int iListGap;"
+
+Global Const $__DM_tagNMCUSTOMDRAW = _
 		$tagNMHDR & ";" & _                                    ; Contains NM_CUSTOMDRAW / NMHDR header among other things
 		"dword dwDrawStage;" & _                               ; Current drawing stage (CDDS_*)
 		"handle hdc;" & _                                      ; Device Context Handle
@@ -591,92 +653,343 @@ Global Const $__DM_g_Style_UpDown[9][2] = _
 _GDIPlus_Startup()
 
 OnAutoItExitRegister("__GUIDarkTheme_OnExit")
-OnAutoItExitRegister("_MsgBoxDarkCleaup")
 
-__WinAPI_SetPreferredAppMode($APPMODE_ALLOWDARK)
+_WinAPI_SetPreferredAppMode($APPMODE_ALLOWDARK)
 
+; Early creation of Dark MsgBox brushes
+If Not $__DM_g_hBrushMsgBoxTop Then $__DM_g_hBrushMsgBoxTop = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMsgBoxTopColor))
+If Not $__DM_g_hBrushMsgBoxBottom Then $__DM_g_hBrushMsgBoxBottom = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMsgBoxBottomColor))
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_OnExit()
-	If $g_hDateOldProc Then __WinAPI_SetWindowLong($g_hDate, $GWL_WNDPROC, $g_hDateOldProc)
-	If $g_hDateProc_CB Then DllCallbackFree($g_hDateProc_CB)
-	If $g_hBrushEdit Then __WinAPI_DeleteObject($g_hBrushEdit)
-	If $g_hMenuFont Then __WinAPI_DeleteObject($g_hMenuFont)
+	If $__DM_g_hMenuFont Then _WinAPI_DeleteObject($__DM_g_hMenuFont)
 	; statusbar
-	If $g_hDots Then _GDIPlus_BitmapDispose($g_hDots)
-	If $g_hCursor Then _WinAPI_DestroyCursor($g_hCursor)
+	If $__DM_g_hDots Then _GDIPlus_BitmapDispose($__DM_g_hDots)
+	If $__DM_g_hCursor Then _WinAPI_DestroyCursor($__DM_g_hCursor)
+	; dark msgbox
+	If $__DM_g_hMsgBoxSubProc Then DllCallbackFree($__DM_g_hMsgBoxSubProc)
 	__GUIDarkTheme_SubclassCleanup()
+	__GUIDarkTheme_BrushCleanup()
+	__GUIDarkTheme_PenCleanup()
 	_GDIPlus_Shutdown()
 EndFunc   ;==>__GUIDarkTheme_OnExit
 
-Func __GUIDarkTheme_WM_CTLCOLOR($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $hWnd, $iMsg
-	Local $hDC = $wParam
-	Local $hCtrl = $lParam
+; #FUNCTION# ====================================================================================================================
+; Author.........: argumentum
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_GroupProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
+    Switch $iMsg
+        Case $WM_ERASEBKGND
+            Return 1
 
-	Switch __WinAPI_GetClassName($hCtrl)
-		Case 'Static', 'Button'
-			__WinAPI_SetBkMode($hDC, $TRANSPARENT)
-			__WinAPI_SetTextColor($hDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_TEXT_LIGHT))
-			; Проверка размера для разделителей (узкие полосы высотой ≤ 3px) —
-			; они должны быть видны, поэтому не используем NULL_BRUSH
-			Local $tRect = __WinAPI_GetClientRect($hCtrl)
-			Local $iHeight = $tRect.Bottom - $tRect.Top
-			If $iHeight > 3 Then
-				Local $hNull = __WinAPI_GetStockObject(5) ; 5 = NULL_BRUSH
-				If $hNull Then Return $hNull
+        Case $WM_PAINT
+            Local $tPaint = DllStructCreate($tagPAINTSTRUCT)
+            Local $hDC = _WinAPI_BeginPaint($hWnd, $tPaint)
+
+            Local $tClient = _WinAPI_GetClientRect($hWnd)
+            Local $iW = $tClient.Right
+            Local $iH = $tClient.Bottom
+
+            Local $hMemDC = _WinAPI_CreateCompatibleDC($hDC)
+            Local $hBitmap = _WinAPI_CreateCompatibleBitmap($hDC, $iW, $iH)
+            Local $hOldBmp = _WinAPI_SelectObject($hMemDC, $hBitmap)
+
+            Local $hFont = _SendMessage($hWnd, $WM_GETFONT, 0, 0)
+            If Not $hFont Then $hFont = _WinAPI_GetStockObject($DEFAULT_GUI_FONT)
+            Local $hOldFont = _WinAPI_SelectObject($hMemDC, $hFont)
+
+            Local $sText = _WinAPI_GetWindowText($hWnd)
+            Local $tTextSize = _WinAPI_GetTextExtentPoint32($hMemDC, $sText)
+            Local $iTextWidth = $tTextSize.X
+            Local $iTextHeight = $tTextSize.Y
+
+			; exclude clip testing
+			Local $tCR = _WinAPI_GetClientRect($hWnd)
+			$tCR.Top = $tCR.Top + $iTextHeight + 2
+			$tCR.Bottom = $tCR.Bottom - 5
+			$tCR.Left = $tCR.Left + 5
+			$tCR.Right = $tCR.Right - 5
+			_WinAPI_ExcludeClipRect($hDC, $tCR)
+			_WinAPI_ExcludeClipRect($hMemDC, $tCR)
+
+            _WinAPI_DrawThemeParentBackground($hWnd, $hMemDC, $tClient)
+
+            Local $hGraphics = _GDIPlus_GraphicsCreateFromHDC($hMemDC)
+            _GDIPlus_GraphicsSetSmoothingMode($hGraphics, 2)
+
+            Local $iRadius = 1
+            Local $iX = 0
+            Local $iY = Int($iTextHeight / 2)
+            Local $iWidth = $iW - 1 - $iX
+            Local $iHeight = $iH - 1 - $iY - 1
+
+            Local $hPath = _GDIPlus_PathCreate()
+            _GDIPlus_PathAddLine($hPath, $iX + $iRadius, $iY, $iX + $iWidth - $iRadius, $iY)
+            _GDIPlus_PathAddArc($hPath, $iX + $iWidth - ($iRadius * 2), $iY, $iRadius * 2, $iRadius * 2, 270, 90)
+            _GDIPlus_PathAddLine($hPath, $iX + $iWidth, $iY + $iRadius, $iX + $iWidth, $iY + $iHeight - $iRadius)
+            _GDIPlus_PathAddArc($hPath, $iX + $iWidth - ($iRadius * 2), $iY + $iHeight - ($iRadius * 2), $iRadius * 2, $iRadius * 2, 0, 90)
+            _GDIPlus_PathAddLine($hPath, $iX + $iWidth - $iRadius, $iY + $iHeight, $iX + $iRadius, $iY + $iHeight)
+            _GDIPlus_PathAddArc($hPath, $iX, $iY + $iHeight - ($iRadius * 2), $iRadius * 2, $iRadius * 2, 90, 90)
+            _GDIPlus_PathAddLine($hPath, $iX, $iY + $iHeight - $iRadius, $iX, $iY + $iRadius)
+            _GDIPlus_PathAddArc($hPath, $iX, $iY, $iRadius * 2, $iRadius * 2, 180, 90)
+            _GDIPlus_PathCloseFigure($hPath)
+
+            If $sText <> "" Then
+                Local $hRegion = _GDIPlus_RegionCreate()
+                _GDIPlus_RegionCombineRect($hRegion, 7, 0, $iTextWidth + 4, $iTextHeight, 0)
+                _GDIPlus_GraphicsSetClipRegion($hGraphics, $hRegion, 3)
+                _GDIPlus_RegionDispose($hRegion)
+            EndIf
+
+            Local $hPen = _GDIPlus_PenCreate(0xFF505050, 1)
+            _GDIPlus_GraphicsDrawPath($hGraphics, $hPath, $hPen)
+
+            _GDIPlus_GraphicsResetClip($hGraphics)
+            _GDIPlus_PenDispose($hPen)
+            _GDIPlus_PathDispose($hPath)
+
+            If $sText <> "" Then
+                Local $hTheme = _WinAPI_OpenThemeData($hWnd, "DarkMode_Explorer::Button")
+                Local $tDTTOPTS = DllStructCreate($tagDTTOPTS)
+                DllStructSetData($tDTTOPTS, 'Size', DllStructGetSize($tDTTOPTS))
+                DllStructSetData($tDTTOPTS, 'Flags', $DTT_TEXTCOLOR)
+                DllStructSetData($tDTTOPTS, 'clrText', 0xFFFFFF)
+
+                Local $iTextFlags = BitOR($DT_SINGLELINE, $DT_LEFT, $DT_TOP)
+                Local $tDrawTextRect = _WinAPI_CreateRectEx(9, 0, $iTextWidth, $iTextHeight)
+
+                _WinAPI_DrawThemeTextEx($hTheme, $BP_GROUPBOX, $GBS_NORMAL, $hMemDC, $sText, $tDrawTextRect, $iTextFlags, $tDTTOPTS)
+                _WinAPI_CloseThemeData($hTheme)
+            EndIf
+
+            _GDIPlus_GraphicsDispose($hGraphics)
+
+            _WinAPI_BitBlt($hDC, 0, 0, $iW, $iH, $hMemDC, 0, 0, $SRCCOPY)
+
+            _WinAPI_SelectObject($hMemDC, $hOldFont)
+            _WinAPI_SelectObject($hMemDC, $hOldBmp)
+            _WinAPI_DeleteObject($hBitmap)
+            _WinAPI_DeleteDC($hMemDC)
+
+            _WinAPI_EndPaint($hWnd, $tPaint)
+            Return 0
+
+    EndSwitch
+
+    Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+EndFunc   ;==>__GUIDarkTheme_GroupProc
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_ButtonProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
+	#forceref $iID
+    Switch $iMsg
+        Case $WM_ERASEBKGND
+            Return 1 ; Prevent background erasing to avoid flickering
+
+        Case $WM_PAINT
+			Local $iPartID = $__DM_g_aButtonSub[$pData][0]
+			Local $sStyles = $__DM_g_aButtonSub[$pData][1]
+			Local $bCtrlInTab = $__DM_g_aButtonSub[$pData][2]
+
+            Local $hTheme = _WinAPI_OpenThemeData($hWnd, "DarkMode_Explorer::Button")
+            Local $iStateID = 0
+
+            Local Const $BST_HOT = 0x0200
+
+            Local $tPaint = DllStructCreate($tagPAINTSTRUCT)
+            Local $hDC = _WinAPI_BeginPaint($hWnd, $tPaint)
+
+            Local $tClient = _WinAPI_GetClientRect($hWnd)
+			Local $iW = $tClient.Right
+			Local $iH = $tClient.Bottom
+
+			; Initiate double buffering
+			Local $hMemDC = _WinAPI_CreateCompatibleDC($hDC)
+			Local $hBitmap = _WinAPI_CreateCompatibleBitmap($hDC, $iW, $iH)
+			Local $hOldBmp = _WinAPI_SelectObject($hMemDC, $hBitmap)
+
+            Local $iState = _GUICtrlButton_GetState($hWnd)
+
+            ; Determine StateID from current state
+            Switch $iPartID
+                Case $BP_CHECKBOX
+					Switch _WinAPI_IsWindowEnabled($hWnd)
+						Case True
+							If BitAND($iState, $BST_INDETERMINATE) Then
+								If BitAND($iState, $BST_HOT) Then
+									$iStateID = $CBS_MIXEDHOT
+								Else
+									$iStateID = $CBS_MIXEDNORMAL
+								EndIf
+							ElseIf BitAND($iState, $BST_CHECKED) Then
+								If BitAND($iState, $BST_HOT) Then
+									$iStateID = $CBS_CHECKEDHOT
+								Else
+									$iStateID = $CBS_CHECKEDNORMAL
+								EndIf
+							Else
+								If BitAND($iState, $BST_HOT) Then
+									$iStateID = $CBS_UNCHECKEDHOT
+								Else
+									$iStateID = $CBS_UNCHECKEDNORMAL
+								EndIf
+							EndIf
+						Case False
+							If BitAND($iState, $BST_INDETERMINATE) Then
+								$iStateID = $CBS_MIXEDDISABLED
+							ElseIf BitAND($iState, $BST_CHECKED) Then
+								$iStateID = $CBS_CHECKEDDISABLED
+							Else
+								$iStateID = $CBS_UNCHECKEDDISABLED
+							EndIf
+					EndSwitch
+
+                Case $BP_RADIOBUTTON
+					Switch _WinAPI_IsWindowEnabled($hWnd)
+						Case True
+							If BitAND($iState, $BST_CHECKED) Then
+								If BitAND($iState, $BST_HOT) Then
+									$iStateID = $RBS_CHECKEDHOT
+								Else
+									$iStateID = $RBS_CHECKEDNORMAL
+								EndIf
+							Else
+								If BitAND($iState, $BST_HOT) Then
+									$iStateID = $RBS_UNCHECKEDHOT
+								Else
+									$iStateID = $RBS_UNCHECKEDNORMAL
+								EndIf
+							EndIf
+						Case False
+							If BitAND($iState, $BST_CHECKED) Then
+								$iStateID = $RBS_CHECKEDDISABLED
+							Else
+								$iStateID = $RBS_UNCHECKEDDISABLED
+							EndIf
+					EndSwitch
+            EndSwitch
+
+            ; Determine DrawText $DT_* flags based on detected styles
+            Local $iTextFlags
+            Select
+                Case StringInStr($sStyles, "BS_RIGHT") <> 0
+                    $iTextFlags = BitOR($DT_SINGLELINE, $DT_NOCLIP, $DT_VCENTER, $DT_RIGHT)
+                Case StringInStr($sStyles, "BS_CENTER") <> 0
+                    $iTextFlags = BitOR($DT_SINGLELINE, $DT_NOCLIP, $DT_VCENTER, $DT_CENTER)
+                Case Else
+                    $iTextFlags = BitOR($DT_SINGLELINE, $DT_NOCLIP, $DT_VCENTER, $DT_LEFT)
+            EndSelect
+
+            ; GetThemeBackgroundContentRect
+            Local $tTextRect = _WinAPI_GetThemeBackgroundContentRect($hTheme, $iPartID, $iStateID, $hMemDC, $tClient)
+            Local $tSIZE = _WinAPI_GetThemePartSize($hTheme, $iPartID, 0, Null, Null, $TS_TRUE)
+
+            ; Get text from control
+            Local $sText = _WinAPI_GetWindowText($hWnd)
+
+            ; DrawThemeParentBackground
+            _WinAPI_DrawThemeParentBackground($hWnd, $hMemDC, $tClient)
+
+			; Paint control background with tab background color if within tab control
+			If $bCtrlInTab Then
+				Local $hBrush = $__DM_g_hBrushTabBk
+				_WinAPI_FillRect($hMemDC, $tClient, $hBrush)
 			EndIf
-			Return $GUI_RUNDEFMSG
-	EndSwitch
 
-	; --- Default behavior for all other statics / controls ---
-	__WinAPI_SetTextColor($hDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_TEXT_LIGHT))
+            ; DrawThemeBackground
+            Local $iWidth = $tSIZE.X
+            Local $iHeight = $tSIZE.Y
+            Local $iClientHeight = $tClient.Bottom - $tClient.Top
+            Local $iHeightPad = ($iClientHeight - $iHeight)
+            Local $tRect = _WinAPI_CreateRectEx(0, 0, $iWidth, $iHeight + $iHeightPad)
+            _WinAPI_DrawThemeBackground($hTheme, $iPartID, $iStateID, $hMemDC, $tRect)
 
-	Local $hBrush = $g_hBrushEdit
+            ; Set flags for DTTOPTS structure
+            Local $tDTTOPTS = DllStructCreate($tagDTTOPTS)
+            DllStructSetData($tDTTOPTS, 'Size', DllStructGetSize($tDTTOPTS))
+            DllStructSetData($tDTTOPTS, 'Flags', $DTT_TEXTCOLOR)
+            DllStructSetData($tDTTOPTS, 'clrText', _WinAPI_IsWindowEnabled($hWnd) ? 0xFFFFFF : 0x808080)
 
-	__WinAPI_SetBkColor($hDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_CONTROL_BG))
-	__WinAPI_SetBkMode($hDC, $TRANSPARENT)
+            ; Setup font
+            Local $hFont = _SendMessage($hWnd, $WM_GETFONT, 0, 0)
+            If Not $hFont Then $hFont = _WinAPI_GetStockObject($DEFAULT_GUI_FONT)
+            Local $hOldFont = _WinAPI_SelectObject($hMemDC, $hFont)
 
-	Return $hBrush
-EndFunc   ;==>__GUIDarkTheme_WM_CTLCOLOR
+            $tTextRect.Left = $tTextRect.Left + $tSIZE.X + 3
+			$tTextRect.Right = $tTextRect.Right + $tSIZE.X + 3
 
+			;_WinAPI_SetBkMode($hMemDC, $TRANSPARENT)
+			;_WinAPI_SetBkColor($hMemDC, _WinAPI_SwitchColor($__DM_g_iCtrlBkColor))
+			;_WinAPI_SetTextColor($hMemDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+
+            _WinAPI_DrawThemeTextEx($hTheme, $BP_CHECKBOX, $iStateID, $hMemDC, $sText, $tTextRect, $iTextFlags, $tDTTOPTS)
+			;_WinAPI_DrawText($hMemDC, $sText, $tTextRect, $iTextFlags)
+
+            _WinAPI_BitBlt($hDC, 0, 0, $iW, $iH, $hMemDC, 0, 0, $SRCCOPY)
+
+            ; Cleanup
+            _WinAPI_CloseThemeData($hTheme)
+            _WinAPI_SelectObject($hDC, $hOldFont)
+            _WinAPI_SelectObject($hMemDC, $hOldBmp)
+			_WinAPI_DeleteObject($hBitmap)
+			_WinAPI_DeleteDC($hMemDC)
+
+            _WinAPI_EndPaint($hWnd, $tPaint)
+            Return 0
+
+    EndSwitch
+
+    Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+EndFunc   ;==>__GUIDarkTheme_ButtonProc
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: Nine
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_UpDownProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 	#forceref $iID, $pData
 	Local Static $bHover
-	Local $bHorz = BitAND(__WinAPI_GetWindowLong($hWnd, $GWL_STYLE), $UDS_HORZ)
-	Local $tRectTmp, $iPos
+	Local $bHorz = BitAND(_WinAPI_GetWindowLong($hWnd, $GWL_STYLE), $UDS_HORZ)
+	Local $tRectTmp, $iPos, $hBrush
 	Switch $iMsg
 		Case $WM_PAINT
-			Local $tPaint, $hDC = __WinAPI_BeginPaint($hWnd, $tPaint)
-			Local $tRect = __WinAPI_GetClientRect($hWnd)
-			Local $hMemDC = __WinAPI_CreateCompatibleDC($hDC)
-			Local $hBitmap = __WinAPI_CreateCompatibleBitmap($hDC, $tRect.right, $tRect.bottom)
-			Local $hOldBmp = __WinAPI_SelectObject($hMemDC, $hBitmap)
+			Local $tPaint, $hDC = _WinAPI_BeginPaint($hWnd, $tPaint)
+			Local $tRect = _WinAPI_GetClientRect($hWnd)
+			Local $hMemDC = _WinAPI_CreateCompatibleDC($hDC)
+			Local $hBitmap = _WinAPI_CreateCompatibleBitmap($hDC, $tRect.right, $tRect.bottom)
+			Local $hOldBmp = _WinAPI_SelectObject($hMemDC, $hBitmap)
 
-			Local $hPen = __WinAPI_CreatePen($PS_SOLID, 1, $COLOR_BORDER)
-			__WinAPI_SelectObject($hMemDC, $hPen)
-			Local $hBrush = __WinAPI_CreateSolidBrush($COLOR_CONTROL_BG)
-			__WinAPI_SetBkMode($hMemDC, $TRANSPARENT)
-			__WinAPI_SelectObject($hMemDC, $hBrush)
-			__WinAPI_Rectangle($hMemDC, $tRect)
+			Local $hPen = $__DM_g_hPenBtnBor
+			_WinAPI_SelectObject($hMemDC, $hPen)
+			$hBrush = $__DM_g_hBrushBtn
+			_WinAPI_SetBkMode($hMemDC, $TRANSPARENT)
+			_WinAPI_SelectObject($hMemDC, $hBrush)
+			_WinAPI_Rectangle($hMemDC, $tRect)
 			If $bHorz Then
-				__WinAPI_DrawLine($hMemDC, Int($tRect.right / 2), 0, Int($tRect.right / 2), $tRect.bottom)
+				_WinAPI_DrawLine($hMemDC, Int($tRect.right / 2), 0, Int($tRect.right / 2), $tRect.bottom)
 			Else
-				__WinAPI_DrawLine($hMemDC, 0, Int($tRect.bottom / 2), $tRect.right, Int($tRect.bottom / 2))
+				_WinAPI_DrawLine($hMemDC, 0, Int($tRect.bottom / 2), $tRect.right, Int($tRect.bottom / 2))
 			EndIf
-			__WinAPI_DeleteObject($hPen)
-			__WinAPI_DeleteObject($hBrush)
 
 			If $bHover Then
 				If $bHorz Then
-					$iPos = Round(__WinAPI_GetMousePos(True, $hWnd).x / __WinAPI_GetClientRect($hWnd).right, 0)
+					$iPos = Round(_WinAPI_GetMousePos(True, $hWnd).x / _WinAPI_GetClientRect($hWnd).right, 0)
 				Else
-					$iPos = Round(__WinAPI_GetMousePos(True, $hWnd).y / __WinAPI_GetClientRect($hWnd).bottom, 0)
+					$iPos = Round(_WinAPI_GetMousePos(True, $hWnd).y / _WinAPI_GetClientRect($hWnd).bottom, 0)
 				EndIf
-				If $g_UseDarkMode Then
-					$hBrush = __WinAPI_CreateSolidBrush(_IsPressed($VK_LBUTTON, $__DM_g_hDllUser32) ? 0x404040 : 0x606060)
+
+				If _IsPressed($VK_LBUTTON, 'user32.dll') Then
+					$hBrush = $__DM_g_hBrushBtnSel
 				Else
-					$hBrush = __WinAPI_CreateSolidBrush(_IsPressed($VK_LBUTTON, $__DM_g_hDllUser32) ? 0xf7e4cc : 0xf9efe0)
+					$hBrush = $__DM_g_hBrushBtnHov
 				EndIf
-				$tRectTmp = __WinAPI_GetClientRect($hWnd)
+
+				$tRectTmp = _WinAPI_GetClientRect($hWnd)
 				If $iPos Then
 					If $bHorz Then
 						$tRectTmp.left = Int($tRect.right / 2)
@@ -690,294 +1003,282 @@ Func __GUIDarkTheme_UpDownProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 						$tRectTmp.bottom = Int($tRect.bottom / 2)
 					EndIf
 				EndIf
-				__WinAPI_SelectObject($hMemDC, $hBrush)
-				__WinAPI_Rectangle($hMemDC, $tRectTmp)
-				__WinAPI_DeleteObject($hBrush)
+				_WinAPI_SelectObject($hMemDC, $hBrush)
+				_WinAPI_Rectangle($hMemDC, $tRectTmp)
 			EndIf
 
-			__WinAPI_SetTextColor($hMemDC, $COLOR_TEXT_LIGHT)
-			$tRectTmp = __WinAPI_GetClientRect($hWnd)
-			Local $iFH = 7 * $g_iDpiScale
+			_WinAPI_SetTextColor($hMemDC, $__DM_g_iTextColor)
+			$tRectTmp = _WinAPI_GetClientRect($hWnd)
+			Local $iFH = 7 * $__DM_g_iDpiScale
 			Local $sFontName = "Segoe MDL2 Assets"
-			Local $hFont = __WinAPI_CreateFont($iFH, 0, 0, 0, $FW_NORMAL, False, False, False, _
+			Local $hFont = _WinAPI_CreateFont($iFH, 0, 0, 0, $FW_NORMAL, False, False, False, _
 					$DEFAULT_CHARSET, $OUT_DEFAULT_PRECIS, $CLIP_DEFAULT_PRECIS, $PROOF_QUALITY, $DEFAULT_PITCH, $sFontName)
-			__WinAPI_SelectObject($hMemDC, $hFont)
+			_WinAPI_SelectObject($hMemDC, $hFont)
 			If $bHorz Then
 				$tRectTmp.top = Int(($tRect.bottom - $iFH) / 2)
 				$tRectTmp.right = $tRect.right / 2
-				__WinAPI_DrawText($hMemDC, ChrW(0xEDD9), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
+				_WinAPI_DrawText($hMemDC, ChrW(0xEDD9), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
 				$tRectTmp.left = Int($tRect.right / 2)
 				$tRectTmp.right = $tRect.right
-				__WinAPI_DrawText($hMemDC, ChrW(0xEDDA), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
+				_WinAPI_DrawText($hMemDC, ChrW(0xEDDA), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
 			Else
 				$tRectTmp.top = Int((Round($tRect.bottom / 2) - $iFH) / 2)
-				__WinAPI_DrawText($hMemDC, ChrW(0xEDDB), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
+				_WinAPI_DrawText($hMemDC, ChrW(0xEDDB), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
 				$tRectTmp.top += Round($tRect.bottom / 2)
-				__WinAPI_DrawText($hMemDC, ChrW(0xEDDC), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
+				_WinAPI_DrawText($hMemDC, ChrW(0xEDDC), $tRectTmp, BitOR($DT_CENTER, $DT_VCENTER, $DT_NOCLIP))
 			EndIf
 
-			__WinAPI_BitBlt($hDC, 0, 0, $tRect.right, $tRect.bottom, $hMemDC, 0, 0, $SRCCOPY)
+			_WinAPI_BitBlt($hDC, 0, 0, $tRect.right, $tRect.bottom, $hMemDC, 0, 0, $SRCCOPY)
 
-			__WinAPI_SelectObject($hMemDC, $hOldBmp)
-			__WinAPI_DeleteObject($hBitmap)
-			__WinAPI_DeleteDC($hMemDC)
-			__WinAPI_DeleteObject($hFont)
-			__WinAPI_EndPaint($hWnd, $tPaint)
+			_WinAPI_SelectObject($hMemDC, $hOldBmp)
+			_WinAPI_DeleteObject($hBitmap)
+			_WinAPI_DeleteDC($hMemDC)
+			_WinAPI_DeleteObject($hFont)
+			_WinAPI_EndPaint($hWnd, $tPaint)
 		Case $WM_MOUSEMOVE
 			$bHover = True
-			__WinAPI_TrackMouseEvent($hWnd, $TME_LEAVE)
-			__WinAPI_InvalidateRect($hWnd, 0, False)
+			_WinAPI_TrackMouseEvent($hWnd, $TME_LEAVE)
+			_WinAPI_InvalidateRect($hWnd, 0, False)
 			Return
 		Case $WM_MOUSELEAVE
 			$bHover = False
-			__WinAPI_InvalidateRect($hWnd, 0, False)
+			_WinAPI_InvalidateRect($hWnd, 0, False)
 			Return
 	EndSwitch
 	Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>__GUIDarkTheme_UpDownProc
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: mLipok, WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_TabProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 	#forceref $iID, $pData
-
+	Local $hBrushTabRecDark
 	Switch $iMsg
-		Case $WM_LBUTTONDOWN
-			; Force focus to tab control on any click
-			__WinAPI_SetFocus($hWnd)
-			__WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
-			Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-
-		Case $WM_SETFOCUS
-			__WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
-			Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-
-		Case $WM_KILLFOCUS
-			__WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
-			Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-
 		Case $WM_ERASEBKGND
-			Return 1 ; Prevent background erase to avoid flicker
+			Return 1 ; Prevent background erasing to avoid flickering
 
 		Case $WM_PAINT
+
+			; sending groupbox to bottom of z-order helps with transparency issue
+			For $i = 0 To UBound($__DM_g_aGroupInTab) - 1
+				If _WinAPI_IsWindowVisible($__DM_g_aGroupInTab[$i]) Then
+					_WinAPI_SetWindowPos($__DM_g_aGroupInTab[$i], $HWND_BOTTOM, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOREDRAW, $SWP_NOSIZE))
+				EndIf
+			Next
+
 			Local $tPaint = DllStructCreate($tagPAINTSTRUCT)
-			Local $hDC = DllCall($__DM_g_hDllUser32, "handle", "BeginPaint", "hwnd", $hWnd, "struct*", $tPaint)
-			If @error Or Not $hDC[0] Then Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-			$hDC = $hDC[0]
+			Local $hDC = _WinAPI_BeginPaint($hWnd, $tPaint)
+			If @error Or Not $hDC Then Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 
-			; Get client rectangle
-			Local $tClient = __WinAPI_GetClientRect($hWnd)
-			If Not IsDllStruct($tClient) Then
-				__WinAPI_EndPaint($hWnd, $tPaint)
-				Return 0
-			EndIf
-
+			Local $tClient = _WinAPI_GetClientRect($hWnd)
 			Local $iWidth = $tClient.Right
 			Local $iHeight = $tClient.Bottom
 
-			; Create memory DC for double buffering
-			Local $hMemDC = __WinAPI_CreateCompatibleDC($hDC)
-			Local $hBitmap = __WinAPI_CreateCompatibleBitmap($hDC, $iWidth, $iHeight)
-			Local $hOldBmp = __WinAPI_SelectObject($hMemDC, $hBitmap)
+			; Prepare Double Buffering
+			Local $hMemDC = _WinAPI_CreateCompatibleDC($hDC)
+			Local $hBitmap = _WinAPI_CreateCompatibleBitmap($hDC, $iWidth, $iHeight)
+			Local $hOldBmp = _WinAPI_SelectObject($hMemDC, $hBitmap)
 
-			; Fill background but exclude overlapping GUI controls from painting
-			Local $hParent = __WinAPI_GetParent($hWnd)
-			Local $hChild = __WinAPI_GetWindow($hParent, $GW_CHILD)
-			Local $tCR, $tPR = __WinAPI_GetWindowRect($hWnd)
-			Local $left, $top, $right, $bottom
+			; Determine if tab control contains an UpDown (spin) control
+			Local $hTabUpDown = _WinAPI_FindWindowEx($hWnd, "msctls_updown32")
+			If $hTabUpDown And _WinAPI_IsWindowVisible($hTabUpDown) Then
+				Local $tCR = _WinAPI_GetWindowRect($hTabUpDown)
+				Local $tPR = _WinAPI_GetWindowRect($hWnd)
 
-			While $hChild
-				If $hChild <> $hWnd And __WinAPI_IsWindowVisible($hChild) Then
-					$tCR = __WinAPI_GetWindowRect($hChild)
-					; Only exclude controls that lie fully within the tab control area
-					If $tCR.left >= $tPR.left And $tCR.right <= $tPR.right And $tCR.top >= $tPR.top And $tCR.bottom <= $tPR.bottom Then
-						$left = $tCR.left - $tPR.left
-						$top = $tCR.top - $tPR.top
-						$right = $tCR.right - $tPR.left
-						$bottom = $tCR.bottom - $tPR.top
-						; Exclude from offscreen bitmap (prevents black fill)
-						DllCall($__DM_g_hDllGdi32, "int", "ExcludeClipRect", "handle", $hMemDC, "int", $left, "int", $top, "int", $right, "int", $bottom)
-						; Exclude from screen DC (prevents BitBlt overwrite)
-						DllCall($__DM_g_hDllGdi32, "int", "ExcludeClipRect", "handle", $hDC, "int", $left, "int", $top, "int", $right, "int", $bottom)
-					EndIf
-				EndIf
-				$hChild = __WinAPI_GetWindow($hChild, $GW_HWNDNEXT)
-			WEnd
+				; Exclude UpDown control from being painted over
+				DllCall('gdi32.dll', "int", "ExcludeClipRect", "handle", $hDC, "int", $tCR.Left - $tPR.Left, "int", _
+						$tCR.Top - $tPR.Top - 100, "int", $tCR.Right - $tPR.Left, "int", $tCR.Bottom - $tPR.Top + 2)
+			EndIf
 
-			; Fill background
-			Local $hBrush = __WinAPI_CreateSolidBrush(__GUIDarkMenu_ColorToCOLORREF($COLOR_CONTROL_BG))
-			__WinAPI_FillRect($hMemDC, $tClient, $hBrush)
-			__WinAPI_DeleteObject($hBrush)
+			; Fill entire tab control with GUI background color
+			Local $hBrushBg = $__DM_g_hBrushGui
+			_WinAPI_FillRect($hMemDC, $tClient, $hBrushBg)
 
-			; Get tab info
-			Local $iTabCount = __SendMessage($hWnd, $TCM_GETITEMCOUNT, 0, 0)
-			Local $iCurSel = __SendMessage($hWnd, $TCM_GETCURSEL, 0, 0)
+			Local $iTabCount = _SendMessage($hWnd, $TCM_GETITEMCOUNT, 0, 0)
+			Local $iCurSel = _SendMessage($hWnd, $TCM_GETCURSEL, 0, 0)
 
 			; Setup font
-			Local $hFont = __SendMessage($hWnd, $WM_GETFONT, 0, 0)
-			If Not $hFont Then $hFont = __WinAPI_GetStockObject($DEFAULT_GUI_FONT)
-			Local $hOldFont = __WinAPI_SelectObject($hMemDC, $hFont)
+			Local $hFont = _SendMessage($hWnd, $WM_GETFONT, 0, 0)
+			If Not $hFont Then $hFont = _WinAPI_GetStockObject($DEFAULT_GUI_FONT)
+			Local $hOldFont = _WinAPI_SelectObject($hMemDC, $hFont)
 
-			__WinAPI_SetBkMode($hMemDC, $TRANSPARENT)
-			__WinAPI_SetTextColor($hMemDC, __GUIDarkMenu_ColorToCOLORREF($COLOR_TEXT_LIGHT))
+			; Prepare the Body Frame (The area beneath the tabs)
+			Local $tFirstTabRect = DllStructCreate($tagRECT)
+			_SendMessage($hWnd, $TCM_GETITEMRECT, 0, DllStructGetPtr($tFirstTabRect))
 
-			; Draw each tab
-			Local $tRect, $iLeft, $iTop, $iRight, $iBottom, $tItem, $tText, $bSelected, $iTabColor, $hTabBrush, $tTabRect, _
-					$sText, $hPen, $hOldPen, $hPenSep, $hOldPenSep, $tTextRect, $hBorderPen, $hOldBorderPen, $hNullBrush, $hOldBorderBrush
+			Local $tBodyRect = DllStructCreate($tagRECT)
+			$tBodyRect.Left = 0
+			$tBodyRect.Top = $tFirstTabRect.Bottom  ; Starts at the bottom edge of the tabs
+			$tBodyRect.Right = $iWidth
+			$tBodyRect.Bottom = $iHeight
 
+			Local $hBrushBorder = $__DM_g_iBrushBorder
+			Local $hBrushTabBody = $__DM_g_hBrushTabBk
+			_WinAPI_FillRect($hMemDC, $tBodyRect, $hBrushTabBody)
+			_WinAPI_FrameRect($hMemDC, $tBodyRect, $hBrushBorder)
+
+			_WinAPI_SetBkMode($hMemDC, $TRANSPARENT)
+			_WinAPI_SetTextColor($hMemDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+
+			; Draw individual tabs
 			For $i = 0 To $iTabCount - 1
-				; Get tab rectangle using TCM_GETITEMRECT
-				$tRect = DllStructCreate($tagRECT)
-				Local $aResult = DllCall($__DM_g_hDllUser32, "lresult", "SendMessageW", _
-						"hwnd", $hWnd, _
-						"uint", $TCM_GETITEMRECT, _
-						"wparam", $i, _
-						"struct*", $tRect)
-				If @error Or Not $aResult[0] Then ContinueLoop
+				Local $bSelected = ($i = $iCurSel)
+				Local $hTabBrush = $__DM_g_hBrushTabBk
+				Local $hBrushUnSel = $__DM_g_hBrushTab
 
-				$iLeft = $tRect.Left
-				$iTop = $tRect.Top
-				$iRight = $tRect.Right
-				$iBottom = $tRect.Bottom
+				Local $tRect = DllStructCreate($tagRECT)
+				_SendMessage($hWnd, $TCM_GETITEMRECT, $i, DllStructGetPtr($tRect))
+				If $tRect.Right < 0 Or $tRect.Left > $iWidth Then ContinueLoop
 
-				; Skip if rectangle is invalid
-				If $iLeft >= $iRight Or $iTop >= $iBottom Then ContinueLoop
-
-				; Get tab text
-				$tItem = DllStructCreate("uint Mask;dword dwState;dword dwStateMask;ptr pszText;int cchTextMax;int iImage;lparam lParam")
-				$tText = DllStructCreate("wchar Text[256]")
-				With $tItem
-					.Mask = 0x0001 ; TCIF_TEXT
-					.pszText = DllStructGetPtr($tText)
-					.cchTextMax = 256
-				EndWith
-
-				DllCall($__DM_g_hDllUser32, "lresult", "SendMessageW", _
-						"hwnd", $hWnd, _
-						"uint", $TCM_GETITEMW, _
-						"wparam", $i, _
-						"struct*", $tItem)
-
-				$sText = DllStructGetData($tText, "Text")
-
-				; Draw tab background
-				$bSelected = ($i = $iCurSel)
-				If $g_UseDarkMode Then
-					$iTabColor = $bSelected ? __WinAPI_ColorAdjustLuma($COLOR_CONTROL_BG, 20) : __WinAPI_ColorAdjustLuma($COLOR_CONTROL_BG, 10)
-				Else
-					$iTabColor = $bSelected ? __WinAPI_ColorAdjustLuma($COLOR_CONTROL_BG, -15) : __WinAPI_ColorAdjustLuma($COLOR_CONTROL_BG, -10)
-				EndIf
-				$hTabBrush = __WinAPI_CreateSolidBrush($iTabColor)
-
-				$tTabRect = DllStructCreate($tagRECT)
-				With $tTabRect
-					.Left = $iLeft
-					.Top = $iTop
-					.Right = $iRight
-					.Bottom = $iBottom
-				EndWith
-
-				__WinAPI_FillRect($hMemDC, $tTabRect, $hTabBrush)
-				__WinAPI_DeleteObject($hTabBrush)
-
-				; Draw selection indicator (top border for selected tab)
 				If $bSelected Then
-					$hPen = __WinAPI_CreatePen(0, 2, __GUIDarkMenu_ColorToCOLORREF(0x0078D4)) ; Blue accent
-					$hOldPen = __WinAPI_SelectObject($hMemDC, $hPen)
-					__WinAPI_MoveTo($hMemDC, $iLeft, $iTop)
-					__WinAPI_LineTo($hMemDC, $iRight - 2, $iTop)
-					__WinAPI_SelectObject($hMemDC, $hOldPen)
-					__WinAPI_DeleteObject($hPen)
+					; Draw selected tab
+					$tRect.top -= 2
+
+					; Fill tab background
+					_WinAPI_FillRect($hMemDC, $tRect, $hTabBrush)
+
+					; Draw border ONLY for the active tab (Top, Left, Right)
+					$hBrushTabRecDark = $__DM_g_iBrushBorder
+					_WinAPI_FrameRect($hMemDC, $tRect, $hBrushTabRecDark)
+
+					; OPEN BOTTOM: Draw a line in tab-color over the body-border to merge them
+					Local $tOpenLine = DllStructCreate($tagRECT)
+					$tOpenLine.Left = $tRect.Left + 1
+					$tOpenLine.Top = $tRect.Bottom - 1 ; Exactly on the border line of the body
+					$tOpenLine.Right = $tRect.Right - 1
+					$tOpenLine.Bottom = $tRect.Bottom + 1
+					_WinAPI_FillRect($hMemDC, $tOpenLine, $hTabBrush)
+
+					; Draw selection indicator with accent color
+					Local $iLeft = $tRect.Left
+					Local $iTop = $tRect.Top
+					Local $iRight = $tRect.Right
+					Local $hPen = $__DM_g_hPen2Accent
+					Local $hOldPen = _WinAPI_SelectObject($hMemDC, $hPen)
+					_WinAPI_MoveTo($hMemDC, $iLeft + 1, $iTop)
+					_WinAPI_LineTo($hMemDC, $iRight - 2, $iTop + 1)
+					_WinAPI_SelectObject($hMemDC, $hOldPen)
+				Else
+					; draw tab
+					$tRect.top -= 0
+					$tRect.bottom += 1
+					$tRect.Left -= 1
+					$tRect.Right += 1
+
+					; Fill tab background
+					Local $hTabBrush2 = $hBrushUnSel
+					_WinAPI_FillRect($hMemDC, $tRect, $hTabBrush2)
+
+					; Draw rectangle around non active tabs
+					$hBrushTabRecDark = $__DM_g_iBrushBorder
+					_WinAPI_FrameRect($hMemDC, $tRect, $hBrushTabRecDark)
 				EndIf
 
-				; Draw separator between tabs
-				If $i < $iTabCount - 1 Then
-					$hPenSep = __WinAPI_CreatePen(0, 1, __GUIDarkMenu_ColorToCOLORREF($COLOR_BORDER))
-					$hOldPenSep = __WinAPI_SelectObject($hMemDC, $hPenSep)
-					__WinAPI_MoveTo($hMemDC, $iRight - 1, $iTop + 4)
-					__WinAPI_LineTo($hMemDC, $iRight - 1, $iBottom - 4)
-					__WinAPI_SelectObject($hMemDC, $hOldPenSep)
-					__WinAPI_DeleteObject($hPenSep)
-				EndIf
-
-				; Draw text centered in tab
-				$tTextRect = DllStructCreate($tagRECT)
+				; Draw text centered
+				Local $sText = _GUICtrlTab_GetItemText($hWnd, $i)
+				Local $tTextRect = DllStructCreate($tagRECT)
 				With $tTextRect
-					.Left = $iLeft + 6
-					.Top = $iTop + 3
-					.Right = $iRight - 6
-					.Bottom = $iBottom - 3
+					.Left = $tRect.Left + 6
+					.Top = $tRect.Top + ($bSelected ? 1 : 3)
+					.Right = $tRect.Right - 6
+					.Bottom = $tRect.Bottom - 3
 				EndWith
-				DllCall($__DM_g_hDllUser32, "int", "DrawTextW", _
-						"handle", $hMemDC, _
-						"wstr", $sText, _
-						"int", -1, _
-						"struct*", $tTextRect, _
-						"uint", BitOR($DT_CENTER, $DT_VCENTER, $DT_SINGLELINE))
+				DllCall("user32.dll", "int", "DrawTextW", "handle", $hMemDC, "wstr", $sText, "int", -1, "struct*", $tTextRect, "uint", BitOR($DT_CENTER, $DT_VCENTER, $DT_SINGLELINE, $DT_NOCLIP))
 			Next
 
-			; Draw border around entire control
-			Local $bTabFocused = (__WinAPI_GetFocus() = $hWnd)
-			If $g_UseDarkMode Then
-				$hBorderPen = __WinAPI_CreatePen(0, 1, _ColorToCOLORREF($bTabFocused ? $COLOR_BORDER_LIGHT : $COLOR_BORDER))
-			Else
-				$hBorderPen = __WinAPI_CreatePen(0, 1, _ColorToCOLORREF($bTabFocused ? 0x0067c0 : $COLOR_BORDER_LIGHT))
-			EndIf
-			$hOldBorderPen = __WinAPI_SelectObject($hMemDC, $hBorderPen)
-			$hNullBrush = __WinAPI_GetStockObject(5) ; NULL_BRUSH
-			$hOldBorderBrush = __WinAPI_SelectObject($hMemDC, $hNullBrush)
+			; Copy memory DC to screen DC (BitBlt)
+			_WinAPI_BitBlt($hDC, 0, 0, $iWidth, $iHeight, $hMemDC, 0, 0, $SRCCOPY)
 
-			DllCall($__DM_g_hDllGdi32, "bool", "Rectangle", "handle", $hMemDC, "int", 0, "int", 0, "int", $iWidth, "int", $iHeight)
-
-			__WinAPI_SelectObject($hMemDC, $hOldBorderPen)
-			__WinAPI_SelectObject($hMemDC, $hOldBorderBrush)
-			__WinAPI_DeleteObject($hBorderPen)
-
-			; Copy to screen
-			__WinAPI_BitBlt($hDC, 0, 0, $iWidth, $iHeight, $hMemDC, 0, 0, $SRCCOPY)
+			; redrawing groupbox helps to ensure that it does not get overpainted
+			For $i = 0 To UBound($__DM_g_aGroupInTab) - 1
+				If _WinAPI_IsWindowVisible($__DM_g_aGroupInTab[$i]) Then
+					_WinAPI_RedrawWindow($__DM_g_aGroupInTab[$i], 0, 0, BitOR($RDW_INVALIDATE, $RDW_NOERASE))
+				EndIf
+			Next
 
 			; Cleanup
-			__WinAPI_SelectObject($hMemDC, $hOldFont)
-			__WinAPI_SelectObject($hMemDC, $hOldBmp)
-			__WinAPI_DeleteObject($hBitmap)
-			__WinAPI_DeleteDC($hMemDC)
-
-			__WinAPI_EndPaint($hWnd, $tPaint)
+			_WinAPI_SelectObject($hMemDC, $hOldBmp)
+			_WinAPI_SelectObject($hMemDC, $hOldFont)
+			_WinAPI_DeleteObject($hBitmap)
+			_WinAPI_DeleteDC($hMemDC)
+			_WinAPI_EndPaint($hWnd, $tPaint)
 			Return 0
+
+		Case $WM_PARENTNOTIFY
+			; Fired when a child window is created inside the tab control.
+			; The tab spinner (msctls_updown32) is created lazily by Windows when tabs overflow -
+			; it doesn't exist at init time, so we theme it here the moment it appears.
+			If _WinAPI_LoWord($wParam) = $WM_CREATE Then
+				Local $hNewChild = HWnd($lParam) ; lParam carries the new child's HWND as integer - must cast!
+				If _WinAPI_GetClassName($hNewChild) = "msctls_updown32" Then
+					If Not $__DM_g_hUpDownSub Then
+						$__DM_g_hUpDownSub = DllCallbackRegister(__GUIDarkTheme_UpDownProc, "lresult", _
+								"hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+						$__DM_g_pUpDownSub = DllCallbackGetPtr($__DM_g_hUpDownSub)
+					EndIf
+					__GUIDarkTheme_AddToSubclass($hNewChild, $__DM_g_hUpDownSub, $__DM_g_pUpDownSub, $__DM_g_iControlCount)
+				EndIf
+			EndIf
+			Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+
 	EndSwitch
 
 	Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>__GUIDarkTheme_TabProc
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_DateProc($hWnd, $iMsg, $wParam, $lParam)
-	Local $iRet
+	Local $iRet, $hDC
 	Switch $iMsg
+
+		Case $WM_NOTIFY
+			Local $tNMHDR = DllStructCreate($tagNMHDR, $lParam)
+			Local $iCode = $tNMHDR.Code
+
+			; this is needed to remove the white border from MonthCal drop down
+			If $iCode = $NM_CUSTOMDRAW Then
+				Local $tNMCUSTOMDRAW = DllStructCreate($__DM_tagNMCUSTOMDRAW, $lParam)
+				Local $dwDrawStage = $tNMCUSTOMDRAW.dwDrawStage
+				$hDC = $tNMCUSTOMDRAW.hdc
+
+				Switch $dwDrawStage
+					Case $CDDS_PREPAINT
+						Return $CDRF_NOTIFYITEMDRAW
+				EndSwitch
+			EndIf
 
 		Case $WM_PAINT
 			Local $tPaint = DllStructCreate($tagPAINTSTRUCT)
-			Local $hDC = __WinAPI_BeginPaint($hWnd, $tPaint)
+			$hDC = _WinAPI_BeginPaint($hWnd, $tPaint)
 
-			Local $tClient = __WinAPI_GetClientRect($hWnd)
+			Local $tClient = _WinAPI_GetClientRect($hWnd)
 			Local $iW = $tClient.Right
 			Local $iH = $tClient.Bottom
 
 			; --- Memory DC for flicker-free rendering ---
-			Local $hMemDC = __WinAPI_CreateCompatibleDC($hDC)
-			Local $hBitmap = __WinAPI_CreateCompatibleBitmap($hDC, $iW, $iH)
-			Local $hOldBmp = __WinAPI_SelectObject($hMemDC, $hBitmap)
+			Local $hMemDC = _WinAPI_CreateCompatibleDC($hDC)
+			Local $hBitmap = _WinAPI_CreateCompatibleBitmap($hDC, $iW, $iH)
+			Local $hOldBmp = _WinAPI_SelectObject($hMemDC, $hBitmap)
 
 			; 1. Let Windows draw the light-mode control into memory DC
-			__WinAPI_CallWindowProc($g_hDateOldProc, $hWnd, $WM_PRINTCLIENT, $hMemDC, $PRF_CLIENT)
+			_WinAPI_CallWindowProc($__DM_g_hDateProcOld, $hWnd, $WM_PRINTCLIENT, $hMemDC, $PRF_CLIENT)
 
 			; 2. Invert all pixels (background becomes black, text white, selection orange)
 			Local $tRect = DllStructCreate($tagRECT)
 			$tRect.right = $iW
 			$tRect.bottom = $iH
-			__WinAPI_InvertRect($hMemDC, $tRect)
+			_WinAPI_InvertRect($hMemDC, $tRect)
 
 			; --- 3. PIXEL HACK: destroy orange highlight & set background color ---
 			Local $iSize = $iW * $iH
 			Local $tPixels = DllStructCreate("dword c[" & $iSize & "]")
 			; Load pixel array directly from bitmap memory
-			Local $iBytes = DllCall($__DM_g_hDllGdi32, "long", "GetBitmapBits", "handle", $hBitmap, "long", $iSize * 4, "ptr", DllStructGetPtr($tPixels))[0]
+			Local $iBytes = DllCall('gdi32.dll', "long", "GetBitmapBits", "handle", $hBitmap, "long", $iSize * 4, "ptr", DllStructGetPtr($tPixels))[0]
 
 			If $iBytes = $iSize * 4 Then
 				Local $iPixel, $r, $g, $b, $iGray
@@ -994,7 +1295,7 @@ Func __GUIDarkTheme_DateProc($hWnd, $iMsg, $wParam, $lParam)
 
 					; Very dark pixel = inverted white background
 					If $iGray < 15 Then
-						$iPixel = $DTP_BG_DARK ; Replace with exact GUI background color
+						$iPixel = $__DM_g_iGuiBkColor ; Replace with exact GUI background color
 					Else
 						; Grayscale value for text (white) and selection (gray)
 						; (negative BitShift shifts left in AutoIt)
@@ -1004,75 +1305,141 @@ Func __GUIDarkTheme_DateProc($hWnd, $iMsg, $wParam, $lParam)
 					$tPixels.c(($i)) = $iPixel
 				Next
 				; Write cleaned pixels back into the bitmap
-				DllCall($__DM_g_hDllGdi32, "long", "SetBitmapBits", "handle", $hBitmap, "long", $iSize * 4, "ptr", DllStructGetPtr($tPixels))
+				DllCall('gdi32.dll', "long", "SetBitmapBits", "handle", $hBitmap, "long", $iSize * 4, "ptr", DllStructGetPtr($tPixels))
 			EndIf
 			; --- END PIXEL HACK ---
 
 			; --- Border color (hover effect) ---
-			Local $iBorderColor = $DTP_BORDER
-			If __WinAPI_GetFocus() = $hWnd Then $iBorderColor = $DTP_BORDER
 			Local $tCursorPos = DllStructCreate($tagPOINT)
-			DllCall($__DM_g_hDllUser32, "bool", "GetCursorPos", "struct*", $tCursorPos)
-			DllCall($__DM_g_hDllUser32, "bool", "ScreenToClient", "hwnd", $hWnd, "struct*", $tCursorPos)
-			If $tCursorPos.X >= 0 And $tCursorPos.X <= $iW And $tCursorPos.Y >= 0 And $tCursorPos.Y <= $iH Then
-				$iBorderColor = $DTP_BORDER_LIGHT
-			EndIf
+			DllCall('user32.dll', "bool", "GetCursorPos", "struct*", $tCursorPos)
+			DllCall('user32.dll', "bool", "ScreenToClient", "hwnd", $hWnd, "struct*", $tCursorPos)
 
 			; --- Draw border ---
-			Local $hPen = __WinAPI_CreatePen(0, 1, __GUIDarkMenu_ColorToCOLORREF($iBorderColor))
-			Local $hNullBr = __WinAPI_GetStockObject(5)
-			Local $hOldPen = __WinAPI_SelectObject($hMemDC, $hPen)
-			Local $hOldBr = __WinAPI_SelectObject($hMemDC, $hNullBr)
-			DllCall($__DM_g_hDllGdi32, "bool", "Rectangle", "handle", $hMemDC, "int", 0, "int", 0, "int", $iW, "int", $iH)
-			__WinAPI_SelectObject($hMemDC, $hOldPen)
-			__WinAPI_SelectObject($hMemDC, $hOldBr)
-			__WinAPI_DeleteObject($hPen)
+			Local $hPen = $__DM_g_hPenBorder
+			Local $hNullBr = _WinAPI_GetStockObject(5)
+			Local $hOldPen = _WinAPI_SelectObject($hMemDC, $hPen)
+			Local $hOldBr = _WinAPI_SelectObject($hMemDC, $hNullBr)
+			DllCall('gdi32.dll', "bool", "Rectangle", "handle", $hMemDC, "int", 0, "int", 0, "int", $iW, "int", $iH)
+			_WinAPI_SelectObject($hMemDC, $hOldPen)
+			_WinAPI_SelectObject($hMemDC, $hOldBr)
 
 			; --- Copy finished result to screen in one step (no flicker) ---
-			__WinAPI_BitBlt($hDC, 0, 0, $iW, $iH, $hMemDC, 0, 0, $SRCCOPY)
+			_WinAPI_BitBlt($hDC, 0, 0, $iW, $iH, $hMemDC, 0, 0, $SRCCOPY)
 
 			; --- Cleanup ---
-			__WinAPI_SelectObject($hMemDC, $hOldBmp)
-			__WinAPI_DeleteObject($hBitmap)
-			__WinAPI_DeleteDC($hMemDC)
-			__WinAPI_EndPaint($hWnd, $tPaint)
+			_WinAPI_SelectObject($hMemDC, $hOldBmp)
+			_WinAPI_DeleteObject($hBitmap)
+			_WinAPI_DeleteDC($hMemDC)
+			_WinAPI_EndPaint($hWnd, $tPaint)
 			Return 0
 
 		Case $WM_ERASEBKGND
 			Return 1
 
 		Case $WM_SETFOCUS, $WM_KILLFOCUS, $WM_LBUTTONDOWN, $WM_LBUTTONUP
-			$iRet = __WinAPI_CallWindowProc($g_hDateOldProc, $hWnd, $iMsg, $wParam, $lParam)
-			__WinAPI_InvalidateRect($hWnd, 0, False)
+			$iRet = _WinAPI_CallWindowProc($__DM_g_hDateProcOld, $hWnd, $iMsg, $wParam, $lParam)
+			_WinAPI_InvalidateRect($hWnd, 0, False)
 			Return $iRet
 
 		Case $WM_MOUSEMOVE
-			$iRet = __WinAPI_CallWindowProc($g_hDateOldProc, $hWnd, $iMsg, $wParam, $lParam)
-			If Not $g_bHover Then
-				$g_bHover = True
-				__WinAPI_InvalidateRect($hWnd, 0, False)
+			$iRet = _WinAPI_CallWindowProc($__DM_g_hDateProcOld, $hWnd, $iMsg, $wParam, $lParam)
+			If Not $__DM_g_bHover Then
+				$__DM_g_bHover = True
+				_WinAPI_InvalidateRect($hWnd, 0, False)
 			EndIf
 			Return $iRet
 
 		Case $WM_MOUSELEAVE
-			$g_bHover = False
-			__WinAPI_InvalidateRect($hWnd, 0, False)
+			$__DM_g_bHover = False
+			_WinAPI_InvalidateRect($hWnd, 0, False)
 
 	EndSwitch
 
-	Return __WinAPI_CallWindowProc($g_hDateOldProc, $hWnd, $iMsg, $wParam, $lParam)
+	Return _WinAPI_CallWindowProc($__DM_g_hDateProcOld, $hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>__GUIDarkTheme_DateProc
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: Nine, WildByDesign, argumentum
+; ===============================================================================================================================
 Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg, $wParam
+	Local $hBrush, $tRect, $hPen
 	Local $tNMHDR = DllStructCreate($tagNMHDR, $lParam)
 	Local $hFrom = $tNMHDR.hWndFrom
 	Local $iCode = $tNMHDR.Code
 	If $iCode = $NM_CUSTOMDRAW Then
-		Local $tNMCD = DllStructCreate($tagNMCUSTOMDRAW, $lParam)
+		If Not $__DM_g_bUseDarkMode Then Return $GUI_RUNDEFMSG
+		Local $tNMCD = DllStructCreate($__DM_tagNMCUSTOMDRAW, $lParam)
 		Local $dwStage = $tNMCD.dwDrawStage
 		Local $hDC = $tNMCD.hdc
-		Switch __WinAPI_GetClassName($hFrom)
+		Switch _WinAPI_GetClassName($hFrom)
+			Case "ToolbarWindow32"
+				Local $tTool = DllStructCreate($tagNMTBCUSTOMDRAW, $lParam)
+				Local Static $iGuiWidth = WinGetClientSize($hWnd)[0]
+				Local Static $iToolbarWidth = _WinAPI_GetWindowWidth($tTool.hWndFrom)
+
+				; resize toolbar only if toolbar covers full client width
+				If $iToolbarWidth = $iGuiWidth And __GUIDarkTheme_GUI_IsResizable($hWnd) Then
+					Local $aSize = WinGetClientSize($hWnd)
+					WinMove($tTool.hWndFrom, "", 0, 0, $aSize[0])
+				EndIf
+
+				Switch $dwStage
+					Case $CDDS_PREPAINT
+						$hBrush = $__DM_g_hBrushCtrl
+						;$hBrush = _GUICtrlToolbar_GetStyleTransparent($tTool.hWndFrom) ? $__DM_g_hBrushGui : $__DM_g_hBrushCtrl
+						$hBrush = $__DM_g_hBrushGui
+						$tRect = DllStructCreate($tagRECT, DllStructGetPtr($tTool, "left"))
+						_WinAPI_FillRect($tTool.hdc, $tRect, $hBrush)
+
+						Return $CDRF_NOTIFYITEMDRAW
+
+					Case $CDDS_ITEMPREPAINT
+						Local $iState = $tTool.uItemState
+
+						If BitAND($iState, $CDIS_HOT) Then
+							$tTool.clrText = $__DM_g_iTextColor
+							$tTool.clrTextHighlight = $__DM_g_iTextColor
+
+							$tRect = DllStructCreate($tagRECT, DllStructGetPtr($tTool, "left"))
+							$hPen = $__DM_g_hPenBtnBor
+							_WinAPI_SelectObject($tTool.hdc, $hPen)
+							$hBrush = BitAND($iState, $CDIS_SELECTED) ? $__DM_g_hBrushBtnSel : $__DM_g_hBrushBtnHov
+							_WinAPI_SelectObject($tTool.hdc, $hBrush)
+							_WinAPI_RoundRect($tTool.hdc, $tRect, 8, 8)
+
+							; clear item state or else this will not work
+							$tTool.uItemState = Null
+
+							Return $TBCDRF_USECDCOLORS
+						EndIf
+
+						If BitAND($iState, $CDIS_CHECKED) Then
+							$tTool.clrText = $__DM_g_iTextColor
+							$tTool.clrTextHighlight = $__DM_g_iTextColor
+
+							$tRect = DllStructCreate($tagRECT, DllStructGetPtr($tTool, "left"))
+							$hPen = $__DM_g_hPenBtnBor
+							_WinAPI_SelectObject($tTool.hdc, $hPen)
+							$hBrush = BitAND($iState, $CDIS_SELECTED) ? $__DM_g_hBrushBtnSel : $__DM_g_hBrushBtnHov
+							_WinAPI_SelectObject($tTool.hdc, $hBrush)
+							_WinAPI_RoundRect($tTool.hdc, $tRect, 8, 8)
+
+							; clear item state or else this will not work
+							$tTool.uItemState = Null
+
+							Return $TBCDRF_USECDCOLORS
+						EndIf
+
+						If Not BitAND($iState, $CDIS_DISABLED) Then
+							$tTool.clrText = $__DM_g_iTextColor
+							$tTool.clrTextHighlight = $__DM_g_iTextColor
+
+							Return $TBCDRF_USECDCOLORS
+						EndIf
+				EndSwitch
+
 			Case "msctls_trackbar32"
 				Local $dwItemSpec = $tNMCD.dwItemSpec
 
@@ -1086,7 +1453,7 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 							Case $TBCD_THUMB
 
 								; Determine thumb style from control style flags
-								Local $iStyle = __WinAPI_GetWindowLong($hFrom, $GWL_STYLE)
+								Local $iStyle = _WinAPI_GetWindowLong($hFrom, $GWL_STYLE)
 								Local $bNoThumb = BitAND($iStyle, $TBS_NOTHUMB) <> 0                    ; no thumb visible
 								Local $bTop = BitAND($iStyle, $TBS_TOP) <> 0                            ; tip points up (horizontal)
 								Local $bBoth = BitAND($iStyle, $TBS_BOTH) <> 0                          ; rectangular thumb
@@ -1105,20 +1472,18 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 								Local $iSplit = $bVert ? $iR - ($iB - $iT) / 2 : $iB - ($iR - $iL) / 2
 
 								Local $tPt = DllStructCreate($tagPOINT)
-								DllCall($__DM_g_hDllUser32, "bool", "GetCursorPos", "struct*", $tPt)
-								__WinAPI_ScreenToClient($hFrom, $tPt)
+								DllCall('user32.dll', "bool", "GetCursorPos", "struct*", $tPt)
+								_WinAPI_ScreenToClient($hFrom, $tPt)
 								Local $bHot = ($tPt.X >= $iL And $tPt.X <= $iR And $tPt.Y >= $iT And $tPt.Y <= $iB - 1)
 
-								Local $iColor = _ColorToCOLORREF($bHot ? 0x2fa7ff : 0x0078D4)
-
-								Local $hBrush = __WinAPI_CreateSolidBrush($iColor)
-								Local $hPen = __WinAPI_CreatePen(0, 1, _ColorToCOLORREF($COLOR_BG_DARK))
-								Local $hOldBrush = __WinAPI_SelectObject($hDC, $hBrush)
-								Local $hOldPen = __WinAPI_SelectObject($hDC, $hPen)
+								$hBrush = $bHot ? $__DM_g_hBrushAccentHot : $__DM_g_hBrushAccent
+								$hPen = $__DM_g_hPenGui
+								Local $hOldBrush = _WinAPI_SelectObject($hDC, $hBrush)
+								Local $hOldPen = _WinAPI_SelectObject($hDC, $hPen)
 
 								If $bBoth Then
 									; rectangular thumb
-									DllCall($__DM_g_hDllGdi32, "bool", "Rectangle", "handle", $hDC, "int", $iL, "int", $iT, "int", $iR + 1, "int", $iB)
+									DllCall('gdi32.dll', "bool", "Rectangle", "handle", $hDC, "int", $iL, "int", $iT, "int", $iR + 1, "int", $iB)
 								ElseIf $bVert Then
 									; vertical slider — pentagon tip points right (default) or left (TBS_DOWNISLEFT)
 									Local $iMidV = ($iT + $iB) / 2
@@ -1149,7 +1514,7 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 										$tPoints.p((9)) = $iSplitV
 										$tPoints.p((10)) = $iT
 									EndIf
-									DllCall($__DM_g_hDllGdi32, "bool", "Polygon", "handle", $hDC, "struct*", $tPoints, "int", 5)
+									DllCall('gdi32.dll', "bool", "Polygon", "handle", $hDC, "struct*", $tPoints, "int", 5)
 								ElseIf $bTop Then
 									; TBS_TOP — pentagon tip points UP
 									Local $iSplitTop = $iT + ($iR - $iL) / 2
@@ -1164,7 +1529,7 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 									$tPoints.p((8)) = $iB
 									$tPoints.p((9)) = $iL
 									$tPoints.p((10)) = $iSplitTop
-									DllCall($__DM_g_hDllGdi32, "bool", "Polygon", "handle", $hDC, "struct*", $tPoints, "int", 5)
+									DllCall('gdi32.dll', "bool", "Polygon", "handle", $hDC, "struct*", $tPoints, "int", 5)
 								Else
 									; TBS_BOTTOM (default) — pentagon tip points DOWN
 									$tPoints = DllStructCreate("int p[10]")
@@ -1178,24 +1543,21 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 									$tPoints.p((8)) = $iB
 									$tPoints.p((9)) = $iL
 									$tPoints.p((10)) = $iSplit
-									DllCall($__DM_g_hDllGdi32, "bool", "Polygon", "handle", $hDC, "struct*", $tPoints, "int", 5)
+									DllCall('gdi32.dll', "bool", "Polygon", "handle", $hDC, "struct*", $tPoints, "int", 5)
 								EndIf
 
-								__WinAPI_SelectObject($hDC, $hOldBrush)
-								__WinAPI_SelectObject($hDC, $hOldPen)
-								__WinAPI_DeleteObject($hBrush)
-								__WinAPI_DeleteObject($hPen)
+								_WinAPI_SelectObject($hDC, $hOldBrush)
+								_WinAPI_SelectObject($hDC, $hOldPen)
 								Return $CDRF_SKIPDEFAULT
 
 							Case $TBCD_CHANNEL
-								$hBrush = __WinAPI_CreateSolidBrush(_ColorToCOLORREF(__WinAPI_ColorAdjustLuma($COLOR_BG_DARK, 30)))
-								Local $tRECT2 = DllStructCreate($tagRECT)
-								$tRECT2.Left = $tNMCD.left
-								$tRECT2.Top = $tNMCD.top
-								$tRECT2.Right = $tNMCD.right
-								$tRECT2.Bottom = $tNMCD.bottom
-								__WinAPI_FillRect($hDC, $tRECT2, $hBrush)
-								__WinAPI_DeleteObject($hBrush)
+								$hBrush = $__DM_g_hBrushGray
+								Local $tRect2 = DllStructCreate($tagRECT)
+								$tRect2.Left = $tNMCD.left
+								$tRect2.Top = $tNMCD.top
+								$tRect2.Right = $tNMCD.right
+								$tRect2.Bottom = $tNMCD.bottom
+								_WinAPI_FillRect($hDC, $tRect2, $hBrush)
 								Return $CDRF_SKIPDEFAULT
 
 							Case Else
@@ -1203,20 +1565,45 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 						EndSwitch
 				EndSwitch
 		EndSwitch
-	Else
-		If __WinAPI_GetClassName($hFrom) = "SysDateTimePick32" Then
-			Switch $iCode
-				Case $DTN_DROPDOWN         ;, $EVENT_OBJECT_CREATE
-					; Apply dark colors when the calendar dropdown appears
-					Local $iCtrl = _GUICtrlDTP_GetMonthCal($hFrom)
-					__WinAPI_SetWindowTheme($iCtrl, "", "")
-					_GUICtrlMonthCal_SetColor($iCtrl, $MCSC_TEXT, $COLOR_TEXT_LIGHT)
-					_GUICtrlMonthCal_SetColor($iCtrl, $MCSC_TITLEBK, $COLOR_CONTROL_BG)
-					_GUICtrlMonthCal_SetColor($iCtrl, $MCSC_TITLETEXT, $COLOR_TEXT_LIGHT)
-					_GUICtrlMonthCal_SetColor($iCtrl, $MCSC_BACKGROUND, $COLOR_CONTROL_BG)
-					_GUICtrlMonthCal_SetColor($iCtrl, $MCSC_MONTHBK, $COLOR_CONTROL_BG)
-					_GUICtrlMonthCal_SetColor($iCtrl, $MCSC_TRAILINGTEXT, $COLOR_TEXT_LIGHT)
 
+	Else
+		If _WinAPI_GetClassName($hFrom) = "SysLink" Then
+			Local Const $tagLITEM = "struct;uint mask;int iLink;uint state;uint stateMask;wchar szID[48];wchar szURL[2083];endstruct"
+    		Local Const $tagNMLINK = "struct;hwnd hwndFrom;uint_PTR idFrom;int code;" & (@AutoItX64 ? "int pad;" : "") & "endstruct;" & $tagLITEM
+			If $iCode = $NM_CLICK Or $iCode = $NM_RETURN Then
+				Local $tNMLINK = DllStructCreate($tagNMLINK, $lParam)
+				Local $sID = DllStructGetData($tNMLINK, "szID")
+				Local $sUrl = DllStructGetData($tNMLINK, "szURL")
+				If $sID <> "" Then
+					ShellExecute($sUrl)
+					Return 0
+				EndIf
+			EndIf
+		EndIf
+		If _WinAPI_GetClassName($hFrom) = "SysDateTimePick32" Then
+			If Not $__DM_g_bUseDarkMode Then Return $GUI_RUNDEFMSG
+			Switch $iCode
+				Case $DTN_DROPDOWN
+					; Remove theme from SysMonthCal32
+					Local $hMonthCal = _GUICtrlDTP_GetMonthCal($hFrom)
+					_WinAPI_SetWindowTheme($hMonthCal, "", "")
+					_SendMessage($hMonthCal, $WM_THEMECHANGED, 0, 0)
+
+					; resize DropDown window for padding (this frames the SysMonthCal32 window)
+					Local $hDropDown = _WinAPI_FindWindowEx(Null, "DropDown")
+					If $hDropDown Then
+						Local $aPos = WinGetPos($hDropDown)
+						If IsArray($aPos) Then WinMove($hDropDown, "", $aPos[0], $aPos[1], $aPos[2] + 3, $aPos[3] + 3)
+					EndIf
+
+					; set timer to capture SysShadow handle which is created yet
+					GUIRegisterMsg($WM_TIMER, "WM_TIMER")
+					_Timer_SetTimer($hWnd, 5)
+
+				Case $DTN_CLOSEUP
+					; kill timer
+					_Timer_KillAllTimers($hWnd)
+					GUIRegisterMsg($WM_TIMER, "")
 			EndSwitch
 		EndIf
 	EndIf
@@ -1224,10 +1611,56 @@ Func __GUIDarkTheme_WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>__GUIDarkTheme_WM_NOTIFY
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func WM_TIMER($hWnd, $iMsg, $wParam, $lParam)
+	#forceref $hWnd, $iMsg, $wParam, $lParam
+	Local $hSysShadow = 0
+	$hSysShadow = _WinAPI_FindWindowEx(Null, "SysShadow")
+
+	If Not $hSysShadow Then
+		$__DM_g_iTimerCycles += 1
+		If $__DM_g_iTimerCycles <= 10 Then Return 0 ; shadow not showing yet
+		; Else user likely has "Show shadows under windows" disabled, no need to keep trying
+	EndIf
+
+	; Find SysMonthCal32 to apply delayed theme removal in case of initial timing issue
+	Local $aWindows = _WinAPI_EnumWindows(True)
+	If @error = 0 Then
+		For $i = 1 To $aWindows[0][0]
+			If $aWindows[$i][1] = "SysMonthCal32" Then
+				; Remove theme from SysMonthCal32
+				_WinAPI_SetWindowTheme($aWindows[$i][0], "", "")
+				_SendMessage($aWindows[$i][0], $WM_THEMECHANGED, 0, 0)
+			EndIf
+		Next
+	EndIf
+
+	$__DM_g_iTimerCycles = 0
+
+	If $hSysShadow Then
+		; Move SysShadow to align with calendar dropdown
+		Local $aPos = WinGetPos($hSysShadow)
+		If IsArray($aPos) Then WinMove($hSysShadow, "", $aPos[0] - 3, $aPos[1] - 3, $aPos[2], $aPos[3])
+	EndIf
+
+	_Timer_KillAllTimers($hWnd)
+
+	Return 0
+EndFunc   ;==>WM_TIMER
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: argumentum
+; ===============================================================================================================================
 Func __GUIDarkTheme_hWnd2Styles($hWnd)
-	Return __GUIDarkTheme_GetCtrlStyleString(__WinAPI_GetWindowLong($hWnd, $GWL_STYLE), __WinAPI_GetWindowLong($hWnd, $GWL_EXSTYLE), __WinAPI_GetClassName($hWnd))
+	Return __GUIDarkTheme_GetCtrlStyleString(_WinAPI_GetWindowLong($hWnd, $GWL_STYLE), _WinAPI_GetWindowLong($hWnd, $GWL_EXSTYLE), _WinAPI_GetClassName($hWnd))
 EndFunc   ;==>__GUIDarkTheme_hWnd2Styles
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: Yashied
+; Modified ......: pixelsearch, SmOke_N
+; ===============================================================================================================================
 Func __GUIDarkTheme_GetStyleString($iStyle, $fExStyle)
 	ConsoleWrite('+ Func __GUIDarkTheme_GetStyleString(' & $iStyle & ', ' & $fExStyle & ')' & @CRLF)
 	Local $Text = '', $Data = $fExStyle ? $__DM_g_Style_GuiExtended : $__DM_g_Style_Gui
@@ -1249,6 +1682,10 @@ Func __GUIDarkTheme_GetStyleString($iStyle, $fExStyle)
 	Return StringRegExpReplace($Text, ',\s\z', '')
 EndFunc   ;==>__GUIDarkTheme_GetStyleString
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: Yashied
+; Modified ......: pixelsearch, SmOke_N
+; ===============================================================================================================================
 Func __GUIDarkTheme_GetCtrlStyleString($iStyle, $fExStyle, $sClass, $iLVExStyle = 0)
 
 	If $sClass = "AutoIt v3 GUI" Or $sClass = "#32770" Or $sClass = "MDIClient" Then ; control = child GUI, dialog box (msgbox) etc...
@@ -1290,7 +1727,10 @@ Func __GUIDarkTheme_GetCtrlStyleString($iStyle, $fExStyle, $sClass, $iLVExStyle 
 	Return StringRegExpReplace($Text, ',\s\z', '')
 EndFunc   ;==>__GUIDarkTheme_GetCtrlStyleString
 
-;=====================================================================
+; #FUNCTION# ====================================================================================================================
+; Author.........: Yashied
+; Modified ......: pixelsearch, SmOke_N
+; ===============================================================================================================================
 Func __GUIDarkTheme_GetCtrlStyleString2(ByRef $iStyle, ByRef $Text, $sClass, $iLVExStyle = 0)
 
 	Local $Data
@@ -1373,183 +1813,341 @@ EndFunc   ;==>__GUIDarkTheme_GetCtrlStyleString2
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _GUIDarkTheme_GUISetDarkTheme
-; Description ...: Sets the theme for a specified window to either dark or light mode on Windows 10.
-; Syntax ........: _GUIDarkTheme_GUISetDarkTheme($hwnd, $dark_theme = True)
-; Parameters ....: $hwnd          - The handle to the window.
-;                  $dark_theme    - If True, sets the dark theme; if False, sets the light theme.
-;                                   (Default is True for dark theme.)
+; Description ...: Sets the theme for a specified window to either dark or light mode on Windows 10/11.
+; Syntax ........: _GUIDarkTheme_GUISetDarkTheme($hGui, $bEnableDarkTheme = True)
+; Parameters ....: $hGui          		- The handle to the window.
+;				   $bEnableDarkTheme	- If True, sets dark theme. If False, sets light theme. Default is True.
 ; Return values .: None
 ; Author ........: DK12000, NoNameCode
-; Modified ......:
-; Remarks .......:
-; Related .......:
-; Link ..........: https://www.autoitscript.com/forum/topic/211196-gui-title-bar-dark-theme-an-elegant-solution-using-dwmapi/
+; Modified ......: WildByDesign
 ; Example .......: No
 ; ===============================================================================================================================
-Func _GUIDarkTheme_GUISetDarkTheme($hWnd, $bEnableDarkTheme = True)
+Func _GUIDarkTheme_GUISetDarkTheme($hGui, $bEnableDarkTheme = Default)
+	Local Const $DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+	If $bEnableDarkTheme = Default Then $bEnableDarkTheme = True
 	Local $iPreferredAppMode = ($bEnableDarkTheme == True) ? $APPMODE_FORCEDARK : $APPMODE_FORCELIGHT
-	Local $iGUI_BkColor = ($bEnableDarkTheme == True) ? $COLOR_BG_DARK : _WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_3DFACE))
-	; update global GUI handle
-	$g_hGui = $hWnd
-	__WinAPI_SetPreferredAppMode($iPreferredAppMode)
-	__WinAPI_RefreshImmersiveColorPolicyState()
-	__WinAPI_FlushMenuThemes()
-	GUISetBkColor($iGUI_BkColor, $hWnd)
-	_GUIDarkTheme_GUICtrlSetDarkTheme($hWnd, $bEnableDarkTheme)            ;To Color the GUI's own Scrollbar
-	__WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_USE_IMMERSIVE_DARK_MODE, $bEnableDarkTheme)
-	$g_UseDarkMode = __WinAPI_ShouldAppsUseDarkMode()
+	Dim $__DM_g_aGroupInTab[0]
+	Dim $__DM_g_a_hDateTime[0]
+	Dim $__DM_g_aButtonSub[1][3]
+	$__DM_g_iButtonCount = 0
+	$__DM_g_iTimerCycles = 0
+	_WinAPI_SetPreferredAppMode($iPreferredAppMode)
+	_WinAPI_RefreshImmersiveColorPolicyState()
+	_WinAPI_FlushMenuThemes()
+	_GUIDarkTheme_GUICtrlSetDarkTheme($hGui, $bEnableDarkTheme)
+	_WinAPI_DwmSetWindowAttribute($hGui, $DWMWA_USE_IMMERSIVE_DARK_MODE, $bEnableDarkTheme)
+	; [VCLauncher PATCH] UDF 3.0.0 ведёт цвета по системной теме (ShouldAppsUseDarkMode),
+	; из-за чего ApplyLight в тёмной системе красит окно тёмным. Нам нужен явный выбор
+	; пользователя, поэтому флаг идёт от переданного параметра. Сохранять при обновлении UDF.
+	; Было: $__DM_g_bUseDarkMode = _WinAPI_ShouldAppsUseDarkMode()
+	$__DM_g_bUseDarkMode = ($bEnableDarkTheme == True)
+	; reset dark mode and light mode colors
+	$__DM_g_iStatusBkColor = $__DM_g_bUseDarkMode ? $__DM_g_iStatusBkColorDark : $__DM_g_iStatusBkColorLight
+	$__DM_g_iGuiBkColor = $__DM_g_bUseDarkMode ? $__DM_g_iGuiBkColorDark : $__DM_g_iGuiBkColorLight
+	$__DM_g_iTextColor = $__DM_g_bUseDarkMode ? $__DM_g_iTextColorDark : $__DM_g_iTextColorLight
+	$__DM_g_iCtrlBkColor = $__DM_g_bUseDarkMode ? $__DM_g_iCtrlBkColorDark : $__DM_g_iCtrlBkColorLight
+	$__DM_g_iBorderColorSel = $__DM_g_bUseDarkMode ? $__DM_g_iBorderColorSelDark : $__DM_g_iBorderColorSelLight
+	$__DM_g_iBorderColor = $__DM_g_bUseDarkMode ? $__DM_g_iBorderColorDark : $__DM_g_iBorderColorLight
+	$__DM_g_iSizeboxPaint = $__DM_g_bUseDarkMode ? $__DM_g_iSizeboxPaintDark : $__DM_g_iSizeboxPaintLight
+	$__DM_g_iMenuBkColor = $__DM_g_bUseDarkMode ? $__DM_g_iMenuBkColorDark : $__DM_g_iMenuBkColorLight
+	$__DM_g_iMenuHotColor = $__DM_g_bUseDarkMode ? $__DM_g_iMenuHotColorDark : $__DM_g_iMenuHotColorLight
+	$__DM_g_iMenuSelColor = $__DM_g_bUseDarkMode ? $__DM_g_iMenuSelColorDark : $__DM_g_iMenuSelColorLight
+	$__DM_g_iMenuTextColor = $__DM_g_bUseDarkMode ? $__DM_g_iMenuTextColorDark : $__DM_g_iMenuTextColorLight
+	$__DM_g_iButtonColor = $__DM_g_bUseDarkMode ? $__DM_g_iButtonColorDark : $__DM_g_iButtonColorLight
+	$__DM_g_iButtonColorHov = $__DM_g_bUseDarkMode ? $__DM_g_iButtonColorHovDark : $__DM_g_iButtonColorHovLight
+	$__DM_g_iButtonColorSel = $__DM_g_bUseDarkMode ? $__DM_g_iButtonColorSelDark : $__DM_g_iButtonColorSelLight
+	$__DM_g_iButtonColorBor = $__DM_g_bUseDarkMode ? $__DM_g_iButtonColorBorDark : $__DM_g_iButtonColorBorLight
+	$__DM_g_iTabColor = $__DM_g_bUseDarkMode ? $__DM_g_iTabColorDark : $__DM_g_iTabColorLight
+	$__DM_g_iTabColorSel = $__DM_g_bUseDarkMode ? $__DM_g_iTabColorSelDark : $__DM_g_iTabColorSelLight
+	$__DM_g_iExtraGray = $__DM_g_bUseDarkMode ? $__DM_g_iExtraGrayDark : $__DM_g_iExtraGrayLight
+	$__DM_g_iTabCtrlBkColor = $__DM_g_bUseDarkMode ? $__DM_g_iTabCtrlBkColorDark : $__DM_g_iTabCtrlBkColorLight
+
+	; create brushes and pens
+	__GUIDarkTheme_CreateBrushes()
+	__GUIDarkTheme_CreatePens()
+
+	Local $iGUI_BkColor = $__DM_g_iGuiBkColor
+	GUISetBkColor($iGUI_BkColor, $hGui)
+	Local $hMenu = _GUICtrlMenu_GetMenu($hGui)
+	If $hMenu Then __GUIDarkMenu_MenuBarBKColor($hMenu, $__DM_g_iMenuBkColor)
+
 	; subclass controls
-	If Not $g_pSubclassProc Then $g_pSubclassProc = DllCallbackRegister("__GUIDarkTheme_SubclassProc", "lresult", _
-			"hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+	If Not $__DM_g_hSubclassProc Then
+		$__DM_g_hSubclassProc = DllCallbackRegister(__GUIDarkTheme_SubclassProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+		$__DM_g_pSubclassProc = DllCallbackGetPtr($__DM_g_hSubclassProc)
+	EndIf
+
+	; set titlebar color to match GUI color
+	If @OSBuild >= 22000 Then _WinAPI_DwmSetWindowAttribute($hGui, $DWMWA_CAPTION_COLOR, _WinAPI_SwitchColor($__DM_g_iGuiBkColor))
 EndFunc   ;==>_GUIDarkTheme_GUISetDarkTheme
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _GUIDarkTheme_GUICtrlAllSetDarkTheme
 ; Description ...: Sets the dark theme to all existing sub Controls from a GUI
-; Syntax ........: _GUIDarkTheme_GUICtrlAllSetDarkTheme($g_hGui[, $bEnableDarkTheme = True, $bPreferNewTheme = False])
-; Parameters ....: $g_hGui                - GUI handle
+; Syntax ........: _GUIDarkTheme_GUICtrlAllSetDarkTheme($hGui[, $bEnableDarkTheme = True)
+; Parameters ....: $hGui                - GUI handle
 ;                  $bEnableDarkTheme    - [optional] a boolean value. Default is True.
-;                  $bPreferNewTheme 	- Prefer the newer DarkMode_DarkTheme theme over DarkMode_Explorer when possible.
-;                                         (Default is False. DarkMode_DarkTheme is only available on Win11 26100.6899 and higher)
 ; Return values .: None
 ; Author ........: NoName
 ; Modified ......: WildByDesign
-; Remarks .......:
-; Related .......:
-; Link ..........:
 ; Example .......: No
 ; ===============================================================================================================================
-Func _GUIDarkTheme_GUICtrlAllSetDarkTheme($g_hGui, $bEnableDarkTheme = True, $bPreferNewTheme = False)
-	Local $aCtrls = __WinAPI_EnumChildWindows($g_hGui, False)
+Func _GUIDarkTheme_GUICtrlAllSetDarkTheme($hGui, $bEnableDarkTheme = Default)
+	If $bEnableDarkTheme = Default Then $bEnableDarkTheme = True
+	Local $aCtrls = _WinAPI_EnumChildWindows($hGui, False)
 	If @error = 0 Then
 		For $i = 1 To $aCtrls[0][0]
-			_GUIDarkTheme_GUICtrlSetDarkTheme($aCtrls[$i][0], $bEnableDarkTheme, $bPreferNewTheme)
+			_GUIDarkTheme_GUICtrlSetDarkTheme($hGui, $aCtrls[$i][0], $bEnableDarkTheme)
+			;ConsoleWrite("EnumChildWindows: " & @TAB & @TAB & "Handle: " & $aCtrls[$i][0] & " : " & "Class: " & $aCtrls[$i][1] & @CRLF)
 		Next
 	EndIf
-	Local $aCtrlsEx = __WinAPI_EnumProcessWindows(0, False) ; allows getting handles for tooltips_class32, ComboLBox, etc.
+
+	Local $aCtrlsEx = _WinAPI_EnumProcessWindows(0, False) ; allows getting handles for tooltips_class32, ComboLBox, etc.
 	If @error = 0 Then
 		For $i = 1 To $aCtrlsEx[0][0]
-			_GUIDarkTheme_GUICtrlSetDarkTheme($aCtrlsEx[$i][0], $bEnableDarkTheme, $bPreferNewTheme)
+			If $aCtrlsEx[$i][1] = 'tooltips_class32' Then _GUIDarkTheme_GUICtrlSetDarkTheme($hGui, $aCtrlsEx[$i][0], $bEnableDarkTheme)
 		Next
 	EndIf
+
 	Return $aCtrls
 EndFunc   ;==>_GUIDarkTheme_GUICtrlAllSetDarkTheme
-
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _GUIDarkTheme_GUICtrlSetDarkTheme
 ; Description ...: Sets the dark theme for a specified control.
-; Syntax ........: _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPreferNewTheme = False)
-; Parameters ....: $vCtrl            - The control handle or identifier.
+; Syntax ........: _GUIDarkTheme_GUICtrlSetDarkTheme($hGui, $hCtrl, $bEnableDarkTheme = True)
+; Parameters ....: $hGui             - The GUI handle.
+;                  $hCtrl            - The control handle.
 ;                  $bEnableDarkTheme - If True, enables the dark theme; if False, disables it.
 ;                                      (Default is True for enabling dark theme.)
-;                  $bPreferNewTheme  - Prefer the newer DarkMode_DarkTheme theme over DarkMode_Explorer when possible.
-;                                      (Default is False. DarkMode_DarkTheme is only available on Win11 26100.6899 and higher)
 ; Return values .: Success: True
 ;                  Failure: False and sets the @error flag:
-;                           1: Invalid control handle or identifier.
+;                           1: Invalid control handle.
 ;                           2: Error while allowing dark mode for the window.
 ;                           3: Error while setting the window theme.
 ;                           4: Error while sending the WM_THEMECHANGED message.
 ; Author ........: NoNameCode
 ; Modified ......: WildByDesign
-; Remarks .......: This function requires the _WinAPI_SetWindowTheme and __WinAPI_AllowDarkModeForWindow functions.
-; Related .......:
-; Link ..........: http://www.opengate.at/blog/2021/08/dark-mode-win32/
+; Remarks .......: This function requires the _WinAPI_SetWindowTheme and __DM_WinAPI_AllowDarkModeForWindow functions.
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPreferNewTheme = False)
+Func _GUIDarkTheme_GUICtrlSetDarkTheme($hGui, $hCtrl, $bEnableDarkTheme = Default)
+	If $bEnableDarkTheme = Default Then $bEnableDarkTheme = True
 	Local $sThemeName = Null, $sThemeList = Null
-	Local $iGUI_Ctrl_Color = ($bEnableDarkTheme == True) ? $COLOR_TEXT_LIGHT : _WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT))
-	Local $iGUI_Ctrl_BkColor = ($bEnableDarkTheme == True) ? $COLOR_CONTROL_BG : _WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_BTNFACE))
-	Local $bSpecialBtn = False, $bSpecialLV = False, $bSpecialTV = False
+	Local $iGUI_Ctrl_Color = $__DM_g_iTextColor
+	Local $iGUI_Ctrl_BkColor = $__DM_g_iCtrlBkColor
+	Local $bSpecialLV = False, $bSpecialTV = False
 	Local $sStyles, $iBuddyPos
+	Local Const $UDM_GETBUDDY = 1130
 	Local Static $bBuddyMoved = False
-	If Not IsHWnd($vCtrl) Then $vCtrl = GUICtrlGetHandle($vCtrl)
-	If Not IsHWnd($vCtrl) Then Return SetError(1, 0, False)
-	__WinAPI_AllowDarkModeForWindow($vCtrl, $bEnableDarkTheme)
+	Local $hTabControl, $bCtrlInTab = False
+	; determine if control is within a tab control
+	$hTabControl = _WinAPI_FindWindowEx($hGui, "SysTabControl32")
+	If $hTabControl Then $bCtrlInTab = __GUIDarkTheme_IsCtrlInTab($hTabControl, $hCtrl)
+	Local $hTheme, $tSIZE
+	If Not IsHWnd($hCtrl) Then $hCtrl = GUICtrlGetHandle($hCtrl)
+	If Not IsHWnd($hCtrl) Then Return SetError(1, 0, False)
+	_WinAPI_AllowDarkModeForWindow($hCtrl, $bEnableDarkTheme)
 	If @error <> 0 Then Return SetError(2, @error, False)
 	;=========
-	;ConsoleWrite(@CRLF & __WinAPI_GetClassName($vCtrl))
-	Switch __WinAPI_GetClassName($vCtrl)
+	;ConsoleWrite(@CRLF & _WinAPI_GetClassName($hCtrl))
+	Switch _WinAPI_GetClassName($hCtrl)
 		Case 'Button'
-			$sStyles = __GUIDarkTheme_hWnd2Styles($vCtrl)
+			$sStyles = __GUIDarkTheme_hWnd2Styles($hCtrl)
+			Local $bSubclassButton = False
+			Local $bSubclassGroup = False
+			If StringInStr($sStyles, "BS_AUTORADIOBUTTON") Or StringInStr($sStyles, "CHECKBOX") Or StringInStr($sStyles, "BS_AUTO3STATE") Then
+				; Subclass checkbox and radio buttons only when run older OS
+				If Not $__DM_g_b24H2Plus Then $bSubclassButton = True
+			EndIf
+			If StringInStr($sStyles, "BS_GROUPBOX") Then
+				; Subclass groupbox and when run older OS
+				If Not $__DM_g_b24H2Plus Then $bSubclassGroup = True
+			EndIf
+
 			Switch $bEnableDarkTheme
 				Case True
-					If $bPreferNewTheme And $g_b24H2Plus Then
-						$sThemeName = 'DarkMode_DarkTheme'
-					Else
-						If StringInStr($sStyles, "BS_GROUPBOX") Or StringInStr($sStyles, "BS_AUTORADIOBUTTON") _
-							Or StringInStr($sStyles, "BS_AUTOCHECKBOX") Or StringInStr($sStyles, "BS_CHECKBOX") _
-							Or StringInStr($sStyles, "BS_AUTO3STATE") Or StringInStr($sStyles, "BS_3STATE") Then
-							$bSpecialBtn = True
+					If $bSubclassGroup Then
+						If Not $__DM_g_hGroupProc Then
+							$__DM_g_hGroupProc = DllCallbackRegister(__GUIDarkTheme_GroupProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+							$__DM_g_pGroupProc = DllCallbackGetPtr($__DM_g_hGroupProc)
+						EndIf
+						_WinAPI_SetWindowTheme($hCtrl, "DarkMode_Explorer", "Button")
+						__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hGroupProc, $__DM_g_pGroupProc, $__DM_g_iControlCount)
+
+						Return True
+					EndIf
+
+					If $bSubclassButton Then
+						If Not $__DM_g_hButtonProc Then
+							$__DM_g_hButtonProc = DllCallbackRegister(__GUIDarkTheme_ButtonProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+							$__DM_g_pButtonProc = DllCallbackGetPtr($__DM_g_hButtonProc)
+						EndIf
+						_WinAPI_SetWindowTheme($hCtrl, "DarkMode_Explorer", "Button")
+						; Increase the width of controls based on part size plus padding (TODO: causing button growth after theme changes)
+						;Local $iPadding = 3
+						;Local $aPos = WinGetPos($hCtrl)
+						;If Not @error Then _WinAPI_SetWindowPos($hCtrl, 0, $aPos[0], $aPos[1], $aPos[2] + $iPadding, $aPos[3], $SWP_NOMOVE)
+						$__DM_g_iButtonCount += 1
+						Local $iPartID
+						If StringInStr($sStyles, "BS_AUTORADIOBUTTON") Then $iPartID = $BP_RADIOBUTTON
+						If StringInStr($sStyles, "CHECKBOX") Then $iPartID = $BP_CHECKBOX
+						If StringInStr($sStyles, "BS_AUTO3STATE") Then $iPartID = $BP_CHECKBOX
+						Local $aUpdate[1][3] = [[$iPartID, $sStyles, $bCtrlInTab]]
+						_ArrayAdd($__DM_g_aButtonSub, $aUpdate)
+						__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hButtonProc, $__DM_g_pButtonProc, $__DM_g_iControlCount, $__DM_g_iButtonCount)
+
+						Return True
+					EndIf
+
+					$sThemeName = 'DarkMode_Explorer'
+
+					If StringInStr($sStyles, "BS_GROUPBOX") Or StringInStr($sStyles, "BS_AUTORADIOBUTTON") Then
+						If Not $__DM_g_b24H2Plus Then _WinAPI_SetWindowTheme($hCtrl, "", "")
+						$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer'
+						If $bCtrlInTab Then
+							If StringInStr($sStyles, "BS_GROUPBOX") Then __DM_GroupboxInTab($hCtrl)
+							GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
 						Else
-							$sThemeName = 'DarkMode_Explorer'
+							GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+						EndIf
+						If Not $__DM_g_b24H2Plus Then Return True
+					Else
+						If $bCtrlInTab And StringInStr($sStyles, "CHECKBOX") Then
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
 						EndIf
 					EndIf
 				Case False
 					$sThemeName = 'Explorer'
+					If StringInStr($sStyles, "BS_GROUPBOX") Or StringInStr($sStyles, "BS_AUTORADIOBUTTON") Then
+						If $bCtrlInTab Then
+							If StringInStr($sStyles, "BS_GROUPBOX") Then __DM_GroupboxInTab($hCtrl)
+							GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						Else
+							GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+						EndIf
+					Else
+						If $bCtrlInTab And StringInStr($sStyles, "CHECKBOX") Then
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						EndIf
+					EndIf
 			EndSwitch
 
-		Case 'msctls_trackbar32'
-			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_BkColor)
-			If $bEnableDarkTheme Then
-				GUIRegisterMsg($WM_NOTIFY, __GUIDarkTheme_WM_NOTIFY)
-			Else
-				GUIRegisterMsg($WM_NOTIFY, "")
+			GUIRegisterMsg($WM_CTLCOLORBTN, "__GUIDarkTheme_WM_CTLCOLOR")
+
+		Case 'ReBarWindow32'
+			_WinAPI_SetWindowTheme($hCtrl, "", "")
+			_SendMessage($hCtrl, $WM_THEMECHANGED, 0, 0)
+			_GUICtrlRebar_SetColorScheme($hCtrl, $iGUI_Ctrl_BkColor, $iGUI_Ctrl_BkColor)
+			For $i = 0 To _GUICtrlRebar_GetBandCount($hCtrl) - 1
+				__GUIDarkTheme_SetBandColor($hCtrl, $i, $iGUI_Ctrl_BkColor, $iGUI_Ctrl_Color)
+			Next
+			; Style fixes to improve theme design
+			_WinAPI_SetWindowLong($hCtrl, $GWL_STYLE, BitOR(_WinAPI_GetWindowLong($hCtrl, $GWL_STYLE), $CCS_NODIVIDER))
+			_WinAPI_SetWindowLong($hCtrl, $GWL_STYLE, BitXOR(_WinAPI_GetWindowLong($hCtrl, $GWL_STYLE), $RBS_BANDBORDERS))
+			_WinAPI_SetWindowPos($hCtrl, 0, 0, 0, 0, 0, $SWP_NOMOVE)
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+
+			Return True
+
+		Case 'ToolbarWindow32'
+			If _GUICtrlToolbar_GetStyleFlat($hCtrl) And _GUICtrlToolbar_GetStyleTransparent($hCtrl) Then
+				; remove the transparent bit in the case of default AutoIt created toolbar (transparent should not be default)
+				_GUICtrlToolbar_SetStyleTransparent($hCtrl, False)
+				_GUICtrlToolbar_SetStyleFlat($hCtrl, False)
 			EndIf
+			If _GUICtrlToolbar_GetStyleTransparent($hCtrl) Then
+				_GUICtrlToolbar_SetColorScheme($hCtrl, $__DM_g_iGuiBkColor, $__DM_g_iGuiBkColor)
+			Else
+				;_GUICtrlToolbar_SetColorScheme($hCtrl, $iGUI_Ctrl_BkColor, $iGUI_Ctrl_BkColor)
+				_GUICtrlToolbar_SetColorScheme($hCtrl, $__DM_g_iGuiBkColor, $__DM_g_iGuiBkColor)
+			EndIf
+
+			GUIRegisterMsg($WM_NOTIFY, "__GUIDarkTheme_WM_NOTIFY")
+
+			Return True
+
+		Case 'SysIPAddress32'
+			ConsoleWrite("IP Address control detected." & @CRLF)
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+
+			Return True
+
+		Case 'msctls_hotkey32'
+			ConsoleWrite("HotKey control detected." & @CRLF)
+
+			Return True
+
+		Case 'msctls_trackbar32'
+			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iGuiBkColor)
+
+			GUIRegisterMsg($WM_NOTIFY, "__GUIDarkTheme_WM_NOTIFY")
+
+			; remove focus rectangle from slider control
+			_SendMessage($hCtrl, $WM_CHANGEUISTATE, 65537, 0)
+
+		Case 'SysLink'
+			If $bEnableDarkTheme Then
+				GUIRegisterMsg($WM_CTLCOLORSTATIC, "__GUIDarkTheme_WM_CTLCOLOR")
+			Else
+				GUIRegisterMsg($WM_CTLCOLORSTATIC, "")
+			EndIf
+
+			GUIRegisterMsg($WM_NOTIFY, "__GUIDarkTheme_WM_NOTIFY")
+
+			Return True
 
 		Case 'msctls_updown32'
 			If $bEnableDarkTheme Then
-				$sThemeName = 'DarkMode_Explorer'
+				;$sThemeName = 'DarkMode_Explorer'
+				$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer'
+			Else
+				$sThemeName = 'Explorer'
 			EndIf
+
 			; move UpDown control by 2 pixel to prevent clipping
-			If BitAND(_WinAPI_GetWindowLong($vCtrl, $GWL_STYLE), $UDS_ALIGNLEFT) Then
+			If BitAND(_WinAPI_GetWindowLong($hCtrl, $GWL_STYLE), $UDS_ALIGNLEFT) Then
 				$iBuddyPos = -2
 			Else
 				$iBuddyPos = 2
 			EndIf
-			If Not $bBuddyMoved Then GUICtrlSetPos(_WinAPI_GetDlgCtrlID($vCtrl), ControlGetPos("", "", $vCtrl)[0] + $iBuddyPos)
-			$bBuddyMoved = True
-			If Not $g_pUpDownSub Then $g_pUpDownSub = DllCallbackRegister("__GUIDarkTheme_UpDownProc", "lresult", _
-					"hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
-			__GUIDarkTheme_AddToSubclass($vCtrl, $g_pUpDownSub, $g_iControlCount)
+			Local $hBuddy = HWnd(_SendMessage($hCtrl, $UDM_GETBUDDY))
+			If $hBuddy And _WinAPI_GetClassName($hBuddy) = "Edit" Then
+				If Not $bBuddyMoved Then GUICtrlSetPos(_WinAPI_GetDlgCtrlID($hCtrl), ControlGetPos("", "", $hCtrl)[0] + $iBuddyPos)
+				$bBuddyMoved = True
+			EndIf
+			If Not $__DM_g_hUpDownSub Then
+				$__DM_g_hUpDownSub = DllCallbackRegister(__GUIDarkTheme_UpDownProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+				$__DM_g_pUpDownSub = DllCallbackGetPtr($__DM_g_hUpDownSub)
+			EndIf
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hUpDownSub, $__DM_g_pUpDownSub, $__DM_g_iControlCount)
 
 		Case 'ListBox'
-			__WinAPI_SetWindowLong($vCtrl, $GWL_EXSTYLE, BitAND(__WinAPI_GetWindowLong($vCtrl, $GWL_EXSTYLE), BitNOT($WS_EX_CLIENTEDGE)))
-			__GUIDarkTheme_AddToSubclass($vCtrl, $g_pSubclassProc, $g_iControlCount)
-			__WinAPI_SetWindowPos($vCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+			_WinAPI_SetWindowLong($hCtrl, $GWL_EXSTYLE, BitAND(_WinAPI_GetWindowLong($hCtrl, $GWL_EXSTYLE), BitNOT($WS_EX_CLIENTEDGE)))
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+			_WinAPI_SetWindowPos($hCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
 
 			Switch $bEnableDarkTheme
 				Case True
-					If $bPreferNewTheme And $g_b24H2Plus Then
-						$sThemeName = 'DarkMode_DarkTheme'
-					Else
-						$sThemeName = 'DarkMode_Explorer'
-					EndIf
-
-					; create brush and register GUI message
-					If Not $g_hBrushEdit Then $g_hBrushEdit = __WinAPI_CreateSolidBrush(__GUIDarkMenu_ColorToCOLORREF($COLOR_CONTROL_BG))
-					GUIRegisterMsg($WM_CTLCOLORLISTBOX, "__GUIDarkTheme_WM_CTLCOLOR")
+					$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer'
 				Case False
 					$sThemeName = 'Explorer'
-					GUIRegisterMsg($WM_CTLCOLORLISTBOX, "")
 			EndSwitch
 
+			GUIRegisterMsg($WM_CTLCOLORLISTBOX, "__GUIDarkTheme_WM_CTLCOLOR")
+
 		Case 'SysTreeView32'
-			$sStyles = __GUIDarkTheme_hWnd2Styles($vCtrl)
-			__GUIDarkTheme_AddToSubclass($vCtrl, $g_pSubclassProc, $g_iControlCount)
-			__WinAPI_SetWindowPos($vCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+			$sStyles = __GUIDarkTheme_hWnd2Styles($hCtrl)
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+			_WinAPI_SetWindowPos($hCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
 
 			Switch $bEnableDarkTheme
 				Case True
-					If $bPreferNewTheme And $g_b24H2Plus Then
-						;$sThemeName = 'DarkMode_DarkTheme' ; DarkMode_DarkTheme still has some bugs
-						$sThemeName = 'DarkMode_Explorer'
-					Else
-						$sThemeName = 'DarkMode_Explorer'
-					EndIf
+					;$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer' ; DarkMode_DarkTheme still has some bugs
+					$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_Explorer' : 'DarkMode_Explorer'
 
 					; dark mode checkboxes
 					If StringInStr($sStyles, "TVS_CHECKBOXES") Then
@@ -1563,109 +2161,210 @@ Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPrefe
 					EndIf
 			EndSwitch
 
-			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_BkColor)
+			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_BkColor)
 
 			; Add TVS_EX_DOUBLEBUFFER extended style to TreeView control
-			_GUICtrlTreeView_SetExtendedStyle($vCtrl, $TVS_EX_DOUBLEBUFFER)
+			_GUICtrlTreeView_SetExtendedStyle($hCtrl, $TVS_EX_DOUBLEBUFFER)
 
 		Case 'SysListView32'
 			; Add LVS_EX_DOUBLEBUFFER to ListView control
-			Local $iExStyle = _GUICtrlListView_GetExtendedListViewStyle($vCtrl)
-			_GUICtrlListView_SetExtendedListViewStyle($vCtrl, BitOR($iExStyle, $LVS_EX_DOUBLEBUFFER))
-
-			__GUIDarkTheme_AddToSubclass($vCtrl, $g_pSubclassProc, $g_iControlCount)
-			__WinAPI_SetWindowPos($vCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+			Local $iExStyle = _GUICtrlListView_GetExtendedListViewStyle($hCtrl)
+			_GUICtrlListView_SetExtendedListViewStyle($hCtrl, BitOR($iExStyle, $LVS_EX_DOUBLEBUFFER))
 
 			Switch $bEnableDarkTheme
 				Case True
-					If $bPreferNewTheme And $g_b24H2Plus Then
-						;$sThemeName = 'DarkMode_DarkTheme' ; DarkMode_DarkTheme border is not great
-						$sThemeName = 'DarkMode_Explorer'
-					Else
-						$sThemeName = 'DarkMode_Explorer'
-					EndIf
+					;$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer' ; DarkMode_DarkTheme border is not great
+					$sThemeName = 'DarkMode_Explorer'
 
 					; checkbox dark mode
-					If (BitAND(_GUICtrlListView_GetExtendedListViewStyle($vCtrl), $LVS_EX_CHECKBOXES) = $LVS_EX_CHECKBOXES) Then
+					If (BitAND(_GUICtrlListView_GetExtendedListViewStyle($hCtrl), $LVS_EX_CHECKBOXES) = $LVS_EX_CHECKBOXES) Then
 						$bSpecialLV = True
 					EndIf
 				Case False
 					$sThemeName = 'Explorer'
 					; checkbox light mode
-					If (BitAND(_GUICtrlListView_GetExtendedListViewStyle($vCtrl), $LVS_EX_CHECKBOXES) = $LVS_EX_CHECKBOXES) Then
+					If (BitAND(_GUICtrlListView_GetExtendedListViewStyle($hCtrl), $LVS_EX_CHECKBOXES) = $LVS_EX_CHECKBOXES) Then
 						$bSpecialLV = True
 					EndIf
 			EndSwitch
 
-			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_BkColor)
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+			_WinAPI_SetWindowLong($hCtrl, $GWL_EXSTYLE, BitAND(_WinAPI_GetWindowLong($hCtrl, $GWL_EXSTYLE), BitNOT($WS_EX_CLIENTEDGE)))
+			_WinAPI_SetWindowPos($hCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+
+			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_BkColor)
 
 		Case 'Edit'
-			__WinAPI_SetWindowLong($vCtrl, $GWL_EXSTYLE, BitAND(__WinAPI_GetWindowLong($vCtrl, $GWL_EXSTYLE), BitNOT($WS_EX_CLIENTEDGE)))
-			__GUIDarkTheme_AddToSubclass($vCtrl, $g_pSubclassProc, $g_iControlCount)
-			__WinAPI_SetWindowPos($vCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+			Local $sEditParent = _WinAPI_GetClassName(_WinAPI_GetParent($hCtrl))
+			If $sEditParent <> "ComboBox" Then
+				_WinAPI_SetWindowLong($hCtrl, $GWL_EXSTYLE, BitAND(_WinAPI_GetWindowLong($hCtrl, $GWL_EXSTYLE), BitNOT($WS_EX_CLIENTEDGE)))
+				__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+				_WinAPI_SetWindowPos($hCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+			EndIf
 
 			Switch $bEnableDarkTheme
 				Case True
-					If $bPreferNewTheme And $g_b24H2Plus Then
-						$sThemeName = 'DarkMode_DarkTheme'
-					Else
-						$sThemeName = 'DarkMode_Explorer'
-					EndIf
-
-					; create brush and register GUI message
-					If Not $g_hBrushEdit Then $g_hBrushEdit = __WinAPI_CreateSolidBrush(__GUIDarkMenu_ColorToCOLORREF($COLOR_CONTROL_BG))
-					GUIRegisterMsg($WM_CTLCOLOREDIT, "__GUIDarkTheme_WM_CTLCOLOR")
+					$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer'
 				Case False
 					$sThemeName = 'Explorer'
-					GUIRegisterMsg($WM_CTLCOLOREDIT, "")
 			EndSwitch
+
+			GUIRegisterMsg($WM_CTLCOLOREDIT, "__GUIDarkTheme_WM_CTLCOLOR")
+			GUIRegisterMsg($WM_CTLCOLORSTATIC, "__GUIDarkTheme_WM_CTLCOLOR")
 
 		Case 'SysHeader32'
 			Switch $bEnableDarkTheme
 				Case True
-					If $bPreferNewTheme And $g_b24H2Plus Then
-						$sThemeName = 'DarkMode_DarkTheme'
-					Else
-						$sThemeName = 'DarkMode_ItemsView'
-					EndIf
+					$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_ItemsView'
+					;$sThemeName = 'DarkMode_ItemsView'
 				Case False
 					$sThemeName = 'ItemsView'
 			EndSwitch
 			$sThemeList = 'Header'
 
 		Case 'Static'
-			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-			If $bEnableDarkTheme Then
-				GUIRegisterMsg($WM_CTLCOLORSTATIC, "__GUIDarkTheme_WM_CTLCOLOR")
+			Local $iTextColor, $iBkColor, $iBkMode
+			__GUIDarkTheme_GetCtrlColors($hCtrl, $iTextColor, $iBkColor, $iBkMode)
+
+			Switch $iTextColor
+				Case 0x000000
+					GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+				Case $__DM_g_iTextColorDark
+					GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+				Case $__DM_g_iTextColorLight
+					GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iGUI_Ctrl_Color)
+				Case Else
+					; skip swapping any custom colors
+					GUICtrlSetColor(_WinAPI_GetDlgCtrlID($hCtrl), $iTextColor)
+			EndSwitch
+
+			If $hTabControl Then
+				If $bCtrlInTab Then
+					Switch $iBkColor
+						Case $__DM_g_iTabCtrlBkColorDark
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						Case $__DM_g_iTabCtrlBkColorLight
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						Case $__DM_g_iCtrlBkColorDark
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						Case $__DM_g_iCtrlBkColorLight
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						Case $__DM_g_iGuiBkColor
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+						Case Else
+							Switch $iBkMode
+								Case $TRANSPARENT
+									GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $__DM_g_iTabCtrlBkColor)
+								Case $OPAQUE
+									; skip making any custom colors transparent
+									GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $iBkColor)
+							EndSwitch
+					EndSwitch
+				Else
+					Switch $iBkColor
+						Case $__DM_g_iCtrlBkColor
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_BKCOLOR_TRANSPARENT)
+						Case $__DM_g_iGuiBkColor
+							GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_BKCOLOR_TRANSPARENT)
+						Case Else
+							Switch $iBkMode
+								Case $TRANSPARENT
+									GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_BKCOLOR_TRANSPARENT)
+								Case $OPAQUE
+									; skip making any custom colors transparent
+									GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $iBkColor)
+							EndSwitch
+					EndSwitch
+				EndIf
 			Else
-				GUIRegisterMsg($WM_CTLCOLORSTATIC, "")
+				Switch $iBkColor
+					Case $__DM_g_iCtrlBkColor
+						GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_BKCOLOR_TRANSPARENT)
+					Case $__DM_g_iGuiBkColor
+						GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_BKCOLOR_TRANSPARENT)
+					Case Else
+						Switch $iBkMode
+							Case $TRANSPARENT
+								GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_BKCOLOR_TRANSPARENT)
+							Case $OPAQUE
+								; skip making any custom colors transparent
+								GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($hCtrl), $iBkColor)
+						EndSwitch
+				EndSwitch
 			EndIf
+
+			Return True
 
 		Case 'SysDateTimePick32'
-			; if SysDateTimePick32 exists, obtain handle for SysDateTimePick32 and register WM_NOTIFY
 			If $bEnableDarkTheme Then
-				$g_hDate = $vCtrl
-				$g_hDateProc_CB = DllCallbackRegister('__GUIDarkTheme_DateProc', 'ptr', 'hwnd;uint;wparam;lparam')
-				$g_pDateProc_CB = DllCallbackGetPtr($g_hDateProc_CB)
-				$g_hDateOldProc = __WinAPI_SetWindowLong($g_hDate, $GWL_WNDPROC, $g_pDateProc_CB)
-				GUIRegisterMsg($WM_NOTIFY, __GUIDarkTheme_WM_NOTIFY)
-			Else
-				GUIRegisterMsg($WM_NOTIFY, "")
-				If $g_hDateOldProc Then __WinAPI_SetWindowLong($g_hDate, $GWL_WNDPROC, $g_hDateOldProc)
-				If $g_hDateProc_CB Then DllCallbackFree($g_hDateProc_CB)
+				; TODO: there is a crash in DateProc when Date ctrl in Rebar and rebar gets resized
+				__DM_DateTimeCtrlHandles($hCtrl)
+				If Not $__DM_g_hDateProc Then $__DM_g_hDateProc = DllCallbackRegister(__GUIDarkTheme_DateProc, 'ptr', 'hwnd;uint;wparam;lparam')
+				If Not $__DM_g_pDateProc Then $__DM_g_pDateProc = DllCallbackGetPtr($__DM_g_hDateProc)
+				If Not $__DM_g_hDateProcOld Then
+					$__DM_g_hDateProcOld = _WinAPI_SetWindowLong($hCtrl, $GWL_WNDPROC, $__DM_g_pDateProc)
+				Else
+					_WinAPI_SetWindowLong($hCtrl, $GWL_WNDPROC, $__DM_g_pDateProc)
+				EndIf
+				; set colors for dropdown calendar
+				_GUICtrlDTP_SetMCColor($hCtrl, 0, $__DM_g_iCtrlBkColor)
+				_GUICtrlDTP_SetMCColor($hCtrl, 1, $__DM_g_iTextColor)
+				_GUICtrlDTP_SetMCColor($hCtrl, 2, _WinAPI_SwitchColor(0x0078D4))
+				_GUICtrlDTP_SetMCColor($hCtrl, 3, $__DM_g_iTextColor)
+				_GUICtrlDTP_SetMCColor($hCtrl, 4, $__DM_g_iCtrlBkColor)
+				_GUICtrlDTP_SetMCColor($hCtrl, 5, $__DM_g_iTextColor)
 			EndIf
 
+			GUIRegisterMsg($WM_NOTIFY, "__GUIDarkTheme_WM_NOTIFY")
+
 		Case 'msctls_progress32'
-			If $bEnableDarkTheme Then
-				If $bPreferNewTheme And $g_b24H2Plus Then
-					$sThemeName = 'DarkMode_CopyEngine'
-				Else
-					$sThemeName = 'DarkMode'
-				EndIf
-				$sThemeList = 'Progress'
+			Local $iProgressHide = False
+			; Get state and progress position
+			Local $iProgressPos = _SendMessage($hCtrl, $PBM_GETPOS, 0, 0)
+			Local $iProgressState = _SendMessage($hCtrl, $PBM_GETSTATE, 0, 0)
+			Local $iCtrlState = GUICtrlGetState(_WinAPI_GetDlgCtrlID($hCtrl))
+			If BitAND($iCtrlState, $GUI_HIDE) Then $iProgressHide = True
+
+			; Remove theme and WS_EX_STATICEDGE extended style
+			_WinAPI_SetWindowTheme($hCtrl, "", "")
+			_WinAPI_SetWindowLong($hCtrl, $GWL_EXSTYLE, BitXOR(_WinAPI_GetWindowLong($hCtrl, $GWL_EXSTYLE), $WS_EX_STATICEDGE))
+
+			; Determine bar color based on state
+			; TODO: bar color can't seem to be changed for PBST_ERROR or PBST_PAUSED
+			Local $iBarColor
+			Switch $iProgressState
+				Case BitAND($iProgressState, $PBST_NORMAL)
+					$iBarColor = _WinAPI_SwitchColor($__DM_g_iAccentColor)
+				Case BitAND($iProgressState, $PBST_ERROR)
+					$iBarColor = _WinAPI_SwitchColor(0xFF2222)
+				Case BitAND($iProgressState, $PBST_PAUSED)
+					$iBarColor = _WinAPI_SwitchColor(0xFCE100)
+				Case Else
+					$iBarColor = _WinAPI_SwitchColor($__DM_g_iAccentColor)
+			EndSwitch
+
+			_SendMessage($hCtrl, $PBM_SETBARCOLOR, 0, $iBarColor)
+			_SendMessage($hCtrl, $PBM_SETBKCOLOR, 0, $__DM_g_iCtrlBkColor)
+
+			; Add WS_BORDER style
+			If BitAND(_WinAPI_GetWindowLong($hCtrl, $GWL_STYLE), $PBM_SETMARQUEE) Then
+				GUICtrlSetStyle(_WinAPI_GetDlgCtrlID($hCtrl), BitOR($PBM_SETMARQUEE, $WS_BORDER))
+			Else
+				GUICtrlSetStyle(_WinAPI_GetDlgCtrlID($hCtrl), $WS_BORDER)
 			EndIf
+
+			; SetWindowPos is needed to allow the WS_BORDER change
+			_WinAPI_SetWindowPos($hCtrl, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+
+			; Restore progress to original value since progress is lost after SetWindowLong
+			_SendMessage($hCtrl, $PBM_SETPOS, $iProgressPos, 0)
+			GUICtrlSetData(_WinAPI_GetDlgCtrlID($hCtrl), $iProgressPos)
+
+			If $iProgressHide Then GUICtrlSetState(_WinAPI_GetDlgCtrlID($hCtrl), $GUI_HIDE)
+
+			Return True
 
 		Case 'Scrollbar'
 			If $bEnableDarkTheme Then $sThemeName = 'DarkMode_Explorer'
@@ -1677,133 +2376,130 @@ Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPrefe
 
 		Case 'msctls_statusbar32'
 			; get handle for statusbar
-			$g_hStatus = $vCtrl
+			$__DM_g_hStatus = $hCtrl
 			Local Const $SP_GRIPPER = 3
 			Local Const $TS_TRUE = 1
-			Local $hTheme = __WinAPI_OpenThemeData($g_hGui, 'Status')
-			Local $tSIZE = __WinAPI_GetThemePartSize($hTheme, $SP_GRIPPER, 0, Null, Null, $TS_TRUE)
-			$g_hGripSize = $tSIZE.X
-			__WinAPI_CloseThemeData($hTheme)
+			$hTheme = _WinAPI_OpenThemeData($hGui, 'Status')
+			$tSIZE = _WinAPI_GetThemePartSize($hTheme, $SP_GRIPPER, 0, Null, Null, $TS_TRUE)
+			$__DM_g_hGripSize = $tSIZE.X
+			_WinAPI_CloseThemeData($hTheme)
 
 			If $bEnableDarkTheme Then
-				If $bPreferNewTheme And $g_b24H2Plus Then
-					$sThemeName = 'DarkMode_DarkTheme'
-					$sThemeList = 'Status'
-					$g_iGripPos = 0
-					$g_iBkColor = 0x3b3b3b
-				Else
-					$sThemeName = 'DarkMode'
-					$sThemeList = 'ExplorerStatusBar'
-					$g_iGripPos = 1
-					$g_iBkColor = 0x1c1c1c
-				EndIf
+				$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode'
+				$sThemeList = $__DM_g_b24H2Plus ? 'Status' : 'ExplorerStatusBar'
+				$__DM_g_iStatusBkColor = $__DM_g_b24H2Plus ? 0x3b3b3b : 0x1C1C1C
+				$__DM_g_iGripPos = $__DM_g_b24H2Plus ? 0 : 1
 			EndIf
 
 			; create sizebox/sizegrip and register WM_SIZE only if GUI is resizable
-			If _GUI_IsResizable($g_hGui) Then
+			If __GUIDarkTheme_GUI_IsResizable($hGui) Then
 				GUIRegisterMsg($WM_SIZE, "__GUIDarkTheme_WM_SIZE")
-				__GUIDarkTheme_StatusRatio()
-				__GUIDarkTheme_CreateSizebox()
+				__GUIDarkTheme_StatusRatio($hGui)
+				__GUIDarkTheme_CreateSizebox($hGui)
 
 				Switch $bEnableDarkTheme
 					Case True
-						__WinAPI_ShowWindow($g_hSizebox, @SW_SHOW)
+						_WinAPI_ShowWindow($__DM_g_hSizebox, @SW_SHOW)
 					Case False
-						__WinAPI_ShowWindow($g_hSizebox, @SW_HIDE)
+						_WinAPI_ShowWindow($__DM_g_hSizebox, @SW_HIDE)
 				EndSwitch
+				_WinAPI_RedrawWindow($__DM_g_hSizebox)
 			EndIf
 
 		Case 'tooltips_class32'
 			If $bEnableDarkTheme Then
-				If $bPreferNewTheme And $g_b24H2Plus Then
-					;$sThemeName = 'DarkMode_DarkTheme' ; works but is faded (MS still developing DarkMode_DarkTheme parts)
-					$sThemeName = 'DarkMode_Explorer' ; use for now
-					$sThemeList = 'ToolTip'
-				Else
-					$sThemeName = 'DarkMode_Explorer'
-					$sThemeList = 'ToolTip'
-				EndIf
-			Else
-				;
+				;$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer' ; works but is faded
+				$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_Explorer' : 'DarkMode_Explorer'
+				$sThemeList = 'ToolTip'
 			EndIf
 
-		Case 'ComboLBox', 'ComboBox'
+		Case 'ComboBox'
 			If $bEnableDarkTheme Then
-				If $bPreferNewTheme And $g_b24H2Plus Then
-					$sThemeName = 'DarkMode_DarkTheme'
-					$sThemeList = 'Combobox'
-				Else
-					$sThemeName = 'DarkMode_CFD'
-					$sThemeList = 'Combobox'
-				EndIf
-
-				; create brush and register GUI message
-				If Not $g_hBrushEdit Then $g_hBrushEdit = __WinAPI_CreateSolidBrush(__GUIDarkMenu_ColorToCOLORREF($COLOR_CONTROL_BG))
-				GUIRegisterMsg($WM_CTLCOLORLISTBOX, "__GUIDarkTheme_WM_CTLCOLOR")
-			Else
-				GUIRegisterMsg($WM_CTLCOLORLISTBOX, "")
+				$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_CFD'
+				$sThemeList = 'Combobox'
+				_WinAPI_SetWindowTheme($hCtrl, $sThemeName, $sThemeList)
+				_SendMessage($hCtrl, $WM_THEMECHANGED, 0, 0)
+				__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hSubclassProc, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
 			EndIf
 
-			GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-			GUICtrlSetBkColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_BkColor)
+			If Not $bEnableDarkTheme Then
+				$sThemeName = 'CFD'
+				$sThemeList = 'Combobox'
+				_WinAPI_SetWindowTheme($hCtrl, $sThemeName, $sThemeList)
+				_SendMessage($hCtrl, $WM_THEMECHANGED, 0, 0)
+			EndIf
 
-			#cs
-				Local $hEdit = __WinAPI_FindWindowEx($vCtrl, 0, "Edit", "")
-				         If $hEdit Then
-				             __WinAPI_SetWindowTheme($hEdit, "DarkMode_CFD", 0)
-				              __WinAPI_AllowDarkModeForWindow($hEdit, True)
-				         EndIf
-				         ; ComboBox dropdown list
-				         Local $hComboLBox = __WinAPI_FindWindowEx($vCtrl, 0, "ComboLBox", "")
-				         If $hComboLBox Then
-				             __WinAPI_SetWindowTheme($hComboLBox, "DarkMode_Explorer", 0)
-				             __WinAPI_AllowDarkModeForWindow($hComboLBox, True)
-				         EndIf
-			#ce
+			; Fix for focus rectangle showing on disabled combo.
+			; {END} на dropdownlist-комбо двигает выбор на последний пункт —
+			; сохраняем текущий индекс до и восстанавливаем после (CB_GETCURSEL/CB_SETCURSEL).
+			Local $iSavedSel = _SendMessage($hCtrl, 0x0147) ; CB_GETCURSEL
+			Local $iState = WinGetState($hCtrl)
+			If Not BitAND($iState, $WIN_STATE_ENABLED) Then
+				WinSetState($hCtrl, "", @SW_ENABLE)
+				ControlFocus($hCtrl, "", "")
+    			ControlSend($hCtrl, "", "", "{END}")
+				WinSetState($hCtrl, "", @SW_DISABLE)
+			Else
+				ControlFocus($hCtrl, "", "")
+    			ControlSend($hCtrl, "", "", "{END}")
+			EndIf
+			If $iSavedSel >= 0 Then _SendMessage($hCtrl, 0x014E, $iSavedSel) ; CB_SETCURSEL
+
+			Return True
+
+		Case 'SysMonthCal32'
+			_GUICtrlMonthCal_SetColor($hCtrl, $MCSC_TEXT, $__DM_g_iTextColor)
+			_GUICtrlMonthCal_SetColor($hCtrl, $MCSC_TITLEBK, _WinAPI_SwitchColor(0x0078D4))
+			_GUICtrlMonthCal_SetColor($hCtrl, $MCSC_TITLETEXT, $__DM_g_iTextColor)
+			_GUICtrlMonthCal_SetColor($hCtrl, $MCSC_BACKGROUND, $__DM_g_iCtrlBkColor)
+			_GUICtrlMonthCal_SetColor($hCtrl, $MCSC_MONTHBK, $__DM_g_iCtrlBkColor)
+			_GUICtrlMonthCal_SetColor($hCtrl, $MCSC_TRAILINGTEXT, $__DM_g_iTextColor)
+			_WinAPI_SetWindowTheme($hCtrl, "", "")
+			_SendMessage($hCtrl, $WM_THEMECHANGED, 0, 0)
+
+			Return True
 
 		Case 'SysTabControl32'
 			If $bEnableDarkTheme Then
-				If $bPreferNewTheme And $g_b24H2Plus Then
-					$sThemeName = 'DarkMode_DarkTheme'
-					$sThemeList = 'Tab'
-				Else
-					$sThemeName = 'DarkMode_Explorer'
-				EndIf
+				$sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer'
+				$sThemeList = 'Tab'
 			Else
 				$sThemeName = 'Explorer'
 			EndIf
 
-			If Not $g_pTabProc Then $g_pTabProc = DllCallbackRegister("__GUIDarkTheme_TabProc", "lresult", _
-					"hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
-			__GUIDarkTheme_AddToSubclass($vCtrl, $g_pTabProc, $g_iControlCount)
+			If Not $__DM_g_hTabProc Then
+				_WinAPI_SetWindowPos($hCtrl, $HWND_BOTTOM, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOREDRAW, $SWP_NOSIZE))
+				$__DM_g_hTabProc = DllCallbackRegister(__GUIDarkTheme_TabProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+				$__DM_g_pTabProc = DllCallbackGetPtr($__DM_g_hTabProc)
+			EndIf
+			__GUIDarkTheme_AddToSubclass($hCtrl, $__DM_g_hTabProc, $__DM_g_pTabProc, $__DM_g_iControlCount)
+
+			; remove focus rectangle from tab items
+			_SendMessage($hCtrl, $WM_CHANGEUISTATE, 65537, 0)
 
 		Case Else
 			$sThemeName = 'DarkMode_Explorer'
 
 	EndSwitch
-	;ConsoleWrite(@CRLF & 'Class:' & __WinAPI_GetClassName($vCtrl) & ' Theme:' & $sThemeName & '::' & $sThemeList)
+	;ConsoleWrite(@CRLF & 'Class:' & _WinAPI_GetClassName($hCtrl) & ' Theme:' & $sThemeName & '::' & $sThemeList)
 	;=========
-	__WinAPI_SetWindowTheme($vCtrl, $sThemeName, $sThemeList)
+	_WinAPI_SetWindowTheme($hCtrl, $sThemeName, $sThemeList)
 	If @error <> 0 Then Return SetError(3, @error, False)
-	__SendMessage($vCtrl, $WM_THEMECHANGED, 0, 0)
+	_SendMessage($hCtrl, $WM_THEMECHANGED, 0, 0)
 	If @error <> 0 Then Return SetError(4, @error, False)
-	If $bSpecialBtn Then
-		; this is used to remove theme from group box and radio buttons which are not themed properly with older DarkMode_Explorer
-		__WinAPI_SetWindowTheme($vCtrl, "", "")
-		GUICtrlSetColor(_WinAPI_GetDlgCtrlID($vCtrl), $iGUI_Ctrl_Color)
-	EndIf
+
 	Local $iSize, $hChecked, $hUnchecked
 	If $bSpecialLV Then
-		Local $hImageListLV = _GUICtrlListView_GetImageList($vCtrl, 2)
+		Local $hImageListLV = _GUICtrlListView_GetImageList($hCtrl, 2)
 		$iSize = _GUIImageList_GetIconHeight($hImageListLV)
 		_GUIImageList_Remove($hImageListLV)
 		If @OSBuild >= 22000 Then
-			$hUnchecked = __GUIDarkTheme_GetImages(0, 3, $iSize, $iSize)
-			$hChecked = __GUIDarkTheme_GetImages(5, 3, $iSize, $iSize)
+			$hUnchecked = __GUIDarkTheme_GetImages($hGui, 0, 3, $iSize, $iSize)
+			$hChecked = __GUIDarkTheme_GetImages($hGui, 5, 3, $iSize, $iSize)
 			_GUIImageList_Add($hImageListLV, $hUnchecked)
 			_GUIImageList_Add($hImageListLV, $hChecked)
-			__WinAPI_DeleteObject($hChecked)
-			__WinAPI_DeleteObject($hUnchecked)
+			_WinAPI_DeleteObject($hChecked)
+			_WinAPI_DeleteObject($hUnchecked)
 		Else
 			$hChecked = _GDIPlus_BitmapCreateFromMemory(__GUIDarkTheme_CheckedPNG($iSize), True)
 			$hUnchecked = _GDIPlus_BitmapCreateFromMemory(__GUIDarkTheme_UncheckedPNG($iSize), True)
@@ -1812,17 +2508,17 @@ Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPrefe
 		EndIf
 	EndIf
 	If $bSpecialTV Then
-		Local $hImageListTV = _GUICtrlTreeView_GetStateImageList($vCtrl)
+		Local $hImageListTV = _GUICtrlTreeView_GetStateImageList($hCtrl)
 		$iSize = _GUIImageList_GetIconHeight($hImageListTV)
 		_GUIImageList_Remove($hImageListTV)
 		If @OSBuild >= 22000 Then
-			$hUnchecked = __GUIDarkTheme_GetImages(0, 3, $iSize, $iSize)
-			$hChecked = __GUIDarkTheme_GetImages(5, 3, $iSize, $iSize)
+			$hUnchecked = __GUIDarkTheme_GetImages($hGui, 0, 3, $iSize, $iSize)
+			$hChecked = __GUIDarkTheme_GetImages($hGui, 5, 3, $iSize, $iSize)
 			_GUIImageList_Add($hImageListTV, $hUnchecked)
 			_GUIImageList_Add($hImageListTV, $hUnchecked)
 			_GUIImageList_Add($hImageListTV, $hChecked)
-			__WinAPI_DeleteObject($hChecked)
-			__WinAPI_DeleteObject($hUnchecked)
+			_WinAPI_DeleteObject($hChecked)
+			_WinAPI_DeleteObject($hUnchecked)
 		Else
 			$hChecked = _GDIPlus_BitmapCreateFromMemory(__GUIDarkTheme_CheckedPNG($iSize), True)
 			$hUnchecked = _GDIPlus_BitmapCreateFromMemory(__GUIDarkTheme_UncheckedPNG($iSize), True)
@@ -1831,59 +2527,66 @@ Func _GUIDarkTheme_GUICtrlSetDarkTheme($vCtrl, $bEnableDarkTheme = True, $bPrefe
 			_GUIImageList_Add($hImageListTV, $hChecked)
 		EndIf
 	EndIf
-	Switch __WinAPI_GetClassName($vCtrl)
-		Case 'SysListView32', 'SysTreeView32'
-			;GUICtrlSetBkColor(GUICtrlGetHandle($vCtrl), 0xFFFFFF)
-	EndSwitch
+
 	Return True
 EndFunc   ;==>_GUIDarkTheme_GUICtrlSetDarkTheme
 
-Func _GUIDarkTheme_ApplyMaterial($hWnd, $iMaterial = $DWMSBT_MAINWINDOW)
-	Local $bTransparency, $sMsg = ""
-	If @OSBuild < 22621 Then Return ConsoleWrite("Windows 11 build 22621 or higher is required." & @CRLF)
-	$bTransparency = RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency")
-	$sMsg &= "Transparency Effects are not enabled on this system." & @CRLF & @CRLF
-	$sMsg &= "Windows 11 materials will not show without Transparency Effects." & @CRLF & @CRLF
-	$sMsg &= "If you would like to enable Transparency Effects, go to:" & @CRLF
-	$sMsg &= "Settings app > Personalization > Colors > Transparency Effects"
-	If Not $bTransparency Then _GUIDarkTheme_MsgBox(BitOR($MB_ICONINFORMATION, $MB_OK), "Information", $sMsg)
-	$COLOR_BG_DARK = 0x000000
-	$COLOR_TEXT_LIGHT = 0xE0E0E0
-	$COLOR_CONTROL_BG = 0x080808
-	$COLOR_BORDER = 0x3F3F3F
-	$COLOR_MENU_BG = $COLOR_BG_DARK
-	$COLOR_MENU_HOT = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 20)
-	$COLOR_MENU_SEL = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 10)
-	$COLOR_MENU_TEXT = $COLOR_TEXT_LIGHT
-	__WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_USE_IMMERSIVE_DARK_MODE, True)
-	__WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_SYSTEMBACKDROP_TYPE, $iMaterial)
-	__WinAPI_DwmExtendFrameIntoClientArea($hWnd, _WinAPI_CreateMargins(-1, -1, -1, -1))
-EndFunc   ;==>_GUIDarkTheme_ApplyMaterial
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func _GUIDarkTheme_ApplyAuto($hGui)
+	If $__DM_g_bUseDarkMode Then
+		_GUIDarkTheme_GUISetDarkTheme($hGui, True)
+		_GUIDarkTheme_GUICtrlAllSetDarkTheme($hGui, True)
+	Else
+		_GUIDarkTheme_GUISetDarkTheme($hGui, False)
+		_GUIDarkTheme_GUICtrlAllSetDarkTheme($hGui, False)
+	EndIf
 
-Func _GUIDarkTheme_ApplyDark($hWnd, $bPreferNewTheme = False)
-	_GUIDarkTheme_GUISetDarkTheme($hWnd, True)
-	_GUIDarkTheme_GUICtrlAllSetDarkTheme($hWnd, True, $bPreferNewTheme)
+	; register WM_SETTINGCHANGE to monitor for system color mode changes
+	_GUIDarkTheme_AutoTheme()
 
 	; GUIDarkMenu register
-	_GUIDarkMenu_Register($hWnd)
+	_GUIDarkMenu_Register($hGui)
+EndFunc   ;==>_GUIDarkTheme_ApplyAuto
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _GUIDarkTheme_ApplyDark
+; Description ...: Automatically sets dark theme for GUI and all controls (with automatic subclassing when necessary)
+; Syntax ........: _GUIDarkTheme_ApplyDark($hGui)
+; Parameters ....: $hGui          		- The handle to the window.
+; Return values .: None
+; Author ........: WildByDesign
+; Example .......: No
+; ===============================================================================================================================
+Func _GUIDarkTheme_ApplyDark($hGui)
+	_GUIDarkTheme_GUISetDarkTheme($hGui, True)
+	_GUIDarkTheme_GUICtrlAllSetDarkTheme($hGui, True)
+
+	; GUIDarkMenu register
+	_GUIDarkMenu_Register($hGui)
 EndFunc   ;==>_GUIDarkTheme_ApplyDark
 
-Func _GUIDarkTheme_ApplyLight($hWnd)
-	_GUIDarkTheme_GUISetDarkTheme($hWnd, False)
-	_GUIDarkTheme_GUICtrlAllSetDarkTheme($hWnd, False)
-	$COLOR_BG_DARK = 0xFFFFFF
-	$COLOR_TEXT_LIGHT = 0x000000
-	$COLOR_CONTROL_BG = 0xFFFFFF
-	$COLOR_BORDER_LIGHT = 0xB0B0B0
-	$COLOR_BORDER = 0x3F3F3F
-	$COLOR_MENU_BG = $COLOR_BG_DARK
-	$COLOR_MENU_HOT = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, -10)
-	$COLOR_MENU_SEL = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, -6)
-	$COLOR_MENU_TEXT = $COLOR_TEXT_LIGHT
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _GUIDarkTheme_ApplyLight
+; Description ...: Automatically sets light theme for GUI and all controls (with automatic subclassing when necessary)
+; Syntax ........: _GUIDarkTheme_ApplyLight($hGui)
+; Parameters ....: $hGui          		- The handle to the window.
+; Return values .: None
+; Author ........: WildByDesign
+; Example .......: No
+; ===============================================================================================================================
+Func _GUIDarkTheme_ApplyLight($hGui)
+	_GUIDarkTheme_GUISetDarkTheme($hGui, False)
+	_GUIDarkTheme_GUICtrlAllSetDarkTheme($hGui, False)
 	; GUIDarkMenu register
-	_GUIDarkMenu_Register($hWnd)
+	_GUIDarkMenu_Register($hGui)
 EndFunc   ;==>_GUIDarkTheme_ApplyLight
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; Modified.......: UEZ, argumentum
+; ===============================================================================================================================
 Func __GUIDarkTheme_CheckedPNG($iSize = 16, $sSavePath = Default)
 	Local $Base64String, $iExt = (IsKeyword($sSavePath) ? 0 : 2) ; "BitAND(@extended, 2)" meant that the user wanted to save to disk
 	Switch $iSize
@@ -1904,7 +2607,7 @@ Func __GUIDarkTheme_CheckedPNG($iSize = 16, $sSavePath = Default)
 			If $iSize <> 16 Then $iExt = BitOR($iExt, 1)
 			$Base64String &= 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB+oDAxcZFLatj+oAAAEPSURBVDjLY2RgYGDQiioo0IrKz+eRVFBgIAK8u3XhwrWlEybc2bJwIaOKb0KCTcP8+QxkgFO9hYWMfsvPnxdSMzAgx4Avzx48YEw4+/8/AwWAiYFCQJIBdzYvYPj1+QN5BlyY2cBwbdlEBjZeAdINuDCzgeHRgY0MHrP24/fCl2cPGNb4KjJ8ef4Aq2Z02zEM4JFSYDBIq2fYkebI8OX5A4KaGRgYGFjQBVR8ExgYGBgYNkUaMvBIKuDVzMDAwIAzHby7eYGBR0oBr2asLoABIXXiEifTl+cPHpCbiN7dvHCBmYGBkVHaysODHAPOTq6oYH59+cSJL88fPuSRVFDgFJGQIDYTXZjZ0HBz3cyZABhkZ7hwets3AAAAAElFTkSuQmCC'
 	EndSwitch
-	Local $bString = __WinAPI_Base64Decode($Base64String)
+	Local $bString = _WinAPI_Base64Decode($Base64String)
 	If @error Then Return SetError(1, $iExt, 0)
 	$bString = Binary($bString)
 	If Not $iExt Then
@@ -1916,6 +2619,10 @@ Func __GUIDarkTheme_CheckedPNG($iSize = 16, $sSavePath = Default)
 	Return SetError(0, $iExt, $bString)
 EndFunc   ;==>__GUIDarkTheme_CheckedPNG
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; Modified.......: UEZ, argumentum
+; ===============================================================================================================================
 Func __GUIDarkTheme_UncheckedPNG($iSize = 16, $sSavePath = Default)
 	Local $Base64String, $iExt = (IsKeyword($sSavePath) ? 0 : 2) ; "BitAND(@extended, 2)" meant that the user wanted to save to disk
 	Switch $iSize
@@ -1936,7 +2643,7 @@ Func __GUIDarkTheme_UncheckedPNG($iSize = 16, $sSavePath = Default)
 			If $iSize <> 16 Then $iExt = BitOR($iExt, 1)
 			$Base64String &= 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IB2cksfwAAAARnQU1BAACxjwv8YQUAAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB+oDAxcfO0smFTUAAADBSURBVDjL7cyhDYNAGIbhD1qFqzhxijsmYAOQDZcQgkIg2IDK7oBou0HrCYIEsGxQNvjPkYBlgK5wpJbXP68FAEqpWxRFJWNMwCCt9dT3/XMcx885DMMijuNHXdcgIhMPzrmf5/nbcZyLVVXVt21bf55n7ElKiSRJtO267m4MAEQExpiw8WfH4BgAgL2uq5ZS7oaccxDRdAJgpWl6JSJs22aEPc9DlmVomuZuAUAQBIVSqhRC+CaDZVl013XPYRheP/vGQ/mk4/+CAAAAAElFTkSuQmCC'
 	EndSwitch
-	Local $bString = __WinAPI_Base64Decode($Base64String)
+	Local $bString = _WinAPI_Base64Decode($Base64String)
 	If @error Then Return SetError(1, $iExt, 0)
 	$bString = Binary($bString)
 	If Not $iExt Then
@@ -1948,6 +2655,10 @@ Func __GUIDarkTheme_UncheckedPNG($iSize = 16, $sSavePath = Default)
 	Return SetError(0, $iExt, $bString)
 EndFunc   ;==>__GUIDarkTheme_UncheckedPNG
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: Andreik
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_SizeboxProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData) ; Andreik
 	#forceref $iID, $pData
 
@@ -1955,7 +2666,7 @@ Func __GUIDarkTheme_SizeboxProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData) ; 
 		Local $tPAINTSTRUCT
 		Local $hDC = _WinAPI_BeginPaint($hWnd, $tPAINTSTRUCT)
 		Local $hGraphics = _GDIPlus_GraphicsCreateFromHDC($hDC)
-		_GDIPlus_GraphicsDrawImageRect($hGraphics, $g_hDots, 0, 0, $g_hGripSize + 2, $g_hGripSize + 2)
+		_GDIPlus_GraphicsDrawImageRect($hGraphics, $__DM_g_hDots, 0, 0, $__DM_g_hGripSize + 2, $__DM_g_hGripSize + 2)
 		_GDIPlus_GraphicsDispose($hGraphics)
 		_WinAPI_EndPaint($hWnd, $tPAINTSTRUCT)
 		Return 0
@@ -1964,113 +2675,145 @@ Func __GUIDarkTheme_SizeboxProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData) ; 
 	Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>__GUIDarkTheme_SizeboxProc
 
-Func __GUIDarkTheme_CreateDots($iWidth, $iHeight, $iBackgroundColor)
-	If $g_hDots Then _GDIPlus_BitmapDispose($g_hDots)
-	Local $hTheme = __WinAPI_OpenThemeData($g_hGui, 'Status')
+; #FUNCTION# ====================================================================================================================
+; Author.........: Andreik
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_CreateDots($hGui, $iWidth, $iHeight, $iBackgroundColor)
+	#forceref $iBackgroundColor
+	If $__DM_g_hDots Then _GDIPlus_BitmapDispose($__DM_g_hDots)
+	Local $hTheme = _WinAPI_OpenThemeData($hGui, 'Status')
 	Local $hBitmap = _GDIPlus_BitmapCreateFromScan0($iWidth, $iHeight)
 	Local $hGraphics = _GDIPlus_ImageGetGraphicsContext($hBitmap)
 	_GDIPlus_GraphicsClear($hGraphics, $iBackgroundColor)
 	; draw SP_GRIPPER directly on graphics object
 	Local $hDC = _GDIPlus_GraphicsGetDC($hGraphics)
-	Local $tRect = _WinAPI_CreateRectEx($g_hGripSize + 2 - $g_hGripSize + $g_iGripPos, $g_hGripSize + 2 - $g_hGripSize + $g_iGripPos, $g_hGripSize, $g_hGripSize)
-	__WinAPI_DrawThemeBackground($hTheme, 3, 0, $hDC, $tRect)
+	Local $tRect = _WinAPI_CreateRectEx($__DM_g_hGripSize + 2 - $__DM_g_hGripSize + $__DM_g_iGripPos, $__DM_g_hGripSize + 2 - $__DM_g_hGripSize + $__DM_g_iGripPos, $__DM_g_hGripSize, $__DM_g_hGripSize)
+	_WinAPI_DrawThemeBackground($hTheme, 3, 0, $hDC, $tRect)
 	_GDIPlus_GraphicsReleaseDC($hGraphics, $hDC)
 	_GDIPlus_GraphicsDispose($hGraphics)
-	__WinAPI_CloseThemeData($hTheme)
+	_WinAPI_CloseThemeData($hTheme)
 	Return $hBitmap
 EndFunc   ;==>__GUIDarkTheme_CreateDots
 
-Func __GUIDarkTheme_WM_SIZE($hWnd, $iMsg, $wParam, $lParam) ; Pixelsearch
+; #FUNCTION# ====================================================================================================================
+; Author.........: pixelsearch
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_WM_SIZE($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $iMsg, $wParam, $lParam
 
-	If $hWnd = $g_hGui Then
-		If Not $g_UseDarkMode Then __WinAPI_ShowWindow($g_hSizebox, @SW_HIDE)
+	If $__DM_g_hSizebox And _WinAPI_GetParent($__DM_g_hSizebox) = $hWnd Then
+		If Not $__DM_g_bUseDarkMode Then _WinAPI_ShowWindow($__DM_g_hSizebox, @SW_HIDE)
 		Local Static $bIsSizeBoxShown = True
-		Local $aSize = WinGetClientSize($g_hGui)
-		Local $aGetParts = _GUICtrlStatusBar_GetParts($g_hStatus)
+		Local $aSize = WinGetClientSize($hWnd)
+		Local $aGetParts = _GUICtrlStatusBar_GetParts($__DM_g_hStatus)
 		Local $aParts[$aGetParts[0]]
 		For $i = 0 To $aGetParts[0] - 1
-			$aParts[$i] = Int($aSize[0] * $g_aRatioW[$i])
+			$aParts[$i] = Int($aSize[0] * $__DM_g_aRatioW[$i])
 		Next
-		If BitAND(WinGetState($g_hGui), $WIN_STATE_MAXIMIZED) Then
-			_GUICtrlStatusBar_SetParts($g_hStatus, $aParts)
-			__WinAPI_ShowWindow($g_hSizebox, @SW_HIDE)
+		If BitAND(WinGetState($hWnd), $WIN_STATE_MAXIMIZED) Then
+			_GUICtrlStatusBar_SetParts($__DM_g_hStatus, $aParts)
+			_WinAPI_ShowWindow($__DM_g_hSizebox, @SW_HIDE)
 			$bIsSizeBoxShown = False
 		Else
-			If $g_aRatioW[UBound($aParts) - 1] <> 1 Then $aParts[UBound($aParts) - 1] = $aSize[0] - $g_iHeight
-			_GUICtrlStatusBar_SetParts($g_hStatus, $aParts)
-			WinMove($g_hSizebox, "", $aSize[0] - $g_hGripSize - 2 - $g_iGripPos, $aSize[1] - $g_hGripSize - 2 - $g_iGripPos, $g_hGripSize + 2, $g_hGripSize + 2)
+			If $__DM_g_aRatioW[UBound($aParts) - 1] <> 1 Then $aParts[UBound($aParts) - 1] = $aSize[0] - $__DM_g_iHeight
+			_GUICtrlStatusBar_SetParts($__DM_g_hStatus, $aParts)
+			WinMove($__DM_g_hSizebox, "", $aSize[0] - $__DM_g_hGripSize - 2 - $__DM_g_iGripPos, $aSize[1] - $__DM_g_hGripSize - 2 - $__DM_g_iGripPos, $__DM_g_hGripSize + 2, $__DM_g_hGripSize + 2)
 			If Not $bIsSizeBoxShown Then
-				__WinAPI_ShowWindow($g_hSizebox, @SW_SHOW)
+				_WinAPI_ShowWindow($__DM_g_hSizebox, @SW_SHOW)
 				$bIsSizeBoxShown = True
 			EndIf
-			__WinAPI_RedrawWindow($g_hSizebox)
+			_WinAPI_RedrawWindow($__DM_g_hSizebox)
 		EndIf
 	EndIf
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>__GUIDarkTheme_WM_SIZE
 
-Func __GUIDarkTheme_StatusRatio()
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_StatusRatio($hGui)
 	; calculate ratio need for the resizing of statusbar parts
-	Local $iGuiWidth = WinGetClientSize($g_hGui)[0]
-	Local $aParts = _GUICtrlStatusBar_GetParts($g_hStatus)
+	Local $iGuiWidth = WinGetClientSize($hGui)[0]
+	Local $aParts = _GUICtrlStatusBar_GetParts($__DM_g_hStatus)
 	_ArrayDelete($aParts, 0)
-	Dim $g_aRatioW[UBound($aParts)]
+	Dim $__DM_g_aRatioW[UBound($aParts)]
 	For $i = 0 To UBound($aParts) - 1
-		$g_aRatioW[$i] = $aParts[$i] / $iGuiWidth
+		$__DM_g_aRatioW[$i] = $aParts[$i] / $iGuiWidth
 	Next
 EndFunc   ;==>__GUIDarkTheme_StatusRatio
 
-Func __GUIDarkTheme_CreateSizebox()
-	$g_hDots = __GUIDarkTheme_CreateDots($g_hGripSize + 2, $g_hGripSize + 2, 0xFF000000 + $g_iBkColor)
-	If $g_bSizeboxCreated Then Return
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_CreateSizebox($hGui)
+	; clean up previous sizebox resources (for theme change) if they exist
+	If $__DM_g_hDots Then _GDIPlus_BitmapDispose($__DM_g_hDots)
+	If $__DM_g_hSizebox Then _WinAPI_DestroyWindow($__DM_g_hSizebox)
 	; create grip
-	$g_iHeight = WinGetPos($g_hStatus)[3] - 3
-	;$g_hDots = __GUIDarkTheme_CreateDots($g_hGripSize + 2, $g_hGripSize + 2, 0xFF000000 + $g_iBkColor)
+	$__DM_g_iHeight = WinGetPos($__DM_g_hStatus)[3] - 3
+	$__DM_g_hDots = __GUIDarkTheme_CreateDots($hGui, $__DM_g_hGripSize + 2, $__DM_g_hGripSize + 2, 0xFF000000 + $__DM_g_iStatusBkColor)
 
 	Local Const $SBS_SIZEBOX = 0x08
 	; Create a sizebox window (Scrollbar class)
-	$g_hSizebox = _WinAPI_CreateWindowEx(0, "Scrollbar", "", $WS_CHILD + $WS_VISIBLE + $SBS_SIZEBOX, _
-			0, 0, 0, 0, $g_hGui) ; $SBS_SIZEBOX or $SBS_SIZEGRIP
+	$__DM_g_hSizebox = _WinAPI_CreateWindowEx(0, "Scrollbar", "", $WS_CHILD + $WS_VISIBLE + $SBS_SIZEBOX, _
+			0, 0, 0, 0, $hGui) ; $SBS_SIZEBOX or $SBS_SIZEGRIP
 
 	; Subclass the sizebox (by changing the window procedure associated with the Scrollbar class)
-	If Not $g_pSizeboxProc Then $g_pSizeboxProc = DllCallbackRegister("__GUIDarkTheme_SizeboxProc", "lresult", _
-			"hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
-	__GUIDarkTheme_AddToSubclass($g_hSizebox, $g_pSizeboxProc, $g_iControlCount)
+	If Not $__DM_g_hSizeboxProc Then
+		$__DM_g_hSizeboxProc = DllCallbackRegister(__GUIDarkTheme_SizeboxProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+		$__DM_g_pSizeboxProc = DllCallbackGetPtr($__DM_g_hSizeboxProc)
+	EndIf
+	__GUIDarkTheme_AddToSubclass($__DM_g_hSizebox, $__DM_g_hSizeboxProc, $__DM_g_pSizeboxProc, $__DM_g_iControlCount)
 
-	$g_hCursor = _WinAPI_LoadCursor(0, $OCR_SIZENWSE)
-	__WinAPI_SetClassLongEx($g_hSizebox, $GCL_HCURSOR, $g_hCursor)
+	$__DM_g_hCursor = _WinAPI_LoadCursor(0, $OCR_SIZENWSE)
+	_WinAPI_SetClassLongEx($__DM_g_hSizebox, $GCL_HCURSOR, $__DM_g_hCursor)
+
+	; Add WS_EX_TRANSPARENT to sizebox
+	_WinAPI_SetWindowLong($__DM_g_hSizebox, $GWL_EXSTYLE, BitOR(_WinAPI_GetWindowLong($__DM_g_hSizebox, $GWL_EXSTYLE), $WS_EX_TRANSPARENT))
 
 	; Fix Z-order of Sizebox (needed for cursor)
-	__WinAPI_SetWindowPos($g_hSizebox, $HWND_TOP, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOREDRAW, $SWP_NOSIZE))
+	_WinAPI_SetWindowPos($__DM_g_hSizebox, $HWND_TOP, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOREDRAW, $SWP_NOSIZE))
 
 	; Add WS_CLIPSIBLINGS to statusbar (needed for cursor)
-	__WinAPI_SetWindowLong($g_hStatus, $GWL_STYLE, BitOR(__WinAPI_GetWindowLong($g_hStatus, $GWL_STYLE), $WS_CLIPSIBLINGS))
+	_WinAPI_SetWindowLong($__DM_g_hStatus, $GWL_STYLE, BitOR(_WinAPI_GetWindowLong($__DM_g_hStatus, $GWL_STYLE), $WS_CLIPSIBLINGS))
 
-	$g_bSizeboxCreated = True
+	; Trigger move and redraw of sizebox (needed mostly after theme changes)
+	Local $aSize = WinGetClientSize($hGui)
+	WinMove($__DM_g_hSizebox, "", $aSize[0] - $__DM_g_hGripSize - 2 - $__DM_g_iGripPos, $aSize[1] - $__DM_g_hGripSize - 2 - $__DM_g_iGripPos, $__DM_g_hGripSize + 2, $__DM_g_hGripSize + 2)
+	_WinAPI_RedrawWindow($__DM_g_hSizebox)
 EndFunc   ;==>__GUIDarkTheme_CreateSizebox
 
-Func __GUIDarkTheme_GetImages($iState, $iPart = 3, $iWidth = 16, $iHeight = 16)
-	Local $hTheme = __WinAPI_OpenThemeData($g_hGui, "Button")
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_GetImages($hGui, $iState, $iPart = 3, $iWidth = 16, $iHeight = 16)
+	Local $hTheme = _WinAPI_OpenThemeData($hGui, $__DM_g_bUseDarkMode ? "DarkMode_Explorer::Button" : "Button")
 	If @error Then Return SetError(1, 0, 0)
-	Local $hDC = __WinAPI_GetDC($g_hGui)
-	Local $hHBitmap = __WinAPI_CreateCompatibleBitmap($hDC, $iWidth, $iHeight)
-	Local $hMemDC = __WinAPI_CreateCompatibleDC($hDC)
-	Local $hObjOld = __WinAPI_SelectObject($hMemDC, $hHBitmap)
-	Local $tRect = __WinAPI_CreateRectEx(0, 0, $iWidth, $iHeight)
-	__WinAPI_DrawThemeBackground($hTheme, $iPart, $iState, $hMemDC, $tRect)
+	Local $hDC = _WinAPI_GetDC($hGui)
+	Local $hHBitmap = _WinAPI_CreateCompatibleBitmap($hDC, $iWidth, $iHeight)
+	Local $hMemDC = _WinAPI_CreateCompatibleDC($hDC)
+	Local $hObjOld = _WinAPI_SelectObject($hMemDC, $hHBitmap)
+	Local $tRect = _WinAPI_CreateRectEx(0, 0, $iWidth, $iHeight)
+	_WinAPI_DrawThemeBackground($hTheme, $iPart, $iState, $hMemDC, $tRect)
 	If @error Then
-		__WinAPI_CloseThemeData($hTheme)
+		_WinAPI_CloseThemeData($hTheme)
 		Return SetError(2, 0, 0)
 	EndIf
-	__WinAPI_SelectObject($hMemDC, $hObjOld)
-	__WinAPI_ReleaseDC($g_hGui, $hDC)
-	__WinAPI_DeleteDC($hMemDC)
-	__WinAPI_CloseThemeData($hTheme)
+	_WinAPI_SelectObject($hMemDC, $hObjOld)
+	_WinAPI_ReleaseDC($hGui, $hDC)
+	_WinAPI_DeleteDC($hMemDC)
+	_WinAPI_CloseThemeData($hTheme)
 	Return $hHBitmap
 EndFunc   ;==>__GUIDarkTheme_GetImages
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkMenu_WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $iMsg, $wParam
 	Local $tagMEASUREITEM = "uint CtlType;uint CtlID;uint itemID;uint itemWidth;uint itemHeight;ulong_ptr itemData"
@@ -2084,8 +2827,8 @@ Func __GUIDarkMenu_WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
 	; itemID is the control ID, not the position!
 	; We must derive the position from the itemID
 	Local $iPos = -1
-	For $i = 0 To UBound($g_aMenuText) - 1
-		If $itemID = $g_aMenuText[$i][0] Then
+	For $i = 0 To UBound($__DM_g_aMenuText) - 1
+		If $itemID = $__DM_g_aMenuText[$i][0] Then
 			$iPos = $i
 			ExitLoop
 		EndIf
@@ -2093,29 +2836,32 @@ Func __GUIDarkMenu_WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
 
 	; Fallback: try the itemID directly
 	If $iPos < 0 Then $iPos = $itemID
-	If $iPos < 0 Or $iPos >= UBound($g_aMenuText) Then $iPos = 0
+	If $iPos < 0 Or $iPos >= UBound($__DM_g_aMenuText) Then $iPos = 0
 
-	Local $sText = $g_aMenuText[$iPos][1]
+	Local $sText = $__DM_g_aMenuText[$iPos][1]
 
 	; Calculate text dimensions
-	Local $hDC = __WinAPI_GetDC($hWnd)
-	__WinAPI_SelectObject($hDC, $g_hMenuFont)
-	Local $tSIZE = __WinAPI_GetTextExtentPoint32($hDC, $sText)
+	Local $hDC = _WinAPI_GetDC($hWnd)
+	_WinAPI_SelectObject($hDC, $__DM_g_hMenuFont)
+	Local $tSIZE = _WinAPI_GetTextExtentPoint32($hDC, $sText)
 	Local $iTextWidth = $tSIZE.X
 	Local $iTextHeight = $tSIZE.Y
 
-	__WinAPI_ReleaseDC($hWnd, $hDC)
+	_WinAPI_ReleaseDC($hWnd, $hDC)
 
 	; Set dimensions with padding (with high DPI)
-	$t.itemWidth = $iTextWidth - (8 * $g_iDpiScale)
+	$t.itemWidth = $iTextWidth - (8 * $__DM_g_iDpiScale)
 	$t.itemHeight = $iTextHeight + 1
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>__GUIDarkMenu_WM_MEASUREITEM
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkMenu_WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $iMsg, $wParam
-	Local Const $SM_CXDLGFRAME = 7
+	#forceref $hWnd, $iMsg, $wParam
 	Local $tagDRAWITEM = "uint CtlType;uint CtlID;uint itemID;uint itemAction;uint itemState;ptr hwndItem;handle hDC;" & _
 			"long left;long top;long right;long bottom;ulong_ptr itemData"
 	Local $t = DllStructCreate($tagDRAWITEM, $lParam)
@@ -2124,89 +2870,30 @@ Func __GUIDarkMenu_WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
 	If $t.CtlType <> $ODT_MENU Then Return $GUI_RUNDEFMSG
 
 	Local $hDC = $t.hDC
-	Local $left = $t.left
-	Local $top = $t.top
-	Local $right = $t.right
-	Local $bottom = $t.bottom
+	Local $iLeft = $t.left
+	Local $iTop = $t.top
+	Local $iRight = $t.right
+	Local $iBottom = $t.bottom
 	Local $state = $t.itemState
 	Local $itemID = $t.itemID
 
 	; convert itemID to position
 	Local $iPos = -1
-	For $i = 0 To UBound($g_aMenuText) - 1
-		If $itemID = $g_aMenuText[$i][0] Then
+	For $i = 0 To UBound($__DM_g_aMenuText) - 1
+		If $itemID = $__DM_g_aMenuText[$i][0] Then
 			$iPos = $i
 			ExitLoop
 		EndIf
 	Next
 
 	If $iPos < 0 Then $iPos = $itemID
-	If $iPos < 0 Or $iPos >= UBound($g_aMenuText) Then $iPos = 0
+	If $iPos < 0 Or $iPos >= UBound($__DM_g_aMenuText) Then $iPos = 0
 
-	Local $sText = $g_aMenuText[$iPos][1]
+	Local $sText = $__DM_g_aMenuText[$iPos][1]
 	$sText = StringReplace($sText, "&", "")
 
 	; Colors
-	Local $clrBG = __GUIDarkMenu_ColorToCOLORREF($COLOR_MENU_BG)
-	Local $clrSel = __GUIDarkMenu_ColorToCOLORREF($COLOR_MENU_SEL)
-	Local $clrText = __GUIDarkMenu_ColorToCOLORREF($COLOR_MENU_TEXT)
-
-	Static $iDrawCount = 0
-	Static $bFullBarDrawn = False
-
-	; Count how many items were drawn in this "draw cycle"
-	$iDrawCount += 1
-
-	; argumentum ; pre-declare all the "Local" in those IF-THEN that could be needed
-	Local $tClient, $iFullWidth, $tFullMenuBar, $hFullBrush
-	Local $tEmptyArea, $hEmptyBrush
-
-	; If we are at the first item AND the bar has not yet been drawn
-	If $iPos = 0 And Not $bFullBarDrawn Then
-		; Get the full window width
-		$tClient = __WinAPI_GetClientRect($hWnd)
-		$iFullWidth = $tClient.right
-
-		; Fill the entire menu bar
-		$tFullMenuBar = DllStructCreate($tagRECT)
-		With $tFullMenuBar
-			.left = 0
-			.top = $top - 1
-			.right = $iFullWidth + 3
-			.bottom = $bottom
-		EndWith
-
-		$hFullBrush = __WinAPI_CreateSolidBrush($clrBG)
-		__WinAPI_FillRect($hDC, $tFullMenuBar, $hFullBrush)
-		__WinAPI_DeleteObject($hFullBrush)
-	EndIf
-
-	; After drawing all items, mark as "drawn"
-	If $iDrawCount >= UBound($g_aMenuText) Then
-		$bFullBarDrawn = True
-		$iDrawCount = 0
-	EndIf
-
-	; Draw background for the area AFTER the last menu item
-	If $iPos = (UBound($g_aMenuText) - 1) Then ; Last menu
-		$tClient = __WinAPI_GetClientRect($hWnd)
-		$iFullWidth = $tClient.right
-
-		; Fill only the area to the RIGHT of the last menu item
-		If $right < $iFullWidth Then
-			$tEmptyArea = DllStructCreate($tagRECT)
-			With $tEmptyArea
-				.left = $right
-				.top = $top
-				.right = $iFullWidth + __WinAPI_GetSystemMetrics($SM_CXDLGFRAME)
-				.bottom = $bottom
-			EndWith
-
-			$hEmptyBrush = __WinAPI_CreateSolidBrush($clrBG)
-			__WinAPI_FillRect($hDC, $tEmptyArea, $hEmptyBrush)
-			__WinAPI_DeleteObject($hEmptyBrush)
-		EndIf
-	EndIf
+	Local $clrText = _WinAPI_SwitchColor($__DM_g_iMenuTextColor)
 
 	; Draw item background (selected = lighter)
 	Local $bSelected = BitAND($state, $ODS_SELECTED)
@@ -2214,97 +2901,82 @@ Func __GUIDarkMenu_WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
 	Local $hBrush
 
 	If $bSelected Then
-		$hBrush = __WinAPI_CreateSolidBrush($clrSel)
+		$hBrush = $__DM_g_hBrushMenuSel
 	ElseIf $bHot Then
-		$hBrush = __WinAPI_CreateSolidBrush($COLOR_MENU_HOT)
+		$hBrush = $__DM_g_hBrushMenuHot
 	Else
-		$hBrush = __WinAPI_CreateSolidBrush($clrBG)
+		$hBrush = $__DM_g_hBrushMenuBk
 	EndIf
 
 	Local $tItemRect = DllStructCreate($tagRECT)
 	With $tItemRect
-		.left = $left
-		.top = $top
-		.right = $right
-		.bottom = $bottom
+		.left = $iLeft
+		.top = $iTop
+		.right = $iRight
+		.bottom = $iBottom
 	EndWith
 
-	__WinAPI_FillRect($hDC, $tItemRect, $hBrush)
-	__WinAPI_DeleteObject($hBrush)
+	_WinAPI_FillRect($hDC, $tItemRect, $hBrush)
 
 	; Setup font
-	__WinAPI_SelectObject($hDC, $g_hMenuFont)
+	_WinAPI_SelectObject($hDC, $__DM_g_hMenuFont)
 
-	__WinAPI_SetBkMode($hDC, $TRANSPARENT)
-	If __WinAPI_GetForegroundWindow() <> $g_hGui Then
-		$clrText = $g_UseDarkMode ? __WinAPI_ColorAdjustLuma($clrText, -30) : 0x6d6d6d
+	_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+	If _WinAPI_GetForegroundWindow() <> $hWnd Then
+		$clrText = $__DM_g_bUseDarkMode ? _WinAPI_ColorAdjustLuma($clrText, -30) : 0x6d6d6d
 	EndIf
-	__WinAPI_SetTextColor($hDC, $clrText)
+	_WinAPI_SetTextColor($hDC, $clrText)
 
 	; Draw text
 	Local $tTextRect = DllStructCreate($tagRECT)
 	With $tTextRect
-		#cs
-			.left = $left + 10
-			.top = $top + 4
-			.right = $right - 10
-			.bottom = $bottom - 4
-		#ce
-		.left = $left
-		.top = $top
-		.right = $right
-		.bottom = $bottom
+		.left = $iLeft
+		.top = $iTop
+		.right = $iRight
+		.bottom = $iBottom
 	EndWith
 
-	DllCall($__DM_g_hDllUser32, "int", "DrawTextW", "handle", $hDC, "wstr", $sText, "int", -1, "ptr", _
+	DllCall('user32.dll', "int", "DrawTextW", "handle", $hDC, "wstr", $sText, "int", -1, "ptr", _
 			DllStructGetPtr($tTextRect), "uint", BitOR($DT_SINGLELINE, $DT_VCENTER, $DT_CENTER, $DT_NOCLIP))
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>__GUIDarkMenu_WM_DRAWITEM
 
-Func _GUIDarkMenu_Register($hWnd)
-	$g_hGui = $hWnd
-
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func _GUIDarkMenu_Register($hGui)
 	; get top menu handle
-	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
+	Local $hMenu = _GUICtrlMenu_GetMenu($hGui)
 	; return from function if no top menu exists
 	If Not $hMenu Then Return False
 
-	GUIRegisterMsg($WM_ACTIVATE, __GUIDarkMenu_WM_ACTIVATE)
-	GUIRegisterMsg($WM_WINDOWPOSCHANGED, __GUIDarkMenu_WM_WINDOWPOSCHANGED)
-	GUIRegisterMsg($WM_MEASUREITEM, __GUIDarkMenu_WM_MEASUREITEM)
-	GUIRegisterMsg($WM_DRAWITEM, __GUIDarkMenu_WM_DRAWITEM)
+	GUIRegisterMsg($WM_ACTIVATE, "__GUIDarkMenu_WM_ACTIVATE")
+	GUIRegisterMsg($WM_WINDOWPOSCHANGED, "__GUIDarkMenu_WM_WINDOWPOSCHANGED")
+	GUIRegisterMsg($WM_MEASUREITEM, "__GUIDarkMenu_WM_MEASUREITEM")
+	GUIRegisterMsg($WM_DRAWITEM, "__GUIDarkMenu_WM_DRAWITEM")
 
 	; create font
-	If Not $g_hMenuFont Then $g_hMenuFont = __GUIDarkMenu_CreateFont("Segoe UI", 9)
-
-	#cs
-		; Detect GUI font size and create menu font
-		Local $iFontSize = __GUIDarkMenu_GUIGetFontSize()[0]
-		Select
-			Case $iFontSize <= 8.5
-				$g_hMenuFont = __GUIDarkMenu_CreateFont("Segoe UI", 8.5)
-			Case $iFontSize >= 8.6
-				$g_hMenuFont = __GUIDarkMenu_CreateFont("Segoe UI", 9)
-			Case Else
-				$g_hMenuFont = __GUIDarkMenu_CreateFont("Segoe UI", 9)
-		EndSelect
-	#ce
+	If Not $__DM_g_hMenuFont Then $__DM_g_hMenuFont = __GUIDarkMenu_CreateFont("Segoe UI", 9)
 
 	; get window DPI for measurement adjustments
-	$g_iDpiScale = Round(__WinAPI_GetDPIForWindow($g_hGui) / 96, 2)
-	If @error Then $g_iDpiScale = 1
-	$g_iDpi = Round(__WinAPI_GetDPIForWindow($g_hGui) / 96, 2) * 100
-	If @error Then $g_iDpi = 100
+	$__DM_g_iDpiScale = Round(_WinAPI_GetDPIForWindow($hGui) / 96, 2)
+	If @error Then $__DM_g_iDpiScale = 1
+	$__DM_g_iDpi = Round(_WinAPI_GetDPIForWindow($hGui) / 96, 2) * 100
+	If @error Then $__DM_g_iDpi = 100
 
-	$g_aMenuText = __GUIDarkMenu_GetTopMenuItems($g_hGui)
+	$__DM_g_aMenuText = __GUIDarkMenu_GetTopMenuItems($hGui)
 
-	For $i = 0 To UBound($g_aMenuText) - 1
+	For $i = 0 To UBound($__DM_g_aMenuText) - 1
 		_GUICtrlMenu_SetItemType($hMenu, $i, $MFT_OWNERDRAW, True)
 	Next
-	__GUIDarkMenu_MenuBarBKColor($hMenu, $COLOR_MENU_BG)
+	__GUIDarkMenu_MenuBarBKColor($hMenu, $__DM_g_iMenuBkColor)
 EndFunc   ;==>_GUIDarkMenu_Register
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: Nine
+; Modified.......: WildByDesign, argumentum
+; ===============================================================================================================================
 Func __GUIDarkMenu_GetTopMenuItems($hWnd)
 	Local $iItemID = 10000
 	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
@@ -2323,7 +2995,7 @@ Func __GUIDarkMenu_GetTopMenuItems($hWnd)
 		;$aList[$i][1] = _GUICtrlMenu_GetItemText($hMenu, $i)
 		; retrieve text via GetMenuStringW (works better than _GUICtrlMenu_GetItemText)
 		$tText = DllStructCreate("wchar s[256]")
-		$iLen = DllCall($__DM_g_hDllUser32, "int", "GetMenuStringW", _
+		$iLen = DllCall('user32.dll', "int", "GetMenuStringW", _
 				"handle", $hMenu, _
 				"uint", $i, _
 				"struct*", $tText, _
@@ -2339,43 +3011,54 @@ Func __GUIDarkMenu_GetTopMenuItems($hWnd)
 	Return $aList
 EndFunc   ;==>__GUIDarkMenu_GetTopMenuItems
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
 Func _GUIDarkMenu_SetColors($hWnd, $MenuBG, $MenuHot, $MenuSel, $MenuText)
 	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
-	$COLOR_MENU_BG = $MenuBG
-	$COLOR_MENU_HOT = $MenuHot
-	$COLOR_MENU_SEL = $MenuSel
-	$COLOR_MENU_TEXT = $MenuText
+	$__DM_g_iMenuBkColor = $MenuBG
+	$__DM_g_iMenuHotColor = $MenuHot
+	$__DM_g_iMenuSelColor = $MenuSel
+	$__DM_g_iMenuTextColor = $MenuText
 	; redraw menubar background area
-	__GUIDarkMenu_MenuBarBKColor($hMenu, $COLOR_MENU_BG)
+	__GUIDarkMenu_MenuBarBKColor($hMenu, $__DM_g_iMenuBkColor)
 	; redraw menubar and force refresh
 	_GUICtrlMenu_DrawMenuBar($hWnd)
-	__WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
+	_WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
 EndFunc   ;==>_GUIDarkMenu_SetColors
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkMenu_WM_WINDOWPOSCHANGED($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $iMsg, $wParam, $lParam
-	If $hWnd <> $g_hGui Then Return $GUI_RUNDEFMSG
 	__GUIDarkMenu_PaintWhiteLine($hWnd)
+
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>__GUIDarkMenu_WM_WINDOWPOSCHANGED
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: ahmet
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkMenu_PaintWhiteLine($hWnd)
-	Local $rcClient = __WinAPI_GetClientRect($hWnd)
+	; Make sure GUI has menu (needed in case of child GUIs)
+	If Not _GUICtrlMenu_GetMenu($hWnd) Then Return
 
-	DllCall($__DM_g_hDllUser32, "int", "MapWindowPoints", _
+	Local $rcClient = _WinAPI_GetClientRect($hWnd)
+
+	DllCall('user32.dll', "int", "MapWindowPoints", _
 			"hwnd", $hWnd, _ ; hWndFrom
 			"hwnd", 0, _ ; hWndTo
 			"ptr", DllStructGetPtr($rcClient), _
 			"uint", 2)   ;number of points - 2 for RECT structure
 
-	If @error Then
-		;MsgBox($MB_ICONERROR, "Error", @error)
-		Exit
-	EndIf
+	If @error Then Return
 
-	Local $rcWindow = __WinAPI_GetWindowRect($hWnd)
+	Local $rcWindow = _WinAPI_GetWindowRect($hWnd)
 
-	__WinAPI_OffsetRect($rcClient, -$rcWindow.left, -$rcWindow.top)
+	_WinAPI_OffsetRect($rcClient, -$rcWindow.left, -$rcWindow.top)
 
 	Local $rcAnnoyingLine = DllStructCreate($tagRECT)
 	$rcAnnoyingLine.left = $rcClient.left
@@ -2386,63 +3069,66 @@ Func __GUIDarkMenu_PaintWhiteLine($hWnd)
 	$rcAnnoyingLine.bottom = $rcAnnoyingLine.top
 	$rcAnnoyingLine.top = $rcAnnoyingLine.top - 1
 
-	Local $hRgn = __WinAPI_CreateRectRgn(-20000, -20000, 20000, 20000)
+	Local $hRgn = _WinAPI_CreateRectRgn(-20000, -20000, 20000, 20000)
 
-	Local $hDC = __WinAPI_GetDCEx($hWnd, $hRgn, BitOR($DCX_WINDOW, $DCX_INTERSECTRGN))
-	Local $hFullBrush = __WinAPI_CreateSolidBrush($COLOR_MENU_BG)
-	__WinAPI_FillRect($hDC, $rcAnnoyingLine, $hFullBrush)
-	__WinAPI_ReleaseDC($hWnd, $hDC)
-	__WinAPI_DeleteObject($hFullBrush)
+	Local $hDC = _WinAPI_GetDCEx($hWnd, $hRgn, BitOR($DCX_WINDOW, $DCX_INTERSECTRGN))
+	Local $hBrush = $__DM_g_hBrushGui
+	_WinAPI_FillRect($hDC, $rcAnnoyingLine, $hBrush)
+	_WinAPI_ReleaseDC($hWnd, $hDC)
 
 EndFunc   ;==>__GUIDarkMenu_PaintWhiteLine
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: ioa747
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkMenu_WM_ACTIVATE($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $iMsg, $wParam, $lParam
-	If $hWnd <> $g_hGui Then Return $GUI_RUNDEFMSG
 	__GUIDarkMenu_PaintWhiteLine($hWnd)
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>__GUIDarkMenu_WM_ACTIVATE
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: ProgAndy
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkMenu_MenuBarBKColor($hMenu, $nColor)
-	Local $tInfo, $aResult
-	Local $hBrush = DllCall($__DM_g_hDllGdi32, 'hwnd', 'CreateSolidBrush', 'int', $nColor)
-	If @error Then Return
-	;$tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;int hBack;int ContextHelpID;ptr MenuData")
-	$tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;handle hBack;int ContextHelpID;ptr MenuData")
+	#forceref $nColor
+	Local $hBrush = $__DM_g_hBrushMenuBk
+	Local $tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;handle hBack;int ContextHelpID;ptr MenuData")
 	DllStructSetData($tInfo, "Mask", 2)
-	DllStructSetData($tInfo, "hBack", $hBrush[0])
+	DllStructSetData($tInfo, "hBack", $hBrush)
 	DllStructSetData($tInfo, "Size", DllStructGetSize($tInfo))
-	$aResult = DllCall($__DM_g_hDllUser32, "int", "SetMenuInfo", "hwnd", $hMenu, "ptr", DllStructGetPtr($tInfo))
-	Return $aResult[0] <> 0
+	DllCall('user32.dll', "int", "SetMenuInfo", "hwnd", $hMenu, "ptr", DllStructGetPtr($tInfo))
 EndFunc   ;==>__GUIDarkMenu_MenuBarBKColor
 
-Func __GUIDarkMenu_ColorToCOLORREF($iColor) ;RGB to BGR
-	Local $iR = BitAND(BitShift($iColor, 16), 0xFF)
-	Local $iG = BitAND(BitShift($iColor, 8), 0xFF)
-	Local $iB = BitAND($iColor, 0xFF)
-	Return BitOR(BitShift($iB, -16), BitShift($iG, -8), $iR)
-EndFunc   ;==>__GUIDarkMenu_ColorToCOLORREF
-
+; #FUNCTION# ====================================================================================================================
+; Author.........: Nine
+; Modified.......: MattyD
+; ===============================================================================================================================
 Func __GUIDarkMenu_GUICtrlGetFont($hWnd)
 	If Not IsHWnd($hWnd) Then $hWnd = GUICtrlGetHandle($hWnd)
 	Local Const $LOGPIXELSY = 90
-	Local $aFont[6], $hDC = __WinAPI_GetDC($hWnd)
+	Local $aFont[6], $hDC = _WinAPI_GetDC($hWnd)
 	Local $hFont = _SendMessage($hWnd, $WM_GETFONT), $tFont = DllStructCreate($tagLOGFONT)
 
-	__WinAPI_GetObject($hFont, DllStructGetSize($tFont), $tFont)
+	_WinAPI_GetObject($hFont, DllStructGetSize($tFont), $tFont)
 
-	$aFont[0] = Round(-(($tFont.Height * 72) / __WinAPI_GetDeviceCaps($hDC, $LOGPIXELSY)) / 0.5) * 0.5
+	$aFont[0] = Round(-(($tFont.Height * 72) / _WinAPI_GetDeviceCaps($hDC, $LOGPIXELSY)) / 0.5) * 0.5
 	$aFont[1] = $tFont.Weight
 	$aFont[2] = BitOR(2 * ($tFont.Italic <> 0), 4 * ($tFont.Underline <> 0), 8 * ($tFont.Strikeout) <> 0)
 	$aFont[3] = $tFont.FaceName
 	$aFont[4] = $tFont.Quality
 	$aFont[5] = $hFont
 
-	__WinAPI_ReleaseDC($hWnd, $hDC)
+	_WinAPI_ReleaseDC($hWnd, $hDC)
 	Return $aFont
 EndFunc   ;==>__GUIDarkMenu_GUICtrlGetFont
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: Nine
+; ===============================================================================================================================
 Func __GUIDarkMenu_GUIGetFontSize()
 	Local $idTest = GUICtrlCreateLabel("Test", -100, -100, -1, -1)
 	Local $aFont = __GUIDarkMenu_GUICtrlGetFont($idTest)
@@ -2450,95 +3136,60 @@ Func __GUIDarkMenu_GUIGetFontSize()
 	Return $aFont
 EndFunc   ;==>__GUIDarkMenu_GUIGetFontSize
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: ???
+; ===============================================================================================================================
 Func __GUIDarkMenu_CreateFont($sFontName, $nHeight = 9, $nWidth = 400)
 	Local $stFontName = DllStructCreate("char[260]")
 	DllStructSetData($stFontName, 1, $sFontName)
-	Local $hDC = __WinAPI_GetDC(0)        ; Get the Desktops DC
-	Local $nPixel = __WinAPI_GetDeviceCaps($hDC, 90)
+	Local $hDC = _WinAPI_GetDC(0)        ; Get the Desktops DC
+	Local $nPixel = _WinAPI_GetDeviceCaps($hDC, 90)
 	$nHeight = 0 - _WinAPI_MulDiv($nHeight, $nPixel, 72)
-	__WinAPI_ReleaseDC(0, $hDC)
-	Local $hFont = __WinAPI_CreateFont($nHeight, 0, 0, 0, $nWidth, False, False, False, _
+	_WinAPI_ReleaseDC(0, $hDC)
+	Local $hFont = _WinAPI_CreateFont($nHeight, 0, 0, 0, $nWidth, False, False, False, _
 			$DEFAULT_CHARSET, $OUT_DEFAULT_PRECIS, $CLIP_DEFAULT_PRECIS, $PROOF_QUALITY, $DEFAULT_PITCH, $sFontName)
 	Return $hFont
 EndFunc   ;==>__GUIDarkMenu_CreateFont
 
-Func _MsgBoxDarkCleaup()
-	If $g_hMsgBoxSubProc Then DllCallbackFree($g_hMsgBoxSubProc)
-EndFunc   ;==>_MsgBoxDarkCleaup
-
-Func _MsgBoxProc($hWnd, $iMsg, $wParam, $lParam, $iSubClsID, $pData)
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign, MattyD
+; ===============================================================================================================================
+Func __DM_MsgBoxProc($hWnd, $iMsg, $wParam, $lParam, $iSubClsID, $pData)
 	#forceref $pData
-	Local Static $hBkColorBrush, $hFooterBrush, $hTimer
+	Local Const $DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+	Local Static $hBkColorBrush, $hFooterBrush
 
 	Switch $iMsg
 
 		Case $WM_NCCREATE
-			If $g_UseDarkMode Then __WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_USE_IMMERSIVE_DARK_MODE, True)
+			If $__DM_g_bUseDarkMode Then _WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_USE_IMMERSIVE_DARK_MODE, True)
 
 		Case $WM_INITDIALOG
-			$hBkColorBrush = __WinAPI_CreateSolidBrush($MSGBOX_BG_TOP)
-			$hFooterBrush = __WinAPI_CreateSolidBrush($MSGBOX_BG_BOTTOM)
-
-			; Store array of button text and determine button availability
-			For $i = 1 To 11
-				$g_aButtonText[$i] = ___WinAPI_GetDlgItemText($hWnd, $i)
-			Next
-
-			If $g_Timeout Then
-				$hTimer = _Timer_SetTimer($hWnd, 1000, "_TimerProc")
-
-				If $g_bShowCount Then
-					Select
-						Case $g_aButtonText[1] And Not $g_aButtonText[2]
-							; OK button
-							__WinAPI_SetDlgItemText($hWnd, $IDOK, StringFormat("%s [%d]", $g_aButtonText[1], $g_Timeout))
-
-						Case $g_aButtonText[1] And $g_aButtonText[2]
-							; OK and Cancel
-							__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-						Case $g_aButtonText[2] And $g_aButtonText[4]
-							; Retry and Cancel
-							__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-						Case $g_aButtonText[6] And $g_aButtonText[7] And $g_aButtonText[2]
-							; Yes, No and Cancel
-							__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-						Case $g_aButtonText[2] And $g_aButtonText[10] And $g_aButtonText[11]
-							; Cancel, Try Again, Continue
-							__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-						Case $g_aButtonText[3] And $g_aButtonText[4] And $g_aButtonText[5]
-							; Abort, Retry, and Ignore
-							__WinAPI_SetDlgItemText($hWnd, $IDABORT, StringFormat("%s [%d]", $g_aButtonText[3], $g_Timeout))
-					EndSelect
-				EndIf
-			EndIf
-
-			If $g_bUseMica And @OSBuild >= 22621 Then
-				__WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_SYSTEMBACKDROP_TYPE, $g_iMaterial)
-				__WinAPI_DwmExtendFrameIntoClientArea($hWnd, _WinAPI_CreateMargins(-1, -1, -1, -1))
-			EndIf
+			$hBkColorBrush = $__DM_g_hBrushMsgBoxTop
+			$hFooterBrush = $__DM_g_hBrushMsgBoxBottom
 
 		Case $WM_CTLCOLORSTATIC, $WM_CTLCOLORDLG
-			If $g_UseDarkMode Then
-				__WinAPI_SetBkMode($wParam, $TRANSPARENT)
-				__WinAPI_SetTextColor($wParam, $MSGBOX_TEXT)
+			If $__DM_g_bUseDarkMode Then
+				_WinAPI_SetBkMode($wParam, $TRANSPARENT)
+				_WinAPI_SetTextColor($wParam, $__DM_g_iMsgBoxTextColor)
 				Return $hBkColorBrush
 			EndIf
 
 		Case $WM_CTLCOLORBTN
-			If $g_UseDarkMode And Not $g_iMaterial Then Return $hFooterBrush
+			If $__DM_g_bUseDarkMode Then
+				_WinAPI_SetTextColor($wParam, $__DM_g_iMsgBoxBottomColor)
+				Return $hFooterBrush
+			EndIf
 
 		Case $WM_PAINT
-			If $g_UseDarkMode Then
+			If $__DM_g_bUseDarkMode Then
 				Local $tPS = DllStructCreate($tagPAINTSTRUCT)
-				Local $hDC = __WinAPI_BeginPaint($hWnd, $tPS)
+				Local $hDC = _WinAPI_BeginPaint($hWnd, $tPS)
 				Local $tPaintRect = DllStructCreate($tagRECT, DllStructGetPtr($tPS, "rPaint"))
-				$tPaintRect.Top = ($tPaintRect.Bottom - (48 * $g_iMsgBoxDpi)) ; this depends on DPI scale
-				__WinAPI_FillRect($hDC, $tPaintRect, $hFooterBrush)
-				__WinAPI_EndPaint($hWnd, $tPS)
+				$tPaintRect.Top = ($tPaintRect.Bottom - (48 * $__DM_g_iMsgBoxDpi)) ; this depends on DPI scale
+				_WinAPI_FillRect($hDC, $tPaintRect, $hFooterBrush)
+				_WinAPI_EndPaint($hWnd, $tPS)
 				Return True
 			EndIf
 
@@ -2546,269 +3197,231 @@ Func _MsgBoxProc($hWnd, $iMsg, $wParam, $lParam, $iSubClsID, $pData)
 			Local $iNotifCode = _WinAPI_HiWord($wParam)
 			Local $iItemID = _WinAPI_LoWord($wParam)
 			If (Not $lParam) Or ($iNotifCode = $BN_CLICKED) Then
-				Return _Dialog_EndDialog($hWnd, $iItemID)
+				Return _WinAPI_EndDialog($hWnd, $iItemID)
 			EndIf
 
 		Case $WM_DESTROY
-			_Timer_KillTimer($hWnd, $hTimer)
-			__WinAPI_RemoveWindowSubclass($hWnd, $g_pMsgBoxSubProc, $iSubClsID)
-			__WinAPI_SetActiveWindow(__WinAPI_GetParent($hWnd))
-			__WinAPI_DeleteObject($hBkColorBrush)
-			__WinAPI_DeleteObject($hFooterBrush)
-
-		Case $WM_NOTIFY
-			If Not $g_UseDarkMode Or Not $g_iMaterial Then Return $CDRF_NOTIFYPOSTPAINT
-			Local $tInfo = DllStructCreate($tagNMCUSTOMDRAWINFO, $lParam)
-			If __WinAPI_GetClassName($tInfo.hWndFrom) = "Button" And $tInfo.Code = $NM_CUSTOMDRAW Then
-				Local $tRect = DllStructCreate($tagRECT, DllStructGetPtr($tInfo, "left"))
-				Switch $tInfo.DrawStage
-					Case $CDDS_PREPAINT
-						Local $hBrush
-						If BitAND($tInfo.ItemState, $CDIS_HOT) Then
-							$hBrush = __WinAPI_CreateSolidBrush(__WinAPI_ColorAdjustLuma($MSGBOX_BG_BUTTON, 20))
-						EndIf
-						If BitAND($tInfo.ItemState, $CDIS_SELECTED) Then
-							$hBrush = __WinAPI_CreateSolidBrush(__WinAPI_ColorAdjustLuma($MSGBOX_BG_BUTTON, 15))
-						EndIf
-						If BitAND($tInfo.ItemState, $CDIS_DISABLED) Then
-							$hBrush = __WinAPI_CreateSolidBrush(__WinAPI_ColorAdjustLuma($MSGBOX_BG_BUTTON, 5))
-						EndIf
-						If Not BitAND($tInfo.ItemState, $CDIS_HOT) And Not BitAND($tInfo.ItemState, $CDIS_SELECTED) And Not BitAND($tInfo.ItemState, $CDIS_DISABLED) Then
-							$hBrush = __WinAPI_CreateSolidBrush(__WinAPI_ColorAdjustLuma($MSGBOX_BG_BUTTON, 10))
-						EndIf
-						__WinAPI_FillRect($tInfo.hDC, $tRect, $hBrush)
-						__WinAPI_DeleteObject($hBrush)
-						Return $CDRF_NOTIFYPOSTPAINT
-				EndSwitch
-			EndIf
-
+			_WinAPI_RemoveWindowSubclass($hWnd, $__DM_g_pMsgBoxSubProc, $iSubClsID)
+			_WinAPI_SetActiveWindow(_WinAPI_GetParent($hWnd))
 	EndSwitch
 	Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-EndFunc   ;==>_MsgBoxProc
+EndFunc   ;==>__DM_MsgBoxProc
 
-Func _TimerProc($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $iMsg, $wParam, $lParam
-	If Not _WinAPI_IsWindow($hWnd) Then Return
-	$g_Timeout -= 1
-
-	If $g_bShowCount Then
-		Select
-			Case $g_aButtonText[1] And Not $g_aButtonText[2]
-				; OK button
-				__WinAPI_SetDlgItemText($hWnd, $IDOK + 1, StringFormat("%s [%d]", $g_aButtonText[1], $g_Timeout))
-
-			Case $g_aButtonText[1] And $g_aButtonText[2]
-				; OK and Cancel
-				__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-			Case $g_aButtonText[2] And $g_aButtonText[4]
-				; Retry and Cancel
-				__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-			Case $g_aButtonText[6] And $g_aButtonText[7] And $g_aButtonText[2]
-				; Yes, No and Cancel
-				__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-			Case $g_aButtonText[2] And $g_aButtonText[10] And $g_aButtonText[11]
-				; Cancel, Try Again, Continue
-				__WinAPI_SetDlgItemText($hWnd, $IDCANCEL, StringFormat("%s [%d]", $g_aButtonText[2], $g_Timeout))
-
-			Case $g_aButtonText[3] And $g_aButtonText[4] And $g_aButtonText[5]
-				; Abort, Retry, and Ignore
-				__WinAPI_SetDlgItemText($hWnd, $IDABORT, StringFormat("%s [%d]", $g_aButtonText[3], $g_Timeout))
-		EndSelect
-	EndIf
-EndFunc   ;==>_TimerProc
-
-Func _CBTHookProc($nCode, $wParam, $lParam)
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign, MattyD
+; ===============================================================================================================================
+Func __DM_CBTHookProc($nCode, $wParam, $lParam)
 	Local Const $hWnd = HWnd($wParam)
-	If $nCode < 0 Then Return __WinAPI_CallNextHookEx($g_hMsgBoxHook, $nCode, $wParam, $lParam)
+	If $nCode < 0 Then Return _WinAPI_CallNextHookEx($__DM_g_hMsgBoxHook, $nCode, $wParam, $lParam)
 	Switch $nCode
 		Case $HCBT_CREATEWND
-			Switch __WinAPI_GetClassName($hWnd)
+			Switch _WinAPI_GetClassName($hWnd)
 				Case "#32770"
-					__WinAPI_SetWindowSubclass($hWnd, $g_pMsgBoxSubProc, 1000)
+					_WinAPI_SetWindowSubclass($hWnd, $__DM_g_pMsgBoxSubProc, 1000)
 				Case "Button"
-					If $g_UseDarkMode Then
-						If $g_b24H2Plus Then
-							__WinAPI_SetWindowTheme($hWnd, "DarkMode_DarkTheme")
-						Else
-							__WinAPI_SetWindowTheme($hWnd, "DarkMode_Explorer")
-						EndIf
+					If $__DM_g_bUseDarkMode Then
+						Local $sThemeName = $__DM_g_b24H2Plus ? 'DarkMode_DarkTheme' : 'DarkMode_Explorer'
+						_WinAPI_SetWindowTheme($hWnd, $sThemeName)
 					EndIf
 			EndSwitch
 	EndSwitch
-	Return __WinAPI_CallNextHookEx($g_hMsgBoxHook, $nCode, $wParam, $lParam)
-EndFunc   ;==>_CBTHookProc
+	Return _WinAPI_CallNextHookEx($__DM_g_hMsgBoxHook, $nCode, $wParam, $lParam)
+EndFunc   ;==>__DM_CBTHookProc
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign, MattyD, argumentum
+; ===============================================================================================================================
 Func _GUIDarkTheme_MsgBox($iFlag, $sTitle, $sText, $iTimeout = 0, $hParentHWND = "")
-	If Not $g_hMsgBoxSubProc Then $g_hMsgBoxSubProc = DllCallbackRegister("_MsgBoxProc", "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
-	If Not $g_pMsgBoxSubProc Then $g_pMsgBoxSubProc = DllCallbackGetPtr($g_hMsgBoxSubProc)
+	If Not $__DM_g_hMsgBoxSubProc Then $__DM_g_hMsgBoxSubProc = DllCallbackRegister(__DM_MsgBoxProc, "lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
+	If Not $__DM_g_pMsgBoxSubProc Then $__DM_g_pMsgBoxSubProc = DllCallbackGetPtr($__DM_g_hMsgBoxSubProc)
 	; check for any DPI changes
-	$g_iMsgBoxDpi = Round(__WinAPI_GetDPI() / 96, 2)
-	If @error Then $g_iMsgBoxDpi = 1
-	$g_UseDarkMode = __WinAPI_ShouldAppsUseDarkMode()
-	$g_bMsgBoxInitialized = False
+	$__DM_g_iMsgBoxDpi = Round(_WinAPI_GetDPI() / 96, 2)
+	If @error Then $__DM_g_iMsgBoxDpi = 1
+	$__DM_g_bUseDarkMode = _WinAPI_ShouldAppsUseDarkMode()
+	$__DM_g_bMsgBoxInitialized = False
 	If $iFlag = Default Then $iFlag = BitOR($MB_TOPMOST, $MB_ICONINFORMATION)
-	$g_Timeout = $iTimeout
-	Local $hMsgProc = DllCallbackRegister("_CBTHookProc", "int", "uint;wparam;lparam")
-	Local Const $hThreadID = __WinAPI_GetCurrentThreadId()
-	$g_hMsgBoxHook = __WinAPI_SetWindowsHookEx($WH_CBT, DllCallbackGetPtr($hMsgProc), Null, $hThreadID)
+	Local $hMsgProc = DllCallbackRegister(__DM_CBTHookProc, "int", "uint;wparam;lparam")
+	Local Const $hThreadID = _WinAPI_GetCurrentThreadId()
+	$__DM_g_hMsgBoxHook = _WinAPI_SetWindowsHookEx($WH_CBT, DllCallbackGetPtr($hMsgProc), Null, $hThreadID)
 	If $sTitle = Default Then $sTitle = "Information"
 	Local Const $iReturn = MsgBox($iFlag, $sTitle, $sText, $iTimeout, $hParentHWND)
-	If $g_hMsgBoxHook Then __WinAPI_UnhookWindowsHookEx($g_hMsgBoxHook)
+	If $__DM_g_hMsgBoxHook Then _WinAPI_UnhookWindowsHookEx($__DM_g_hMsgBoxHook)
 	DllCallbackFree($hMsgProc)
+	While GUIGetMsg()
+	WEnd
 	Return $iReturn
 EndFunc   ;==>_GUIDarkTheme_MsgBox
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _GUIDarkTheme_MsgBoxSet
-; Description ...: Sets custom colors and materials
-; Syntax ........: _GUIDarkTheme_MsgBoxSet($iBgColorTop, $iBgColorBottom, $iBgColorButton, $bShowCount, $iMaterial)
-; Parameters ....: $iBgColorTop       - [optional] 0xRRGGBB (RGB value). Default is $MSGBOX_BG_TOP.
-;                  $iBgColorBottom    - [optional] 0xRRGGBB (RGB value). Default is $MSGBOX_BG_BOTTOM.
-;                  $iBgColorButton 	  - [optional] 0xRRGGBB (RGB value). Default is $MSGBOX_BG_BUTTON.
-;                  $bShowCount 	      - [optional] Boolean. Default is True.
-;                  $iMaterial 	      - [optional] Integer. Default is blank. Options below:
-;                                     - $DWMSBT_AUTO               ; Default (Auto)
-;                                     - $DWMSBT_NONE               ; None
-;                                     - $DWMSBT_MAINWINDOW         ; Mica
-;                                     - $DWMSBT_TRANSIENTWINDOW    ; Acrylic
-;                                     - $DWMSBT_TABBEDWINDOW       ; Mica Alt (Tabbed)
+; Description ...: Sets custom colors
+; Syntax ........: _GUIDarkTheme_MsgBoxSet($iBgColorTop, $iBgColorBottom, $iBgColorButton)
+; Parameters ....: $iBgColorTop       - [optional] 0xRRGGBB (RGB value). Default is $__DM_g_iMsgBoxTopColor.
+;                  $iBgColorBottom    - [optional] 0xRRGGBB (RGB value). Default is $__DM_g_iMsgBoxBottomColor.
+;                  $iBgColorButton 	  - [optional] 0xRRGGBB (RGB value). Default is $__DM_g_iMsgBoxButtonColor.
 ; Return values .: None
 ; Author ........: WildByDesign
-; Remarks .......: Windows 11 material effects look best with background values between 0x000000 and 0x202020
-; Related .......:
-; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _GUIDarkTheme_MsgBoxSet($iBgColorTop = Default, $iBgColorBottom = Default, $iBgColorButton = Default, $bShowCount = Default, $iMaterial = Default)
-	If $iBgColorTop <> Default Then $MSGBOX_BG_TOP = __WinAPI_SwitchColor($iBgColorTop)
-	If $iBgColorBottom <> Default Then $MSGBOX_BG_BOTTOM = __WinAPI_SwitchColor($iBgColorBottom)
-	If $iBgColorButton <> Default Then $MSGBOX_BG_BUTTON = __WinAPI_SwitchColor($iBgColorButton)
-	If $bShowCount <> Default Then $g_bShowCount = $bShowCount
-	If $iMaterial <> Default And $iMaterial <> "" And @OSBuild >= 22621 Then
-		$g_bUseMica = True
-		$g_iMaterial = $iMaterial
-	EndIf
+Func _GUIDarkTheme_MsgBoxSet($iBgColorTop = Default, $iBgColorBottom = Default, $iBgColorButton = Default)
+	If $iBgColorTop <> Default Then $__DM_g_iMsgBoxTopColor = _WinAPI_SwitchColor($iBgColorTop)
+	If $iBgColorBottom <> Default Then $__DM_g_iMsgBoxBottomColor = _WinAPI_SwitchColor($iBgColorBottom)
+	If $iBgColorButton <> Default Then $__DM_g_iMsgBoxButtonColor = _WinAPI_SwitchColor($iBgColorButton)
 EndFunc   ;==>_GUIDarkTheme_MsgBoxSet
 
-Func _Dialog_EndDialog($hWnd, $iReturn)
-	Local $aCall = DllCall($__DM_g_hDllUser32, "bool", "EndDialog", "hwnd", $hWnd, "int_ptr", $iReturn)
+; #FUNCTION# ====================================================================================================================
+; Author.........: MattyD
+; ===============================================================================================================================
+Func _WinAPI_EndDialog($hWnd, $iReturn)
+	Local $aCall = DllCall('user32.dll', "bool", "EndDialog", "hwnd", $hWnd, "int_ptr", $iReturn)
 	If @error Then Return SetError(@error, @extended, False)
 	Return $aCall[0]
-EndFunc   ;==>_Dialog_EndDialog
+EndFunc   ;==>_WinAPI_EndDialog
 
-Func __WinAPI_GetDPI($hWnd = 0) ; UEZ
-	$hWnd = Not $hWnd ? _WinAPI_GetDesktopWindow() : $hWnd
-	Local Const $hDC = __WinAPI_GetDC($hWnd)
-	If @error Then Return SetError(1, 0, 0)
-	Local Const $iDPI = __WinAPI_GetDeviceCaps($hDC, $LOGPIXELSX)
-	If @error Or Not $iDPI Then
-		__WinAPI_ReleaseDC($hWnd, $hDC)
-		Return SetError(2, 0, 0)
-	EndIf
-	__WinAPI_ReleaseDC($hWnd, $hDC)
-	Return $iDPI
-EndFunc   ;==>__WinAPI_GetDPI
-
-Func ___WinAPI_GetDlgItemText($hDlg, $iDlgItem)
-	Local $hCtrl, $iBuffLen, $tBuff, $sResult = ""
-	$hCtrl = __WinAPI_GetDlgItem($hDlg, $iDlgItem)
-	If Not @error Then $iBuffLen = __SendMessage($hCtrl, $WM_GETTEXTLENGTH)
-	If Not @error Then
-		$tBuff = DllStructCreate(StringFormat("wchar[%d]", $iBuffLen + 1))
-		__SendMessage($hCtrl, $WM_GETTEXT, $iBuffLen + 1, DllStructGetPtr($tBuff))
-		If Not @error Then $sResult = DllStructGetData($tBuff, 1)
-	EndIf
-	Return SetError(@error, @extended, $sResult)
-EndFunc   ;==>___WinAPI_GetDlgItemText
-
-Func __WinAPI_SetDlgItemText($hDlg, $nIDDlgItem, $lpString) ;https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setdlgitemtextw
-	Local $aRet = DllCall($__DM_g_hDllUser32, "int", "SetDlgItemText", "hwnd", $hDlg, "int", $nIDDlgItem, "str", $lpString)
-	If @error Then Return SetError(@error, @extended, 0)
-	Return $aRet[0]
-EndFunc   ;==>__WinAPI_SetDlgItemText
-
-Func __GUIDarkTheme_AddToSubclass($hCtrl, $pSubclassProc, $idSubClass)
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_AddToSubclass($hCtrl, $hSubclassProc, $pSubclassProc, $idSubClass, $pData = "")
 	If $hCtrl Then
-		$g_aControls[$g_iControlCount][0] = $hCtrl            ; hWnd
-		$g_aControls[$g_iControlCount][1] = $pSubclassProc    ; pSubclassProc
-		$g_aControls[$g_iControlCount][2] = $idSubClass       ; idSubClass
+		; Авто-расширение реестра. Без этого при заполнении [150] запись по индексу 150
+		; выходит за границы массива и роняет приложение фатальной ошибкой. Реестр растёт,
+		; пока режим темы не сменится (dark<->light) — тогда SubclassCleanup сбрасывает его.
+		If $__DM_g_iControlCount >= UBound($__DM_g_aControls) Then _
+			ReDim $__DM_g_aControls[$__DM_g_iControlCount + 50][4]
+		$__DM_g_aControls[$__DM_g_iControlCount][0] = $hCtrl            ; hWnd
+		$__DM_g_aControls[$__DM_g_iControlCount][1] = $hSubclassProc    ; hSubclassProc
+		$__DM_g_aControls[$__DM_g_iControlCount][2] = $pSubclassProc    ; pSubclassProc
+		$__DM_g_aControls[$__DM_g_iControlCount][3] = $idSubClass       ; idSubClass
 
 		Switch $pSubclassProc
-			Case $g_pUpDownSub
-				__WinAPI_SetWindowSubclass($hCtrl, DllCallbackGetPtr($g_pUpDownSub), $g_iControlCount)
-			Case $g_pSubclassProc
-				__WinAPI_SetWindowSubclass($hCtrl, DllCallbackGetPtr($g_pSubclassProc), $g_iControlCount)
-			Case $g_pTabProc
-				__WinAPI_SetWindowSubclass($hCtrl, DllCallbackGetPtr($g_pTabProc), $g_iControlCount)
-			Case $g_pSizeboxProc
-				__WinAPI_SetWindowSubclass($hCtrl, DllCallbackGetPtr($g_pSizeboxProc), $g_iControlCount)
+			Case $__DM_g_pUpDownSub
+				_WinAPI_SetWindowSubclass($hCtrl, $__DM_g_pUpDownSub, $__DM_g_iControlCount)
+			Case $__DM_g_pSubclassProc
+				_WinAPI_SetWindowSubclass($hCtrl, $__DM_g_pSubclassProc, $__DM_g_iControlCount)
+			Case $__DM_g_pTabProc
+				_WinAPI_SetWindowSubclass($hCtrl, $__DM_g_pTabProc, $__DM_g_iControlCount)
+			Case $__DM_g_pSizeboxProc
+				_WinAPI_SetWindowSubclass($hCtrl, $__DM_g_pSizeboxProc, $__DM_g_iControlCount)
+			Case $__DM_g_pButtonProc
+				_WinAPI_SetWindowSubclass($hCtrl, $__DM_g_pButtonProc, $__DM_g_iControlCount, $pData)
+			Case $__DM_g_pGroupProc
+				_WinAPI_SetWindowSubclass($hCtrl, $__DM_g_pGroupProc, $__DM_g_iControlCount)
 		EndSwitch
 
-		$g_iControlCount += 1
+		$__DM_g_iControlCount += 1
 	EndIf
 EndFunc   ;==>__GUIDarkTheme_AddToSubclass
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_SubclassCleanup()
-	Local $hCtrl, $pSubclassProc, $idSubClass
+	Local $hCtrl, $hSubclassProc, $pSubclassProc, $idSubClass
+	#forceref $hSubclassProc
 	; Remove all subclasses
-	For $i = 0 To $g_iControlCount - 1
-		$hCtrl = $g_aControls[$i][0]
-		$pSubclassProc = $g_aControls[$i][1]
-		$idSubClass = $g_aControls[$i][2]
+	For $i = 0 To $__DM_g_iControlCount - 1
+		$hCtrl = $__DM_g_aControls[$i][0]
+		$hSubclassProc = $__DM_g_aControls[$i][1]
+		$pSubclassProc = $__DM_g_aControls[$i][2]
+		$idSubClass = $__DM_g_aControls[$i][3]
 		If $hCtrl Then
-			__WinAPI_RemoveWindowSubclass($hCtrl, DllCallbackGetPtr($pSubclassProc), $idSubClass)
+			_WinAPI_RemoveWindowSubclass($hCtrl, $pSubclassProc, $idSubClass)
 		EndIf
 	Next
-	If $g_pUpDownSub Then DllCallbackFree($g_pUpDownSub)
-	$g_pUpDownSub = 0
-	If $g_pSubclassProc Then DllCallbackFree($g_pSubclassProc)
-	$g_pSubclassProc = 0
-	If $g_pTabProc Then DllCallbackFree($g_pTabProc)
-	$g_pTabProc = 0
-	If $g_pSizeboxProc Then DllCallbackFree($g_pSizeboxProc)
-	$g_pSizeboxProc = 0
+
+	If $__DM_g_hGroupProc Then DllCallbackFree($__DM_g_hGroupProc)
+	$__DM_g_hGroupProc = 0
+	$__DM_g_pGroupProc = 0
+	If $__DM_g_hButtonProc Then DllCallbackFree($__DM_g_hButtonProc)
+	$__DM_g_hButtonProc = 0
+	$__DM_g_pButtonProc = 0
+	If $__DM_g_hUpDownSub Then DllCallbackFree($__DM_g_hUpDownSub)
+	$__DM_g_hUpDownSub = 0
+	$__DM_g_pUpDownSub = 0
+	If $__DM_g_hSubclassProc Then DllCallbackFree($__DM_g_hSubclassProc)
+	$__DM_g_hSubclassProc = 0
+	$__DM_g_pSubclassProc = 0
+	If $__DM_g_hTabProc Then DllCallbackFree($__DM_g_hTabProc)
+	$__DM_g_hTabProc = 0
+	$__DM_g_pTabProc = 0
+	If $__DM_g_hSizeboxProc Then DllCallbackFree($__DM_g_hSizeboxProc)
+	$__DM_g_hSizeboxProc = 0
+	$__DM_g_pSizeboxProc = 0
 	; reset array
-	Global $g_aControls[150][3] = [[0, 0, 0]]
-	$g_iControlCount = 0
+	Global $__DM_g_aControls[150][4] = [[0, 0, 0, 0]]
+	$__DM_g_iControlCount = 0
+	; clear date time picker subclasses
+	If $__DM_g_hDateProcOld Then
+		For $i = 0 To UBound($__DM_g_a_hDateTime) - 1
+			_WinAPI_SetWindowLong($__DM_g_a_hDateTime[$i], $GWL_WNDPROC, $__DM_g_hDateProcOld)
+		Next
+		$__DM_g_hDateProcOld = 0
+	EndIf
+	If $__DM_g_hDateProc Then
+		DllCallbackFree($__DM_g_hDateProc)
+		$__DM_g_hDateProc = 0
+		$__DM_g_pDateProc = 0
+	EndIf
 EndFunc   ;==>__GUIDarkTheme_SubclassCleanup
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
 Func __GUIDarkTheme_SubclassProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 	#forceref $iID, $pData
-	Local $hDC, $sClass, $iRet, $tRect
+	Local $hDC, $sClass, $iRet, $tRect, $hBrush
 	Switch $iMsg
+		Case $WM_CTLCOLORLISTBOX
+			$hDC = $wParam
+			_WinAPI_SetTextColor($hDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+			$hBrush = $__DM_g_hBrushCtrl
+			_WinAPI_SetBkColor($hDC, _WinAPI_SwitchColor($__DM_g_iCtrlBkColor))
+			_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+			Return $hBrush
+
+		Case $WM_CTLCOLOREDIT
+			$hDC = $wParam
+			_WinAPI_SetTextColor($hDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+			_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+			$hBrush = $__DM_g_hBrushCtrl
+			Return $hBrush
+
 		Case $WM_NOTIFY
-			If Not $g_UseDarkMode Then Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+			If Not $__DM_g_bUseDarkMode Then Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 			Local $tNMHDR = DllStructCreate($tagNMHDR, $lParam)
 			Local $hFrom = $tNMHDR.hWndFrom
 			Local $iCode = $tNMHDR.Code
 			If $iCode = $NM_CUSTOMDRAW Then
-				Local $tNMCD = DllStructCreate($tagNMCUSTOMDRAW, $lParam)
+				Local $tNMCD = DllStructCreate($__DM_tagNMCUSTOMDRAW, $lParam)
 				Local $dwStage = $tNMCD.dwDrawStage
 				$hDC = $tNMCD.hdc
-				Switch __WinAPI_GetClassName($hFrom)
+				Switch _WinAPI_GetClassName($hFrom)
 					Case "sysheader32"
 						Switch $dwStage
 							Case $CDDS_PREPAINT
 								Return $CDRF_NOTIFYITEMDRAW
 							Case $CDDS_ITEMPREPAINT
-								__WinAPI_SetTextColor($hDC, _ColorToCOLORREF($COLOR_TEXT_LIGHT))
+								_WinAPI_SetTextColor($hDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+								_WinAPI_SetBkColor($hDC, _WinAPI_SwitchColor(0x000000))
 								Return BitOR($CDRF_NEWFONT, $CDRF_NOTIFYPOSTPAINT)
 						EndSwitch
 				EndSwitch
 			EndIf
 
 		Case $WM_PAINT
-			$sClass = __WinAPI_GetClassName($hWnd)
+			$sClass = _WinAPI_GetClassName($hWnd)
 			If $sClass = "syslistview32" Or $sClass = "systreeview32" Or $sClass = "edit" Then
 				$iRet = __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-				Local $iWinStyle = __WinAPI_GetWindowLong($hWnd, $GWL_STYLE)
+				Local $iWinStyle = _WinAPI_GetWindowLong($hWnd, $GWL_STYLE)
 				If BitAND($iWinStyle, $WS_HSCROLL) And BitAND($iWinStyle, $WS_VSCROLL) Then
-					$hDC = __WinAPI_GetWindowDC($hWnd)
-					_PaintSizeBox($hWnd, $hDC)
-					__WinAPI_ReleaseDC($hWnd, $hDC)
+					$hDC = _WinAPI_GetWindowDC($hWnd)
+					__GUIDarkTheme_PaintSizeBox($hWnd, $hDC)
+					_WinAPI_ReleaseDC($hWnd, $hDC)
 				EndIf
 				Return $iRet
 			Else
@@ -2818,29 +3431,39 @@ Func __GUIDarkTheme_SubclassProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 		Case $WM_NCPAINT
 			; WS_EX_CLIENTEDGE border is drawn in WM_NCPAINT (non-client area), not WM_CTLCOLOR.
 			; We let Windows draw the default frame first, then overdraw it with our dark border.
-			Local $iBorderColor
-			$sClass = __WinAPI_GetClassName($hWnd)
+			Local $hPen
+			$sClass = _WinAPI_GetClassName($hWnd)
 			If _IsBorderedControl($sClass) Then
 				$iRet = __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-				$hDC = __WinAPI_GetWindowDC($hWnd)
-				$tRect = __WinAPI_GetWindowRect($hWnd)
+				$hDC = _WinAPI_GetWindowDC($hWnd)
+				$tRect = _WinAPI_GetWindowRect($hWnd)
 				Local $iW = $tRect.Right - $tRect.Left
 				Local $iH = $tRect.Bottom - $tRect.Top
-				If $g_UseDarkMode Then
-					$iBorderColor = (__WinAPI_GetFocus() = $hWnd) ? $COLOR_BORDER_LIGHT : $COLOR_BORDER
+				If $__DM_g_bShowCtrlBorder Then
+					$hPen = $__DM_g_bUseDarkMode ? $__DM_g_hPenBorder : $__DM_g_hPenBorderSel
 				Else
-					$iBorderColor = (__WinAPI_GetFocus() = $hWnd) ? 0x0067c0 : $COLOR_BORDER_LIGHT
+					$hPen = $__DM_g_hPenGui
 				EndIf
-				Local $hPen = __WinAPI_CreatePen(0, 1, _ColorToCOLORREF($iBorderColor))
-				Local $hOldPen = __WinAPI_SelectObject($hDC, $hPen)
-				Local $hNull = __WinAPI_GetStockObject(5)
-				Local $hOldBr = __WinAPI_SelectObject($hDC, $hNull)
-				DllCall($__DM_g_hDllGdi32, "bool", "Rectangle", "handle", $hDC, "int", 0, "int", 0, "int", $iW, "int", $iH)
-				__WinAPI_SelectObject($hDC, $hOldPen)
-				__WinAPI_SelectObject($hDC, $hOldBr)
-				__WinAPI_DeleteObject($hPen)
-				_PaintSizeBox($hWnd, $hDC)
-				__WinAPI_ReleaseDC($hWnd, $hDC)
+				Local $hOldPen = _WinAPI_SelectObject($hDC, $hPen)
+				Local $hNull = _WinAPI_GetStockObject(5)
+				Local $hOldBr = _WinAPI_SelectObject($hDC, $hNull)
+				DllCall('gdi32.dll', "bool", "Rectangle", "handle", $hDC, "int", 0, "int", 0, "int", $iW, "int", $iH)
+				Local $hPen2 = (_WinAPI_GetFocus() = $hWnd) ? $__DM_g_hPen2Accent : $__DM_g_bUseDarkMode ? $__DM_g_hPen2Border : $__DM_g_hPen2BorderSel
+				Local $hOldPen2 = _WinAPI_SelectObject($hDC, $hPen2)
+				If _WinAPI_GetClassName($hWnd) = "Edit" Then
+					If $__DM_g_bShowEditActive Then _WinAPI_DrawLine($hDC, 0, $iH - 1, $tRect.Right, $iH - 1)
+				EndIf
+				Local $hPen3 = (_WinAPI_GetFocus() = $hWnd) ? $__DM_g_hPenAccent : $__DM_g_hPenGui
+				Local $hOldPen3 = _WinAPI_SelectObject($hDC, $hPen3)
+				If _WinAPI_GetClassName($hWnd) = "Edit" And _WinAPI_GetFocus() <> $hWnd Then
+					If $__DM_g_bShowEditActive Then _WinAPI_DrawLine($hDC, 0, $iH - 1, $tRect.Right, $iH - 1)
+				EndIf
+				_WinAPI_SelectObject($hDC, $hOldPen)
+				_WinAPI_SelectObject($hDC, $hOldBr)
+				_WinAPI_SelectObject($hDC, $hOldPen2)
+				_WinAPI_SelectObject($hDC, $hOldPen3)
+				__GUIDarkTheme_PaintSizeBox($hWnd, $hDC)
+				_WinAPI_ReleaseDC($hWnd, $hDC)
 				Return $iRet
 			EndIf
 
@@ -2848,55 +3471,62 @@ Func __GUIDarkTheme_SubclassProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 			; Scrollbar hot-tracking animates via WM_TIMER and paints the sizebox directly,
 			; bypassing both WM_PAINT and WM_NCPAINT.  Re-stamp the corner on every NC mouse
 			; move so the dark fill is never lost while the cursor is over the control.
-			$sClass = __WinAPI_GetClassName($hWnd)
+			$sClass = _WinAPI_GetClassName($hWnd)
 			If $sClass = "edit" Or $sClass = "listbox" Or $sClass = "syslistview32" Or $sClass = "systreeview32" Then
 				$iRet = __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
-				$hDC = __WinAPI_GetWindowDC($hWnd)
-				_PaintSizeBox($hWnd, $hDC)
-				__WinAPI_ReleaseDC($hWnd, $hDC)
+				$hDC = _WinAPI_GetWindowDC($hWnd)
+				__GUIDarkTheme_PaintSizeBox($hWnd, $hDC)
+				_WinAPI_ReleaseDC($hWnd, $hDC)
 				Return $iRet
 			EndIf
 
-		Case $WM_SETFOCUS, $WM_KILLFOCUS
-			$sClass = __WinAPI_GetClassName($hWnd)
-			If _IsBorderedControl($sClass) Then
-				; Trigger WM_NCPAINT to redraw border with updated focus color
-				__WinAPI_SetWindowPos($hWnd, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
-			EndIf
 		Case $WM_NCCALCSIZE ;generate non-client area to ensure borders are not overpainted because no WS_EX_CLIENTEDGE
-			$sClass = __WinAPI_GetClassName($hWnd)
+			$sClass = _WinAPI_GetClassName($hWnd)
 			If _IsBorderedControl($sClass) And $wParam Then
 				$iRet = __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 				$tRect = DllStructCreate($tagRECT, $lParam)
+				If $sClass = "ListBox" Then Return $iRet
 				$tRect.left += 1
 				$tRect.top += 1
 				$tRect.right -= 1
-				$tRect.bottom -= 1
+				If $sClass = "Edit" Then
+					$tRect.bottom -= $__DM_g_bShowEditActive ? 2 : 1
+				Else
+					$tRect.bottom -= 1
+				EndIf
+
 				Return $iRet
 			EndIf
 	EndSwitch
 	Return __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>__GUIDarkTheme_SubclassProc
 
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
 Func _IsBorderedControl($sClass)
-	Return ($sClass = "edit" Or $sClass = "listbox" Or $sClass = "syslistview32" Or $sClass = "systreeview32" Or $sClass = "combobox")
+	Return ($sClass = "edit" Or $sClass = "listbox" Or $sClass = "syslistview32" Or $sClass = "systreeview32")
 EndFunc   ;==>_IsBorderedControl
 
-Func _PaintSizeBox($hWnd, $hDC)
-	Local $iWinStyle = __WinAPI_GetWindowLong($hWnd, $GWL_STYLE)
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_PaintSizeBox($hWnd, $hDC)
+	Local $iWinStyle = _WinAPI_GetWindowLong($hWnd, $GWL_STYLE)
 
 	; Only proceed if both horizontal and vertical scrollbars are active
 	If Not (BitAND($iWinStyle, $WS_HSCROLL) And BitAND($iWinStyle, $WS_VSCROLL)) Then Return False
 
 	; 1. Retrieve exact Window and Client dimensions
-	Local $tRW = __WinAPI_GetWindowRect($hWnd)
-	Local $tRC = __WinAPI_GetClientRect($hWnd)
+	Local $tRW = _WinAPI_GetWindowRect($hWnd)
+	Local $tRC = _WinAPI_GetClientRect($hWnd)
 
 	; 2. Map Client coordinates to Window-DC space
 	Local $tPoint = DllStructCreate($tagPOINT)
 	$tPoint.X = 0
 	$tPoint.Y = 0
-	__WinAPI_ClientToScreen($hWnd, $tPoint)
+	_WinAPI_ClientToScreen($hWnd, $tPoint)
 
 	; Calculate border offsets
 	Local $iOffL = $tPoint.X - $tRW.Left
@@ -2917,21 +3547,23 @@ Func _PaintSizeBox($hWnd, $hDC)
 	$tCorner.Right = $iWinW - $iOffL
 	$tCorner.Bottom = $iWinH - $iOffT
 
-	; Adjust for ListView the size of the box
-	If __WinAPI_GetClassName($hWnd) = "SysListView32" Then
-		$tCorner.Right += 1
-		$tCorner.Bottom += 1
+	; Adjust for Edit the size of the box
+	If _WinAPI_GetClassName($hWnd) = "Edit" Then
+		$tCorner.Bottom -= $__DM_g_bShowEditActive ? 1 : 0
 	EndIf
 
 	; 4. Paint the box using the dark theme color
-	Local $hBrush = __WinAPI_CreateSolidBrush(_ColorToCOLORREF($COLOR_BG_DARK))
-	__WinAPI_FillRect($hDC, $tCorner, $hBrush)
-	__WinAPI_DeleteObject($hBrush)
+	Local $hBrush = $__DM_g_hBrushSizebox
+	_WinAPI_FillRect($hDC, $tCorner, $hBrush)
 
 	Return True
-EndFunc   ;==>_PaintSizeBox
+EndFunc   ;==>__GUIDarkTheme_PaintSizeBox
 
-Func _GUI_IsResizable($hWnd) ; ioa747
+; #FUNCTION# ====================================================================================================================
+; Author.........: ioa747
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_GUI_IsResizable($hWnd)
 	Local $iStyle = _WinAPI_GetWindowLong($hWnd, $GWL_STYLE)
 	; Check if the WS_SIZEBOX (0x00040000) bit is set
 	; $WS_SIZEBOX and $WS_THICKFRAME are the same constant
@@ -2940,40 +3572,619 @@ Func _GUI_IsResizable($hWnd) ; ioa747
 	Else
 		Return False
 	EndIf
-EndFunc   ;==>_GUI_IsResizable
+EndFunc   ;==>__GUIDarkTheme_GUI_IsResizable
 
-Func _GUIDarkTheme_SwitchTheme($bPreferNewTheme = False)
-	__WinAPI_LockWindowUpdate($g_hGui)
-	$g_UseDarkMode = __WinAPI_ShouldAppsUseDarkMode()
-	Switch $g_UseDarkMode
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func _GUIDarkTheme_SwitchTheme($hWnd)
+	_WinAPI_LockWindowUpdate($hWnd)
+	$__DM_g_bUseDarkMode = _WinAPI_ShouldAppsUseDarkMode()
+	Switch $__DM_g_bUseDarkMode
 		Case True
 			__GUIDarkTheme_SubclassCleanup()
-			; currently dark mode, switch to light mode
-			_GUIDarkTheme_ApplyLight($g_hGui)
-			;__GUIDarkTheme_SubclassCleanup()
+			__GUIDarkTheme_BrushCleanup()
+			__GUIDarkTheme_PenCleanup()
+			_GUIDarkTheme_ApplyLight($hWnd)
 		Case False
 			__GUIDarkTheme_SubclassCleanup()
-			; switch colors
-			$g_iBkColor = 0x1c1c1c
-			$COLOR_BG_DARK = 0x121212
-			$COLOR_TEXT_LIGHT = 0xE0E0E0
-			$COLOR_CONTROL_BG = 0x202020
-			$COLOR_BORDER_LIGHT = 0xB0B0B0
-			$COLOR_BORDER = 0x3F3F3F
-			$COLOR_MENU_BG = __WinAPI_ColorAdjustLuma($COLOR_BG_DARK, 5)
-			$COLOR_MENU_HOT = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 20)
-			$COLOR_MENU_SEL = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 10)
-			$COLOR_MENU_TEXT = $COLOR_TEXT_LIGHT
-			; currently light mode, switch to dark mode
-			_GUIDarkTheme_ApplyDark($g_hGui, $bPreferNewTheme)
+			__GUIDarkTheme_BrushCleanup()
+			__GUIDarkTheme_PenCleanup()
+			_GUIDarkTheme_ApplyDark($hWnd)
 	EndSwitch
-	; recreate Edit brush with updated color
-	If $g_hBrushEdit Then __WinAPI_DeleteObject($g_hBrushEdit)
-	$g_hBrushEdit = 0
-	If Not $g_hBrushEdit Then $g_hBrushEdit = __WinAPI_CreateSolidBrush(__GUIDarkMenu_ColorToCOLORREF($COLOR_CONTROL_BG))
 	; redraw window and menubar
-	__WinAPI_RedrawWindow($g_hGui, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW, $RDW_ALLCHILDREN))
-	_GUICtrlMenu_DrawMenuBar($g_hGui)
-	__WinAPI_LockWindowUpdate(0)
-	__WinAPI_SetWindowPos($g_hGui, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+	_WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW, $RDW_ALLCHILDREN))
+	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
+	If $hMenu Then _GUICtrlMenu_DrawMenuBar($hWnd)
+	_WinAPI_LockWindowUpdate(0)
+	_WinAPI_SetWindowPos($hWnd, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
 EndFunc   ;==>_GUIDarkTheme_SwitchTheme
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: argumentum
+; ===============================================================================================================================
+Func _GUIDarkTheme_Version()
+	Return $__DM_g_Version
+EndFunc   ;==>_GUIDarkTheme_Version
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func _GUIDarkTheme_SetCornerPref($hWnd, $iCornerPref)
+	; Requires Windows 11 Build 22000 or higher
+	; Options $DWMWCP_DEFAULT, $DWMWCP_DONOTROUND, $DWMWCP_ROUND, $DWMWCP_ROUNDSMALL
+	Local Const $DWMWA_WINDOW_CORNER_PREFERENCE = 33
+	If @OSBuild >= 22000 Then
+		_WinAPI_DwmSetWindowAttribute($hWnd, $DWMWA_WINDOW_CORNER_PREFERENCE, $iCornerPref)
+	EndIf
+EndFunc   ;==>_GUIDarkTheme_SetCornerPref
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _GUIDarkTheme_CtrlBorderSet
+; Description ...: Sets whether or not border is shown around controls or if Edit controls have active color on bottom.
+; Syntax ........: _GUIDarkTheme_CtrlBorderSet($bShowCtrlBorder = Default, $bShowEditActive = Default)
+; Parameters ....: $bShowCtrlBorder		- Boolean. True to show borders around controls, False to now show. Default is True.
+;				   $bShowEditActive		- Boolean. True to show active color on Edit control, False not. Default is True.
+; Return values .: None
+; Author ........: WildByDesign
+; Example .......: No
+; ===============================================================================================================================
+Func _GUIDarkTheme_CtrlBorderSet($bShowCtrlBorder = Default, $bShowEditActive = Default)
+	If $bShowCtrlBorder = Default Then $__DM_g_bShowCtrlBorder = True
+	If $bShowCtrlBorder <> Default Then $__DM_g_bShowCtrlBorder = $bShowCtrlBorder
+	If $bShowEditActive = Default Then $__DM_g_bShowEditActive = True
+	If $bShowEditActive <> Default Then $__DM_g_bShowEditActive = $bShowEditActive
+EndFunc   ;==>_GUIDarkTheme_CtrlBorderSet
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_CreatePens()
+	If Not $__DM_g_hPenBlack Then $__DM_g_hPenBlack = _WinAPI_CreatePen($PS_SOLID, 1, 0x000000)
+	If Not $__DM_g_hPenBtnBor Then $__DM_g_hPenBtnBor = _WinAPI_CreatePen($PS_SOLID, 1, _WinAPI_SwitchColor($__DM_g_iButtonColorBor))
+	If Not $__DM_g_hPenGui Then $__DM_g_hPenGui = _WinAPI_CreatePen($PS_SOLID, 1, _WinAPI_SwitchColor($__DM_g_iGuiBkColor))
+	If Not $__DM_g_hPenBorder Then $__DM_g_hPenBorder = _WinAPI_CreatePen($PS_SOLID, 1, _WinAPI_SwitchColor($__DM_g_iBorderColor))
+	If Not $__DM_g_hPenBorderSel Then $__DM_g_hPenBorderSel = _WinAPI_CreatePen($PS_SOLID, 1, _WinAPI_SwitchColor($__DM_g_iBorderColorSel))
+	If Not $__DM_g_hPenAccent Then $__DM_g_hPenAccent = _WinAPI_CreatePen($PS_SOLID, 1, _WinAPI_SwitchColor($__DM_g_iAccentColor))
+	If Not $__DM_g_hPen2Accent Then $__DM_g_hPen2Accent = _WinAPI_CreatePen($PS_SOLID, 2, _WinAPI_SwitchColor($__DM_g_iAccentColor))
+	If Not $__DM_g_hPen2Border Then $__DM_g_hPen2Border = _WinAPI_CreatePen($PS_SOLID, 2, _WinAPI_SwitchColor($__DM_g_iBorderColor))
+	If Not $__DM_g_hPen2BorderSel Then $__DM_g_hPen2BorderSel = _WinAPI_CreatePen($PS_SOLID, 2, _WinAPI_SwitchColor($__DM_g_iBorderColorSel))
+EndFunc   ;==>__GUIDarkTheme_CreatePens
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_PenCleanup()
+	If $__DM_g_hPenBlack Then
+		_WinAPI_DeleteObject($__DM_g_hPenBlack)
+		$__DM_g_hPenBlack = 0
+	EndIf
+	If $__DM_g_hPen2Accent Then
+		_WinAPI_DeleteObject($__DM_g_hPen2Accent)
+		$__DM_g_hPen2Accent = 0
+	EndIf
+	If $__DM_g_hPen2Border Then
+		_WinAPI_DeleteObject($__DM_g_hPen2Border)
+		$__DM_g_hPen2Border = 0
+	EndIf
+	If $__DM_g_hPen2BorderSel Then
+		_WinAPI_DeleteObject($__DM_g_hPen2BorderSel)
+		$__DM_g_hPen2BorderSel = 0
+	EndIf
+	If $__DM_g_hPenAccent Then
+		_WinAPI_DeleteObject($__DM_g_hPenAccent)
+		$__DM_g_hPenAccent = 0
+	EndIf
+	If $__DM_g_hPenBorderSel Then
+		_WinAPI_DeleteObject($__DM_g_hPenBorderSel)
+		$__DM_g_hPenBorderSel = 0
+	EndIf
+	If $__DM_g_hPenBorder Then
+		_WinAPI_DeleteObject($__DM_g_hPenBorder)
+		$__DM_g_hPenBorder = 0
+	EndIf
+	If $__DM_g_hPenGui Then
+		_WinAPI_DeleteObject($__DM_g_hPenGui)
+		$__DM_g_hPenGui = 0
+	EndIf
+	If $__DM_g_hPenBtnBor Then
+		_WinAPI_DeleteObject($__DM_g_hPenBtnBor)
+		$__DM_g_hPenBtnBor = 0
+	EndIf
+EndFunc   ;==>__GUIDarkTheme_PenCleanup
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func _GUIDarkTheme_AutoTheme($bFollowSystemTheme = True)
+	If $bFollowSystemTheme Then
+		GUIRegisterMsg($WM_SETTINGCHANGE, "__GUIDarkTheme_WM_SETTINGCHANGE")
+	Else
+		GUIRegisterMsg($WM_SETTINGCHANGE, "")
+	EndIf
+EndFunc   ;==>_GUIDarkTheme_AutoTheme
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: argumentum
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_WM_SETTINGCHANGE($hWnd, $iMsg, $wParam, $lParam)
+	#forceref $hWnd, $iMsg, $wParam
+	; lParam is a pointer to a string indicating what changed
+	Local $tString = DllStructCreate("wchar[256]", $lParam)
+	Local $sParam = DllStructGetData($tString, 1)
+	Local Static $iModePrev
+
+	; "ImmersiveColorSet" indicates a Light/Dark mode change
+	If $sParam = "ImmersiveColorSet" Then
+		Local $iMode = RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+		If $iModePrev <> $iMode Then
+			$iModePrev = $iMode
+			_GUIDarkTheme_SwitchTheme($hWnd)
+		Else
+			Return $GUI_RUNDEFMSG
+		EndIf
+	EndIf
+
+	Return $GUI_RUNDEFMSG
+EndFunc   ;==>__GUIDarkTheme_WM_SETTINGCHANGE
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_CreateBrushes()
+	If Not $__DM_g_hBrushGui Then $__DM_g_hBrushGui = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iGuiBkColor))
+	If Not $__DM_g_hBrushCtrl Then $__DM_g_hBrushCtrl = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iCtrlBkColor))
+	If Not $__DM_g_hBrushBtn Then $__DM_g_hBrushBtn = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iButtonColor))
+	If Not $__DM_g_hBrushBtnHov Then $__DM_g_hBrushBtnHov = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iButtonColorHov))
+	If Not $__DM_g_hBrushBtnSel Then $__DM_g_hBrushBtnSel = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iButtonColorSel))
+	If Not $__DM_g_hBrushMenuBk Then $__DM_g_hBrushMenuBk = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMenuBkColor))
+	If Not $__DM_g_hBrushMenuSel Then $__DM_g_hBrushMenuSel = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMenuSelColor))
+	If Not $__DM_g_hBrushMenuHot Then $__DM_g_hBrushMenuHot = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMenuHotColor))
+	If Not $__DM_g_hBrushAccent Then $__DM_g_hBrushAccent = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor(0x0078D4))
+	If Not $__DM_g_hBrushAccentHot Then $__DM_g_hBrushAccentHot = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor(0x2FA7FF))
+	If Not $__DM_g_hBrushTab Then $__DM_g_hBrushTab = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iTabColor))
+	If Not $__DM_g_hBrushTabSel Then $__DM_g_hBrushTabSel = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iTabColorSel))
+	If Not $__DM_g_hBrushSizebox Then $__DM_g_hBrushSizebox = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iSizeboxPaint))
+	If Not $__DM_g_hBrushGray Then $__DM_g_hBrushGray = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iExtraGray))
+	If Not $__DM_g_hBrushMsgBoxTop Then $__DM_g_hBrushMsgBoxTop = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMsgBoxTopColor))
+	If Not $__DM_g_hBrushMsgBoxBottom Then $__DM_g_hBrushMsgBoxBottom = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iMsgBoxBottomColor))
+	If Not $__DM_g_hBrushTabBk Then $__DM_g_hBrushTabBk = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iTabCtrlBkColor))
+	If Not $__DM_g_iBrushBorder Then $__DM_g_iBrushBorder = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($__DM_g_iBorderColor))
+EndFunc   ;==>__GUIDarkTheme_CreateBrushes
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_BrushCleanup()
+	If $__DM_g_iBrushBorder Then
+		_WinAPI_DeleteObject($__DM_g_iBrushBorder)
+		$__DM_g_iBrushBorder = 0
+	EndIf
+	If $__DM_g_hBrushTabBk Then
+		_WinAPI_DeleteObject($__DM_g_hBrushTabBk)
+		$__DM_g_hBrushTabBk = 0
+	EndIf
+	If $__DM_g_iBrushHdr Then
+		_WinAPI_DeleteObject($__DM_g_iBrushHdr)
+		$__DM_g_iBrushHdr = 0
+	EndIf
+	If $__DM_g_iBrushHdrHot Then
+		_WinAPI_DeleteObject($__DM_g_iBrushHdrHot)
+		$__DM_g_iBrushHdrHot = 0
+	EndIf
+	If $__DM_g_iBrushHdrSel Then
+		_WinAPI_DeleteObject($__DM_g_iBrushHdrSel)
+		$__DM_g_iBrushHdrSel = 0
+	EndIf
+	If $__DM_g_hBrushMsgBoxBottom Then
+		_WinAPI_DeleteObject($__DM_g_hBrushMsgBoxBottom)
+		$__DM_g_hBrushMsgBoxBottom = 0
+	EndIf
+	If $__DM_g_hBrushMsgBoxTop Then
+		_WinAPI_DeleteObject($__DM_g_hBrushMsgBoxTop)
+		$__DM_g_hBrushMsgBoxTop = 0
+	EndIf
+	If $__DM_g_hBrushGray Then
+		_WinAPI_DeleteObject($__DM_g_hBrushGray)
+		$__DM_g_hBrushGray = 0
+	EndIf
+	If $__DM_g_hBrushTabSel Then
+		_WinAPI_DeleteObject($__DM_g_hBrushTabSel)
+		$__DM_g_hBrushTabSel = 0
+	EndIf
+	If $__DM_g_hBrushTab Then
+		_WinAPI_DeleteObject($__DM_g_hBrushTab)
+		$__DM_g_hBrushTab = 0
+	EndIf
+	If $__DM_g_hBrushAccentHot Then
+		_WinAPI_DeleteObject($__DM_g_hBrushAccentHot)
+		$__DM_g_hBrushAccentHot = 0
+	EndIf
+	If $__DM_g_hBrushAccent Then
+		_WinAPI_DeleteObject($__DM_g_hBrushAccent)
+		$__DM_g_hBrushAccent = 0
+	EndIf
+	If $__DM_g_hBrushMenuBk Then
+		_WinAPI_DeleteObject($__DM_g_hBrushMenuBk)
+		$__DM_g_hBrushMenuBk = 0
+	EndIf
+	If $__DM_g_hBrushMenuSel Then
+		_WinAPI_DeleteObject($__DM_g_hBrushMenuSel)
+		$__DM_g_hBrushMenuSel = 0
+	EndIf
+	If $__DM_g_hBrushMenuHot Then
+		_WinAPI_DeleteObject($__DM_g_hBrushMenuHot)
+		$__DM_g_hBrushMenuHot = 0
+	EndIf
+	If $__DM_g_hBrushSizebox Then
+		_WinAPI_DeleteObject($__DM_g_hBrushSizebox)
+		$__DM_g_hBrushSizebox = 0
+	EndIf
+	If $__DM_g_hBrushGui Then
+		_WinAPI_DeleteObject($__DM_g_hBrushGui)
+		$__DM_g_hBrushGui = 0
+	EndIf
+	If $__DM_g_hBrushBtnSel Then
+		_WinAPI_DeleteObject($__DM_g_hBrushBtnSel)
+		$__DM_g_hBrushBtnSel = 0
+	EndIf
+	If $__DM_g_hBrushBtnHov Then
+		_WinAPI_DeleteObject($__DM_g_hBrushBtnHov)
+		$__DM_g_hBrushBtnHov = 0
+	EndIf
+	If $__DM_g_hBrushBtn Then
+		_WinAPI_DeleteObject($__DM_g_hBrushBtn)
+		$__DM_g_hBrushBtn = 0
+	EndIf
+	If $__DM_g_hBrushCtrl Then
+		_WinAPI_DeleteObject($__DM_g_hBrushCtrl)
+		$__DM_g_hBrushCtrl = 0
+	EndIf
+EndFunc   ;==>__GUIDarkTheme_BrushCleanup
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_WM_CTLCOLOR($hWnd, $iMsg, $wParam, $lParam)
+	Local $hDC = $wParam
+	Local $hCtrl = $lParam
+	Local $hBrush
+
+	Switch $iMsg
+		Case $WM_CTLCOLORLISTBOX
+			$hDC = $wParam
+			_WinAPI_SetTextColor($hDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+			$hBrush = $__DM_g_hBrushCtrl
+			_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+			Return $hBrush
+
+		Case $WM_CTLCOLORBTN
+			Local $hTabControl = _WinAPI_FindWindowEx($hWnd, "SysTabControl32")
+			If $hTabControl Then
+				If __GUIDarkTheme_IsCtrlInTab($hTabControl, $hCtrl) Then
+					$hBrush = $__DM_g_hBrushTabBk
+					Return $hBrush
+				Else
+					Return $GUI_RUNDEFMSG
+				EndIf
+			EndIf
+
+		Case $WM_CTLCOLOREDIT
+			_WinAPI_SetTextColor($hDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+			_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+			$hBrush = $__DM_g_hBrushCtrl
+			Return $hBrush
+
+		Case $WM_CTLCOLORSTATIC
+			If _WinAPI_GetClassName($hCtrl) = "Edit" Then
+				_WinAPI_SetTextColor($hDC, _WinAPI_SwitchColor($__DM_g_iTextColor))
+				_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+				$hBrush = $__DM_g_hBrushCtrl
+				Return $hBrush
+			EndIf
+
+			If _WinAPI_GetClassName($hCtrl) = "SysLink" Then
+				_WinAPI_SetBkMode($hDC, $TRANSPARENT)
+				$hBrush = $__DM_g_hBrushGui
+				Return $hBrush
+			EndIf
+
+			Return $GUI_RUNDEFMSG
+
+	EndSwitch
+
+	Return $GUI_RUNDEFMSG
+EndFunc   ;==>__GUIDarkTheme_WM_CTLCOLOR
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_GetCtrlColors($hWnd, ByRef $iTextColor, ByRef $iBkColor, ByRef $iBkMode)
+	Local $hDC = _WinAPI_GetDC($hWnd)
+	Local $hBrushTemp = _SendMessage(_WinAPI_GetParent($hWnd), $WM_CTLCOLORSTATIC, $hDC, $hWnd)
+	$iTextColor = "0x" & Hex(_WinAPI_GetTextColor($hDC), 6)
+	$iBkColor = "0x" & Hex(_WinAPI_GetBkColor($hDC), 6)
+	$iBkMode = _WinAPI_GetBkMode($hDC)
+	$hBrushTemp = _WinAPI_SelectObject($hDC, $hBrushTemp)
+	_WinAPI_ReleaseDC($hWnd, $hDC)
+EndFunc   ;==>__GUIDarkTheme_GetCtrlColors
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: ioa747
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_IsCtrlInTab($hTab, $hCtrl)
+	; Get the bounding rectangles of the Tab and the Control
+	Local $tRectTab = _WinAPI_GetWindowRect($hTab)
+	Local $tRectCtrl = _WinAPI_GetWindowRect($hCtrl)
+
+	; Get the intersection of the two rectangles
+	Local $tIntersect = _WinAPI_IntersectRect($tRectTab, $tRectCtrl)
+
+	; Check if the intersection rectangle is NOT empty
+	If DllStructGetData($tIntersect, "Left") <> 0 Or DllStructGetData($tIntersect, "Right") <> 0 Then
+		; If it intersects, return the current selected Tab Index (0, 1, etc.) in @extended
+		Return SetError(0, $hTab, True)
+	EndIf
+
+	Return SetError(0, 0, False) ; Not within the Tab area
+EndFunc   ;==>__GUIDarkTheme_IsCtrlInTab
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: ioa747
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __GUIDarkTheme_IsCtrlInRebar($hRebar, $hCtrl)
+	; Get the bounding rectangles of the Rebar and the Control
+	Local $tRectRebar = _WinAPI_GetWindowRect($hRebar)
+	Local $tRectCtrl = _WinAPI_GetWindowRect($hCtrl)
+
+	; Get the intersection of the two rectangles
+	Local $tIntersect = _WinAPI_IntersectRect($tRectRebar, $tRectCtrl)
+
+	; Check if the intersection rectangle is NOT empty
+	If DllStructGetData($tIntersect, "Left") <> 0 Or DllStructGetData($tIntersect, "Right") <> 0 Then
+		; If it intersects, return the current selected Tab Index (0, 1, etc.) in @extended
+		Return SetError(0, $hRebar, True)
+	EndIf
+
+	Return SetError(0, 0, False) ; Not within the Rebar area
+EndFunc   ;==>__GUIDarkTheme_IsCtrlInRebar
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __DM_DarkThemeAvailability()
+	Local $iRet = __DM_QueryDarkMode()
+	Switch $iRet
+		Case 2
+			; DarkMode_DarkTheme is available
+			Return True
+		Case 1
+			; DarkMode_Explorer is available, used only when DarkMode_DarkTheme is not available
+			Return False
+		Case Else
+			; Fallback, OS may not support dark mode or detection failed
+			Return False
+	EndSwitch
+EndFunc   ;==>__DM_DarkThemeAvailability
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: argumentum
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __DM_QueryDarkMode()
+	Local $iColor
+	If Not _WinAPI_IsThemeActive() Then Return SetError(0, 1, False)
+	Local $hWnd = GUICreate("GUIDarkTheme")
+	Local $iCOLOR_WINDOW = _WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW))  ; because of alt. themes
+	$iColor = __DM_QueryThemeColors("DarkMode_DarkTheme::Edit", $hWnd)
+	If Not @error And Hex($iColor, 6) <> Hex($iCOLOR_WINDOW, 6) Then
+		GUIDelete($hWnd)
+		Return 2 ; DarkMode_DarkTheme is available
+	EndIf
+	$iColor = __DM_QueryThemeColors("DarkMode_Explorer::Edit", $hWnd)
+	If Not @error And Hex($iColor, 6) <> Hex($iCOLOR_WINDOW, 6) Then
+		GUIDelete($hWnd)
+		Return 1 ; DarkMode_Explorer is available, used only when DarkMode_DarkTheme is not available
+	EndIf
+	GUIDelete($hWnd)
+	Return 0
+EndFunc   ;==>__DM_QueryDarkMode
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: argumentum
+; Modified.......: WildByDesign
+; ===============================================================================================================================
+Func __DM_QueryThemeColors($sClass, $hWnd = Default)
+	Local Const $TMT_FILLCOLOR = 3802
+	Local Const $EP_BACKGROUND = 3
+	Local Const $EBS_NORMAL = 1
+	Local $hWndWas = $hWnd
+	If IsKeyword($hWnd) Then $hWnd = GUICreate("Simple_GetThemeColor")
+	Local $hTheme = _WinAPI_OpenThemeData($hWnd, $sClass)
+	If @error Then
+		If IsKeyword($hWndWas) Then GUIDelete($hWnd)
+		Return SetError(1, 0, False)
+	EndIf
+	Local $iColor = _WinAPI_GetThemeColor($hTheme, $EP_BACKGROUND, $EBS_NORMAL, $TMT_FILLCOLOR)
+	If @error Then
+		If IsKeyword($hWndWas) Then GUIDelete($hWnd)
+		Return SetError(2, 0, False)
+	EndIf
+	_WinAPI_CloseThemeData($hTheme)
+	Return $iColor
+EndFunc   ;==>__DM_QueryThemeColors
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __DM_GroupboxInTab($hWnd)
+	_ArrayAdd($__DM_g_aGroupInTab, $hWnd)
+EndFunc   ;==>__DM_GroupboxInTab
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func __DM_DateTimeCtrlHandles($hWnd)
+	_ArrayAdd($__DM_g_a_hDateTime, $hWnd)
+EndFunc   ;==>__DM_DateTimeCtrlHandles
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _GUIDarkTheme_AccentColorSet
+; Description ...: Sets the accent color used by certain controls
+; Syntax ........: _GUIDarkTheme_AccentColorSet($iColor = Default)
+; Parameters ....: $hGui is GUI handle.
+;                ; $iColor	- 0xRRGGBB, Default is 0x0078D4.
+; Return values .: None
+; Author ........: WildByDesign
+; Example .......: No
+; ===============================================================================================================================
+Func _GUIDarkTheme_AccentColorSet($hGui, $iColor = Default)
+	If $iColor = Default Then $__DM_g_iAccentColor = 0x0078D4
+	If Not $iColor Then $__DM_g_iAccentColor = 0x0078D4
+	If $iColor <> Default Then $__DM_g_iAccentColor = $iColor
+	__GUIDarkTheme_PenCleanup()
+	$__DM_g_iAccentColor = $iColor
+	__GUIDarkTheme_CreatePens()
+	; redraw GUI
+	_WinAPI_RedrawWindow($hGui, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW, $RDW_ALLCHILDREN))
+EndFunc   ;==>_GUIDarkTheme_AccentColorSet
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: MattyD
+; ===============================================================================================================================
+Func _GUICtrlTreeView_SetExtendedStyle($hTreeView, $iExStyle)
+	Local Const $TVM_SETEXTENDEDSTYLE = 0x112C
+	Local $iResult = _SendMessage($hTreeView, $TVM_SETEXTENDEDSTYLE, 0x07FD, $iExStyle)
+	Return SetError(@error, @extended, $iResult)
+EndFunc   ;==>_GUICtrlTreeView_SetExtendedStyle
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
+Func _WinAPI_GetDPI($hWnd = 0)
+	Local Const $LOGPIXELSX = 88
+	$hWnd = Not $hWnd ? _WinAPI_GetDesktopWindow() : $hWnd
+	Local Const $hDC = _WinAPI_GetDC($hWnd)
+	If @error Then Return SetError(1, 0, 0)
+	Local Const $iDPI = _WinAPI_GetDeviceCaps($hDC, $LOGPIXELSX)
+	If @error Or Not $iDPI Then
+		_WinAPI_ReleaseDC($hWnd, $hDC)
+		Return SetError(2, 0, 0)
+	EndIf
+	_WinAPI_ReleaseDC($hWnd, $hDC)
+	Return $iDPI
+EndFunc   ;==>_WinAPI_GetDPI
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
+Func _WinAPI_SetProcessDpiAwarenessContext($DPI_AWARENESS_CONTEXT_value)
+	Local $aResult = DllCall('user32.dll', "bool", "SetProcessDpiAwarenessContext", @AutoItX64 ? "int64" : "int", $DPI_AWARENESS_CONTEXT_value) ;requires Win10 v1703+ / Windows Server 2016+
+	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
+	If Not $aResult[0] Then Return SetError(2, @extended, 0)
+	Return $aResult[0]
+EndFunc   ;==>_WinAPI_SetProcessDpiAwarenessContext
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
+Func _WinAPI_GetDpiFromDpiAwarenessContext($DPI_AWARENESS_CONTEXT_value)
+	Local $aResult = DllCall('user32.dll', "uint", "GetDpiFromDpiAwarenessContext", @AutoItX64 ? "int64" : "int", $DPI_AWARENESS_CONTEXT_value) ;requires Win10 v1803+ / Windows Server 2016+
+	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
+	If Not $aResult[0] Then Return SetError(2, @extended, 0)
+	Return $aResult[0]
+EndFunc   ;==>_WinAPI_GetDpiFromDpiAwarenessContext
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
+Func _WinAPI_Base64Decode($sB64String)
+	Local $aCrypt = DllCall("Crypt32.dll", "bool", "CryptStringToBinaryA", "str", $sB64String, "dword", 0, "dword", 1, "ptr", 0, "dword*", 0, "ptr", 0, "ptr", 0)
+	If @error Or Not $aCrypt[0] Then Return SetError(1, 0, "")
+	Local $bBuffer = DllStructCreate("byte[" & $aCrypt[5] & "]")
+	$aCrypt = DllCall("Crypt32.dll", "bool", "CryptStringToBinaryA", "str", $sB64String, "dword", 0, "dword", 1, "struct*", $bBuffer, "dword*", $aCrypt[5], "ptr", 0, "ptr", 0)
+	If @error Or Not $aCrypt[0] Then Return SetError(2, 0, "")
+	Return DllStructGetData($bBuffer, 1)
+EndFunc   ;==>_WinAPI_Base64Decode
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
+Func _WinAPI_FindWindowEx($hParent, $sClass, $sTitle = "", $hAfter = 0)
+	Local $ret = DllCall('user32.dll', "hwnd", "FindWindowExW", "hwnd", $hParent, "hwnd", $hAfter, "wstr", $sClass, "wstr", $sTitle)
+	If @error Or Not IsArray($ret) Then Return 0
+	Return $ret[0]
+EndFunc   ;==>_WinAPI_FindWindowEx
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: UEZ
+; ===============================================================================================================================
+Func _WinAPI_GetDPIForWindow($hWnd)
+	Local $aResult = DllCall('user32.dll', "uint", "GetDpiForWindow", "hwnd", $hWnd) ;requires Win10 v1607+ / no server support
+	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
+	If Not $aResult[0] Then Return SetError(2, @extended, 0)
+	Return $aResult[0]
+EndFunc   ;==>_WinAPI_GetDPIForWindow
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; ===============================================================================================================================
+Func _GUIDarkTheme_ToolbarSetTrans($hToolbar, $bTransparency = Default)
+	If $bTransparency = Default Then $bTransparency = True
+	If $bTransparency <> Default Then $bTransparency = $bTransparency
+
+	_GUICtrlToolbar_SetStyleTransparent($hToolbar, $bTransparency)
+
+	; fix top line above toolbar
+	If _GUICtrlToolbar_GetStyleTransparent($hToolbar) Then
+		_GUICtrlToolbar_SetColorScheme($hToolbar, $__DM_g_iGuiBkColor, $__DM_g_iGuiBkColor)
+	Else
+		_GUICtrlToolbar_SetColorScheme($hToolbar, $__DM_g_iCtrlBkColor, $__DM_g_iCtrlBkColor)
+	EndIf
+
+	; trigger refresh of toolbar
+	_WinAPI_SetWindowPos($hToolbar, 0, 0, 0, 0, 0, BitOR($SWP_NOMOVE, $SWP_NOSIZE, $SWP_NOZORDER, $SWP_FRAMECHANGED))
+EndFunc   ;==>_GUIDarkTheme_ToolbarSetTrans
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: Nine
+; ===============================================================================================================================
+Func __GUIDarkTheme_SetBandColor($hWnd, $iIndex, $nClrBack, $nClrFore)
+	Local $tInfo = DllStructCreate($tagREBARBANDINFO)
+
+	$tInfo.cbSize = DllStructGetSize($tInfo)
+	$tInfo.fMask = $RBBIM_COLORS
+	$tInfo.clrBack = $nClrBack
+	$tInfo.clrFore = $nClrFore
+
+	_SendMessage($hWnd, $RB_SETBANDINFOA, $iIndex, $tInfo, 0, "wparam", "struct*")
+EndFunc   ;==>__GUIDarkTheme_SetBandColor
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: jugador
+; Notes..........: This fixed version of the _WinAPI_DefSubclassProc function prevents some subclassing crashes
+; ===============================================================================================================================
+Func __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+	Return DllCall('comctl32.dll', 'lresult', 'DefSubclassProc', 'hwnd', $hWnd, 'uint', $iMsg, 'wparam', $wParam, _
+			'lparam', $lParam)[0]
+EndFunc   ;==>__WinAPI_DefSubclassProc
+
+; #FUNCTION# ====================================================================================================================
+; Author.........: WildByDesign
+; Modified.......: argumentum
+; ===============================================================================================================================
+Func __DM_GetThemeDetails($sSep = @TAB, $sLastCRLF = @CRLF)
+    Local $iRevision = RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
+    Local $iOSBuild = @OSBuild & "." & $iRevision
+    Local $sRet = " OSBuild.rev:" & $sSep & $iOSBuild & @CRLF
+    Local $sUxThemeDll = @SystemDir & "\uxtheme.dll"
+    Local $iUxThemeVer = StringReplace(FileGetVersion($sUxThemeDll), "10.0.", "")
+    $sRet &= "     UxTheme:" & $sSep & $iUxThemeVer & @CRLF
+    Local $sAeroMsStyles = @WindowsDir & "\Resources\Themes\aero\aero.msstyles"
+    Local $iAeroVer = StringReplace(FileGetVersion($sAeroMsStyles), "10.0.", "")
+    $sRet &= "  Aero Theme:" & $sSep & $iAeroVer & $sLastCRLF
+    Return $sRet
+EndFunc   ;==>__DM_GetThemeDetails

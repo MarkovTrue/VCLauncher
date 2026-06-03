@@ -50,6 +50,9 @@ Global Const $gc_iGuiHeight = $gc_iHeaderH + 289 ; высота клиента (
 ; чтобы полоса справа под кнопкой настроек не отличалась по тону.
 Global Const $gc_iClrBgDark = 0x1E1E1E
 Global Const $gc_iClrBgLight = 0xF0F0F0
+; Акцентный синий (ссылка обновления, пульс шестерёнки) и цвета светлой палитры
+Global Const $gc_iClrAccent = 0x0078D4
+Global Const $gc_iClrSepLight = 0xC0C0C0, $gc_iClrInfoLight = 0x808080
 ; Переменные путей к инструментам (загружаются из ini)
 Global $g_sPathVideoCompare = @ScriptDir & '\video-compare.exe'
 Global $g_sPathSync = @ScriptDir & '\Sync\dist\Sync.exe'
@@ -110,7 +113,16 @@ Global $g_sTheme = "System" ; System | Light | Dark
 Global $g_bDarkMode = False
 Global $g_bThemeInitialized = False ; флаг: применяли ли уже UDF-тему
 Global $g_bAppliedDark = False ; тема, реально применённая к GUI (для отслеживания смены)
-Global $g_iClrBg, $g_iClrFg, $g_iClrInfo, $g_iClrInput, $g_iClrSep
+Global $g_iClrBg, $g_iClrFg, $g_iClrInfo, $g_iClrSep
+; Подсветка поля при drag&drop. UDF 3.0.0 монополизирует WM_CTLCOLOREDIT, поэтому
+; временную голубую заливку даём через свой делегат-хендлер (см. _OnEvent_WM_CTLCOLOREDIT).
+Global $g_hDragHiCtrl = 0 ; HWND подсвечиваемого поля (0 = нет)
+Global $g_hBrushDrag = 0  ; кисть подсветки (создаётся лениво)
+; Палитра для кастомной отрисовки. Раньше эти глобалы объявлял форк GUIDarkTheme;
+; ванильная UDF 3.0.0 их не содержит, поэтому держим их в проекте. Дефолт - тёмные
+; значения, _ApplyTheme переопределяет их при смене темы.
+Global $COLOR_BG_DARK = 0x1E1E1E, $COLOR_TEXT_LIGHT = 0xCCCCCC, $COLOR_CONTROL_BG = 0x2D2D2D
+Global $COLOR_BORDER_LIGHT = 0x555555, $COLOR_BORDER = 0x3C3C3C
 ; Остальные переменные (чтение и нормализация путей; относительные пути считаем от папки скрипта)
 Global $g_sVideoFile1 = _NormalizePath(IniRead($gc_sPathIni, "LastDirs", "Video1", ""))
 Global $g_sVideoFile2 = _NormalizePath(IniRead($gc_sPathIni, "LastDirs", "Video2", ""))
@@ -138,30 +150,6 @@ While 1
 WEnd
 
 
-; Освобождение GDI/HIMAGELIST handle'ов — срабатывает при любом пути выхода.
-Func _Cleanup()
-	If $g_bPulseActive Then AdlibUnRegister("_PulseSettingsButton")
-	_HeaderDisposeBitmap($g_hLogoBitmap)
-	_DestroyImgList($g_hCompareImgList)
-	_DestroyImgList($g_hSettingsImgList)
-	_DestroyImgList($g_hSwapImgList)
-	_DestroyImgList($g_hSettingsCheckImgList)
-	If $g_hLinkSubclassCB Then
-		DllCallbackFree($g_hLinkSubclassCB)
-		$g_hLinkSubclassCB = 0
-	EndIf
-EndFunc   ;==>_Cleanup
-
-
-; Освобождает HIMAGELIST и обнуляет переменную (ByRef).
-Func _DestroyImgList(ByRef $hList)
-	If $hList Then
-		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $hList)
-		$hList = 0
-	EndIf
-EndFunc   ;==>_DestroyImgList
-
-
 Func _MainGUI()
 	$g_hGui = GUICreate($gc_sAppName, $gc_iGuiWidth, $gc_iGuiHeight, -1, -1, $WS_SIZEBOX + $WS_SYSMENU + $WS_MINIMIZEBOX, $WS_EX_ACCEPTFILES)
 
@@ -175,9 +163,8 @@ Func _MainGUI()
 	$g_iButtonSettings = GUICtrlCreateButton("", $gc_iGuiWidth - 40, 8, 30, 30) ; иконка-шестерёнка ставится ниже (PNG)
 	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 
-	; Разделитель сразу под шапкой (как перед блоком «Смещение»)
+	; Разделитель сразу под шапкой (как перед блоком «Смещение»). Цвет ставит _ApplyTheme.
 	$g_iSeparatorTop = GUICtrlCreateLabel("", 0, $gc_iHeaderH, $gc_iGuiWidth, 1)
-	GUICtrlSetBkColor($g_iSeparatorTop, 0xC0C0C0)
 
 	Local $iY = $gc_iHeaderH + 16 ; отступ от нижнего края шапки (+4px воздуха после полоски)
 
@@ -194,7 +181,6 @@ Func _MainGUI()
 	$g_iButtonChoose1 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY - 1, 70, 23)
 
 	$g_iLabelInfo1 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 24, $gc_iGuiWidth - 180, 15)
-	GUICtrlSetColor($g_iLabelInfo1, 0x808080)
 
 	; --- Видео 2 ---
 	$g_iLabel2 = GUICtrlCreateLabel(Lang("GUI", "File2", "File 2"), 10, $iY + 54, 74, 20)
@@ -209,15 +195,13 @@ Func _MainGUI()
 	$g_iButtonChoose2 = GUICtrlCreateButton(Lang("GUI", "Choose", "Choose"), $gc_iGuiWidth - 82, $iY + 51, 70, 23)
 
 	$g_iLabelInfo2 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 90, $iY + 76, $gc_iGuiWidth - 180, 15)
-	GUICtrlSetColor($g_iLabelInfo2, 0x808080)
 
 	; --- Поменять местами ---
 	$g_iButtonSwap = GUICtrlCreateButton("", $gc_iGuiWidth - 60, $iY + 24, 26, 26) ; иконка-свап ставится ниже (PNG)
 	GUICtrlSetTip($g_iButtonSwap, Lang("GUI", "SwapTip", "Swap files"))
 
-	; --- Разделитель ---
+	; --- Разделитель --- (цвет ставит _ApplyTheme)
 	$g_iSeparator = GUICtrlCreateLabel("", 0, $iY + 100, $gc_iGuiWidth, 1)
-	GUICtrlSetBkColor($g_iSeparator, 0xC0C0C0)
 
 	; --- Режим сравнения ---
 	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Compare:"), 10, $iY + 143, 74, 20)
@@ -234,7 +218,7 @@ Func _MainGUI()
 	$g_iRadioOffsetManual = GUICtrlCreateRadio(Lang("GUI", "OffsetManual", "Manual"), $gc_iGuiWidth - 228, $iY + 113, 72, 20)
 	; Статус sync — цветной текст рядом с «Авто»: смещение при OK, краткое слово иначе.
 	; SS_NOTIFY чтобы Label принимал клики (детали ошибки).
-	$g_iLabelSyncStatus = GUICtrlCreateLabel("", 142, $iY + 115, $gc_iGuiWidth - 376, 20, $SS_NOTIFY)
+	$g_iLabelSyncStatus = GUICtrlCreateLabel("", 140, $iY + 115, $gc_iGuiWidth - 376, 20, $SS_NOTIFY)
 	GUICtrlSetFont($g_iLabelSyncStatus, $g_iAppFontSize, 400, 0, $g_sAppFont)
 	$g_iInputOffset = GUICtrlCreateInput("", $gc_iGuiWidth - 150, $iY + 113, 60, 20)
 	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
@@ -244,7 +228,6 @@ Func _MainGUI()
 	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 171, $gc_iGuiWidth - 180, 70, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $WS_VSCROLL))
 
 	; --- Кнопка «Сравнить» ---
-	Local Const $BS_MULTILINE = 0x2000
 	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 171, 70, 70, $BS_MULTILINE)
 	; иконки кнопок назначаются в _ApplyTheme (_ApplyButtonIcons) — зависят от темы
 
@@ -419,18 +402,34 @@ Func _OnEvent_WM_DROPFILES($hWnd, $iMsg, $wParam, $lParam)
 
 	Local $iCtrlID = $aCursorInfo[4]
 
-	; Подсвечиваем соответствующий элемент
+	; Подсвечиваем поле под курсором. Цвет даёт делегат _OnEvent_WM_CTLCOLOREDIT,
+	; здесь только помечаем контрол и форсим перерисовку.
+	$g_hDragHiCtrl = 0
 	If $iCtrlID = $g_iInput1 Then
-		GUICtrlSetBkColor($g_iInput1, $COLOR_SKYBLUE)
+		$g_hDragHiCtrl = GUICtrlGetHandle($g_iInput1)
 	ElseIf $iCtrlID = $g_iInput2 Then
-		GUICtrlSetBkColor($g_iInput2, $COLOR_SKYBLUE)
+		$g_hDragHiCtrl = GUICtrlGetHandle($g_iInput2)
 	EndIf
+	If $g_hDragHiCtrl Then _WinAPI_InvalidateRect($g_hDragHiCtrl)
 
 	; Через небольшую задержку восстанавливаем исходный вид после drop события
 	AdlibRegister("_RestoreControlsStyle", 100)
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>_OnEvent_WM_DROPFILES
+
+
+; Делегат покраски edit. UDF 3.0.0 перехватывает WM_CTLCOLOREDIT глобально, поэтому
+; временную drag-подсветку вставляем здесь, а все прочие поля отдаём в обработчик UDF.
+Func _OnEvent_WM_CTLCOLOREDIT($hWnd, $iMsg, $wParam, $lParam)
+	If $g_hDragHiCtrl <> 0 And $lParam = $g_hDragHiCtrl Then
+		If Not $g_hBrushDrag Then $g_hBrushDrag = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($COLOR_SKYBLUE))
+		_WinAPI_SetBkColor($wParam, _WinAPI_SwitchColor($COLOR_SKYBLUE))
+		_WinAPI_SetTextColor($wParam, _WinAPI_SwitchColor(0x000000))
+		Return $g_hBrushDrag
+	EndIf
+	Return __GUIDarkTheme_WM_CTLCOLOR($hWnd, $iMsg, $wParam, $lParam)
+EndFunc   ;==>_OnEvent_WM_CTLCOLOREDIT
 
 
 Func _OnEvent_GUI_EVENT_DROPPED()
@@ -556,8 +555,8 @@ Func _UpdateFilesInfo()
 
 		GUICtrlSetState($g_iButtonCompare, $GUI_ENABLE)
 
-		; Обновляем поле команды
-		GUICtrlSetData($g_iEditCommand, _ComputeCommand())
+		; Обновляем поле команды из уже посчитанных инфо/crop (без повторного _GetVideoInfo)
+		GUICtrlSetData($g_iEditCommand, _ComputeCommandFrom($aInfo1, $aInfo2, $aCropArgs))
 	Else
 		; Показываем только разрешение без crop
 		If $bFile1Exists Then
@@ -599,11 +598,18 @@ Func _ComputeCommand()
 	Local $aVideo2Info = _GetVideoInfo($g_sVideoFile2)
 	If $aVideo1Info[0] <= 0 Or $aVideo2Info[0] <= 0 Then Return ""
 	Local $aCropArgs = _CalculateCropArgs($aVideo1Info, $aVideo2Info)
+	Return _ComputeCommandFrom($aVideo1Info, $aVideo2Info, $aCropArgs)
+EndFunc   ;==>_ComputeCommand
+
+
+; Собирает команду из уже посчитанных инфо/crop — без повторного запроса разрешения.
+; Вызывающий гарантирует валидные $aVideo*Info (разрешение > 0).
+Func _ComputeCommandFrom($aVideo1Info, $aVideo2Info, $aCropArgs)
 	Local $sOffset = GUICtrlRead($g_iInputOffset)
 	Local $iOffsetMs = ($sOffset <> "") ? Int($sOffset) : 0
 	Local $bIsVertical = (GUICtrlRead($g_iRadioVertical) = $GUI_CHECKED)
 	Return _BuildVideoCompareCommand($aVideo1Info, $aVideo2Info, $aCropArgs, $bIsVertical, $iOffsetMs)
-EndFunc   ;==>_ComputeCommand
+EndFunc   ;==>_ComputeCommandFrom
 
 
 Func _GetVideoInfo($sVideoPath)
@@ -1104,7 +1110,11 @@ Func _RunVideoCompare($sCmdLine)
 	DllStructSetData($tSA, "nLength", DllStructGetSize($tSA))
 	DllStructSetData($tSA, "bInherit", True)
 
-	Local $aPipe = DllCall("kernel32.dll", "bool", "CreatePipe", "handle*", 0, "handle*", 0, "struct*", $tSA, "dword", 0)
+	Local $aPipe = DllCall("kernel32.dll", "bool", "CreatePipe", _
+			"handle*", 0,    _
+			"handle*", 0,    _
+			"struct*", $tSA, _
+			"dword",   0)
 	If @error Or Not $aPipe[0] Then Return
 	Local $hRead = $aPipe[1], $hWrite = $aPipe[2]
 
@@ -1139,11 +1149,22 @@ Func _RunVideoCompare($sCmdLine)
 	; Неблокирующее чтение: в паузах Sleep() в OnEventMode GUI успевает обрабатывать события,
 	; поэтому окно не «зависает», пока работает video-compare.
 	While 1
-		Local $aPeek = DllCall("kernel32.dll", "bool", "PeekNamedPipe", "handle", $hRead, "ptr", 0, "dword", 0, "ptr", 0, "struct*", $tAvail, "ptr", 0)
+		Local $aPeek = DllCall("kernel32.dll", "bool", "PeekNamedPipe", _
+				"handle",  $hRead,  _
+				"ptr",     0,       _
+				"dword",   0,       _
+				"ptr",     0,       _
+				"struct*", $tAvail, _
+				"ptr",     0)
 		If @error Or Not $aPeek[0] Then ExitLoop
 		Local $iAvail = DllStructGetData($tAvail, 1)
 		If $iAvail > 0 Then
-			Local $aRF = DllCall("kernel32.dll", "bool", "ReadFile", "handle", $hRead, "struct*", $tBuf, "dword", 4096, "struct*", $tRead, "ptr", 0)
+			Local $aRF = DllCall("kernel32.dll", "bool", "ReadFile", _
+					"handle",  $hRead, _
+					"struct*", $tBuf,  _
+					"dword",   4096,   _
+					"struct*", $tRead, _
+					"ptr",     0)
 			If @error Or Not $aRF[0] Then ExitLoop
 			Local $iN = DllStructGetData($tRead, 1)
 			If $iN = 0 Then ExitLoop
@@ -1154,7 +1175,13 @@ Func _RunVideoCompare($sCmdLine)
 			Local $aWait = DllCall("kernel32.dll", "dword", "WaitForSingleObject", "handle", $hProcess, "dword", 0)
 			If Not @error And $aWait[0] = 0 Then
 				; Процесс завершился: дочитаем остатки и выходим
-				Local $aPeek2 = DllCall("kernel32.dll", "bool", "PeekNamedPipe", "handle", $hRead, "ptr", 0, "dword", 0, "ptr", 0, "struct*", $tAvail, "ptr", 0)
+				Local $aPeek2 = DllCall("kernel32.dll", "bool", "PeekNamedPipe", _
+						"handle",  $hRead,  _
+						"ptr",     0,       _
+						"dword",   0,       _
+						"ptr",     0,       _
+						"struct*", $tAvail, _
+						"ptr",     0)
 				If @error Or Not $aPeek2[0] Or DllStructGetData($tAvail, 1) = 0 Then ExitLoop
 			Else
 				Sleep(30)
@@ -1505,10 +1532,7 @@ Func _UpdateCompareButtonIcon()
 	Local $hNew = _ApplyHIconToButton($g_iButtonCompare, $hIcon, $iIconSize)
 	If Not $hNew Then Return
 
-	; Освобождаем предыдущий imagelist после замены
-	If $g_hCompareImgList Then
-		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $g_hCompareImgList)
-	EndIf
+	_DestroyImgList($g_hCompareImgList) ; освобождаем предыдущий imagelist после замены
 	$g_hCompareImgList = $hNew
 EndFunc   ;==>_UpdateCompareButtonIcon
 
@@ -1516,9 +1540,10 @@ EndFunc   ;==>_UpdateCompareButtonIcon
 Func _RestoreControlsStyle()
 	AdlibUnRegister("_RestoreControlsStyle")
 
-	; Восстанавливаем цвет фона input полей
-	GUICtrlSetBkColor($g_iInput1, $g_iClrInput)
-	GUICtrlSetBkColor($g_iInput2, $g_iClrInput)
+	; Снимаем drag-подсветку: сбрасываем флаг и перерисовываем поле обычным цветом UDF
+	Local $hPrev = $g_hDragHiCtrl
+	$g_hDragHiCtrl = 0
+	If $hPrev Then _WinAPI_InvalidateRect($hPrev)
 
 	; Обновляем информацию о файлах
 	_UpdateFilesInfo()
@@ -1803,14 +1828,12 @@ Func _SetPalette()
 		$g_iClrBg = $gc_iClrBgDark
 		$g_iClrFg = $COLOR_TEXT_LIGHT
 		$g_iClrInfo = 0x969AA2 ; как подзаголовок шапки (HeaderHelper $iColSub, dark)
-		$g_iClrInput = 0x2D2D2D
 		$g_iClrSep = $COLOR_BORDER
 	Else
 		$g_iClrBg = $gc_iClrBgLight
 		$g_iClrFg = 0x000000
-		$g_iClrInfo = 0x808080
-		$g_iClrInput = 0xFFFFFF
-		$g_iClrSep = 0xC0C0C0
+		$g_iClrInfo = $gc_iClrInfoLight
+		$g_iClrSep = $gc_iClrSepLight
 	EndIf
 EndFunc   ;==>_SetPalette
 
@@ -1824,24 +1847,33 @@ Func _ApplyTheme()
 
 	; Применяем UDF-тему ко всему GUI. Не используем _GUIDarkTheme_SwitchTheme —
 	; он определяет направление по системной теме, а не по нашему выбору.
-	; Важно: _GUIDarkTheme_ApplyLight меняет внутренние UDF-глобалы на светлые значения,
-	; но _GUIDarkTheme_ApplyDark их обратно не восстанавливает. Поэтому перед переключением
-	; в тёмную тему явно возвращаем тёмную палитру UDF (те же значения, что задаёт _SwitchTheme).
+	; Перед сменой темы задаём проектную палитру ($COLOR_*, $g_iBkColor) для кастомной
+	; отрисовки. UDF свои внутренние цвета сбрасывает сам при каждом GUISetDarkTheme.
 	If $bNeedSwitch Then
-		If $g_bThemeInitialized Then __GUIDarkTheme_SubclassCleanup()
+		; Полная очистка перед сменой темы. UDF кэширует кисти/перья (guard "If Not $h"),
+		; поэтому без BrushCleanup/PenCleanup они остаются старого цвета и поля красятся
+		; неверно. _GUIDarkTheme_SwitchTheme делает все три cleanup; повторяем то же.
+		If $g_bThemeInitialized Then
+			__GUIDarkTheme_SubclassCleanup()
+			__GUIDarkTheme_BrushCleanup()
+			__GUIDarkTheme_PenCleanup()
+		EndIf
 		If $g_bDarkMode Then
-			$g_iBkColor = 0x1E1E1E
-			$COLOR_BG_DARK = 0x1E1E1E
+			$g_iBkColor = $gc_iClrBgDark
+			$COLOR_BG_DARK = $gc_iClrBgDark
 			$COLOR_TEXT_LIGHT = 0xCCCCCC
 			$COLOR_CONTROL_BG = 0x2D2D2D
 			$COLOR_BORDER_LIGHT = 0x555555
 			$COLOR_BORDER = 0x3C3C3C
-			_GUIDarkTheme_ApplyDark($g_hGui, True)
+			_GUIDarkTheme_ApplyDark($g_hGui)
 		Else
 			_GUIDarkTheme_ApplyLight($g_hGui)
 		EndIf
 		$g_bThemeInitialized = True
 		$g_bAppliedDark = $g_bDarkMode
+		; UDF при ApplyDark/Light переустанавливает свой WM_CTLCOLOREDIT-хендлер.
+		; Перебиваем его нашим делегатом, иначе drag-подсветка не отрисуется.
+		GUIRegisterMsg($WM_CTLCOLOREDIT, "_OnEvent_WM_CTLCOLOREDIT")
 	EndIf
 
 	; Палитра для кастомных элементов
@@ -1850,16 +1882,28 @@ Func _ApplyTheme()
 	; UDF ставит фон окна 0x121212 — в тёмной теме делаем его светлее
 	If $g_bDarkMode Then GUISetBkColor($g_iClrBg, $g_hGui)
 
-	; Info-лейблы — серый оттенок
+	; Статические лейблы тела окна. UDF в кейсе "Static" делает им ПРОЗРАЧНЫЙ фон
+	; (GUICtrlSetBkColor TRANSPARENT) и красит текст. У прозрачного static текст при каждой
+	; перерисовке накладывается на старый — RDW_ERASE родителя не чистит чужой HWND,
+	; поэтому шрифт «жирнеет» с каждой сменой темы. Ставим НЕПРОЗРАЧНЫЙ фон = цвет тела окна:
+	; $g_iClrBg точно совпадает с фоном (light 0xF0F0F0, dark 0x1E1E1E через GUISetBkColor),
+	; вид тот же, но static стирает фон сплошной кистью и накопления нет.
+	Local $aBodyLabels[5] = [$g_iLabel1, $g_iLabel2, $g_iLabelCompare, $g_iLabelOffset, $g_iLabelCommand]
+	For $iLbl In $aBodyLabels
+		GUICtrlSetBkColor($iLbl, $g_iClrBg)
+		GUICtrlSetColor($iLbl, $g_iClrFg)
+	Next
+
+	; Info-лейблы — серый оттенок, непрозрачный фон по той же причине
+	GUICtrlSetBkColor($g_iLabelInfo1, $g_iClrBg)
+	GUICtrlSetBkColor($g_iLabelInfo2, $g_iClrBg)
 	GUICtrlSetColor($g_iLabelInfo1, $g_iClrInfo)
 	GUICtrlSetColor($g_iLabelInfo2, $g_iClrInfo)
 
-	; Поле ввода сдвига
-	GUICtrlSetColor($g_iInputOffset, $g_iClrFg)
-	GUICtrlSetBkColor($g_iInputOffset, $g_iClrInput)
+	; Поле сдвига красит UDF (edit), проектная покраска убрана как дубль.
 
-	; Статус-иконка sync — прозрачный фон. Цвет символа задаётся в _SetSyncStatus.
-	GUICtrlSetBkColor($g_iLabelSyncStatus, $GUI_BKCOLOR_TRANSPARENT)
+	; Статус sync — непрозрачный фон тела. Цвет символа задаётся в _SetSyncStatus.
+	GUICtrlSetBkColor($g_iLabelSyncStatus, $g_iClrBg)
 	; При смене темы пересчитываем цвет под текущий статус
 	If $g_sLastSyncStatus <> "" Then _SetSyncStatus($g_sLastSyncStatus, $g_iLastSyncOffset)
 
@@ -1873,9 +1917,10 @@ Func _ApplyTheme()
 	; Иконки подсказок должны соответствовать выбранной теме (Dark/Light)
 	If $bNeedSwitch Then _RenderHeader()
 
-	; Финальная полная перерисовка окна
-	; RDW_INVALIDATE=0x1, RDW_UPDATENOW=0x100, RDW_ALLCHILDREN=0x80
-	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
+	; Финальная полная перерисовка окна. RDW_ERASE обязателен: UDF переводит static-лейблы
+	; в прозрачный фон ($GUI_BKCOLOR_TRANSPARENT), и без стирания фона текст накладывается
+	; на старый при каждой смене темы (лейблы выглядят всё жирнее).
+	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_ERASE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
 EndFunc   ;==>_ApplyTheme
 
 
@@ -1978,12 +2023,21 @@ EndFunc   ;==>_SettingsWindow
 Func _ApplyThemeToSettingsGui()
 	If $g_hSettingsGui = 0 Then Return
 
-	; ВАЖНО: _GUIDarkTheme_GUISetDarkTheme внутри перезаписывает глобал $g_hGui UDF'а
-	; на переданный $hWnd. Сохраняем и восстанавливаем наш главный handle.
-	Local $hMainSaved = $g_hGui
+	; UDF 3.0.0 держит ОДИН глобальный реестр subclass-кнопок ($__DM_g_aButtonSub) на весь
+	; процесс. На Win10 (не 24H2+) радио/чекбоксы главного окна subclass'атся, и их ButtonProc
+	; читает $__DM_g_aButtonSub[$pData] без проверки границ. _GUIDarkTheme_GUISetDarkTheme при
+	; КАЖДОМ вызове обнуляет этот массив ($__DM_g_aButtonSub[1][3], $__DM_g_iButtonCount = 0).
+	; Тема окна настроек затирает его, у настроек subclass-кнопок нет — массив остаётся [1][3],
+	; а радио главного окна хранят $pData = 1..4. Любая их перерисовка → индекс вне границ →
+	; фатальный краш AutoIt. Сохраняем/восстанавливаем реестр вокруг покраски настроек.
+	Local $aButtonSubSaved = $__DM_g_aButtonSub
+	Local $iButtonCountSaved = $__DM_g_iButtonCount
+
 	_GUIDarkTheme_GUISetDarkTheme($g_hSettingsGui, $g_bDarkMode)
-	_GUIDarkTheme_GUICtrlAllSetDarkTheme($g_hSettingsGui, $g_bDarkMode, True)
-	$g_hGui = $hMainSaved
+	_GUIDarkTheme_GUICtrlAllSetDarkTheme($g_hSettingsGui, $g_bDarkMode)
+
+	$__DM_g_aButtonSub = $aButtonSubSaved
+	$__DM_g_iButtonCount = $iButtonCountSaved
 
 	GUISetBkColor($g_iClrBg, $g_hSettingsGui)
 
@@ -2083,7 +2137,7 @@ Func _SettingsUpdateInfoText()
 
 	If $g_sAvailableVersion <> "" Then
 		GUICtrlSetData($g_iSettingsLabelUpdateInfo, StringFormat(Lang("Updates", "AvailableVersion", "Version %s is available"), $g_sAvailableVersion))
-		GUICtrlSetColor($g_iSettingsLabelUpdateInfo, 0x0078D4) ; акцентный синий, кликабельно
+		GUICtrlSetColor($g_iSettingsLabelUpdateInfo, $gc_iClrAccent) ; кликабельно
 		GUICtrlSetState($g_iSettingsLabelUpdateInfo, $GUI_SHOW)
 	ElseIf GUICtrlRead($g_iSettingsComboUpdates) = Lang("Updates", "FreqNever", "Never") Then
 		GUICtrlSetState($g_iSettingsLabelUpdateInfo, $GUI_HIDE) ; проверки выключены — дата нерелевантна
@@ -2095,14 +2149,6 @@ Func _SettingsUpdateInfoText()
 		GUICtrlSetState($g_iSettingsLabelUpdateInfo, $GUI_SHOW)
 	EndIf
 EndFunc   ;==>_SettingsUpdateInfoText
-
-
-Func _MainGUI_Refresh()
-	_ApplyTheme()
-	_RenderHeader()
-	; Перерисовка окна
-	DllCall("user32.dll", "bool", "RedrawWindow", "hwnd", $g_hGui, "ptr", 0, "handle", 0, "uint", $RDW_INVALIDATE + $RDW_UPDATENOW + $RDW_ALLCHILDREN)
-EndFunc   ;==>_MainGUI_Refresh
 
 
 ; Сравнивает версии вида "1.07" покомпонентно как числа.
@@ -2196,7 +2242,7 @@ EndFunc   ;==>_StopSettingsPulse
 ; Тик мигания: переключает иконку шестерёнки между цветом темы и акцентным синим.
 Func _PulseSettingsButton()
 	_DestroyImgList($g_hSettingsImgList)
-	$g_hSettingsImgList = _SetButtonCenterIcon($g_iButtonSettings, "Settings.png", 18, $g_bPulsePhase ? 0x0078D4 : _IconTint())
+	$g_hSettingsImgList = _SetButtonCenterIcon($g_iButtonSettings, "Settings.png", 18, $g_bPulsePhase ? $gc_iClrAccent : _IconTint())
 	$g_bPulsePhase = Not $g_bPulsePhase
 EndFunc   ;==>_PulseSettingsButton
 
@@ -2235,3 +2281,29 @@ Func _OnEvent_SettingsCheckNow()
 	GUICtrlSetState($g_iSettingsButtonCheckNow, $GUI_ENABLE)
 	If $g_hSettingsGui <> 0 Then _SettingsUpdateInfoText() ; обновить поле (ссылка/дата)
 EndFunc   ;==>_OnEvent_SettingsCheckNow
+
+
+; === Ресурсы и завершение ===
+
+; Освобождение GDI/HIMAGELIST handle'ов — срабатывает при любом пути выхода.
+Func _Cleanup()
+	If $g_bPulseActive Then AdlibUnRegister("_PulseSettingsButton")
+	_HeaderDisposeBitmap($g_hLogoBitmap)
+	_DestroyImgList($g_hCompareImgList)
+	_DestroyImgList($g_hSettingsImgList)
+	_DestroyImgList($g_hSwapImgList)
+	_DestroyImgList($g_hSettingsCheckImgList)
+	If $g_hLinkSubclassCB Then
+		DllCallbackFree($g_hLinkSubclassCB)
+		$g_hLinkSubclassCB = 0
+	EndIf
+EndFunc   ;==>_Cleanup
+
+
+; Освобождает HIMAGELIST и обнуляет переменную (ByRef).
+Func _DestroyImgList(ByRef $hList)
+	If $hList Then
+		DllCall("comctl32.dll", "int", "ImageList_Destroy", "handle", $hList)
+		$hList = 0
+	EndIf
+EndFunc   ;==>_DestroyImgList
