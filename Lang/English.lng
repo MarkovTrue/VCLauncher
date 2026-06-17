@@ -13,6 +13,7 @@ Offset=Offset
 OffsetAuto=Auto
 OffsetManual=Manual
 TabCommand=Command
+CommandHint=Generated automatically, you can edit it
 Language=Language:
 Theme=Theme:
 ThemeSystem=System
@@ -48,13 +49,14 @@ Video=Video
 3={Y} Video info
 4={LEFT}{RIGHT} Seek ±1 sec
 5={UP}{DOWN} Seek ±15 sec
-6={PGUP}{PGDOWN} Seek ±10 min
+6={F} Save frames as PNG
 7={3} Show/hide HUD
 8={0} Video/subtraction mode
 9={Y} Toggle subtraction mode
 10={PLUS}{MINUS} Shift ±1 frame
 11={CTRL}{PLUS}{MINUS} Shift ±10 frames
 12={ALT}{PLUS}{MINUS} Shift ±100 frames
+13={6}{7} Zoom ±100%
 
 [Sync]
 StatusNotRun=Status: search not started

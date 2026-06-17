@@ -84,10 +84,12 @@ Func _HeaderCreateBitmap($sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, B
 	Local $hFont = _GDIPlus_FontCreate($hFamily, $nFontSize, $iFontStyle)
 	Local $hTitleFont = _GDIPlus_FontCreate($hFamily, 10, 1) ; заголовок приложения, bold
 	Local $hVcFont = _GDIPlus_FontCreate($hFamily, 10, 0)    ; "Video-compare" + версия
-	Local $hRightTitleFont = _GDIPlus_FontCreate($hFamily, 10, 1) ; заголовок колонки клавиш
+	Local $hRightTitleFont = _GDIPlus_FontCreate($hFamily, 10, 1) ; заголовок колонки клавиш (жирный)
 	Local $hBrush = _GDIPlus_BrushCreateSolid($iColText)
 	Local $hSubBrush = _GDIPlus_BrushCreateSolid($iColSub)
-	Local $hFormat = _GDIPlus_StringFormatCreate()
+	; NoWrap (0x1000): держим подсказку в одну строку. Иначе длинное слово
+	; переносится во вторую строку (обрезана по высоте) и в первой остаётся щель.
+	Local $hFormat = _GDIPlus_StringFormatCreate(0x1000)
 
 	; --- заголовок под иконкой: VCLauncher (жирный), затем Video-compare и версия
 	; двумя строками (обычный, приглушённый). Блок прижат к левому краю под иконкой. ---
@@ -105,15 +107,20 @@ Func _HeaderCreateBitmap($sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, B
 	_GDIPlus_PenDispose($hPen)
 
 	; --- правый заголовок ---
-	Local $iRightX = 162
+	Local $iRightX = 154
 	__HeaderDrawText($hGfx, $sTitleRight, $hRightTitleFont, $hBrush, $hFormat, $iRightX, 11, $iDstW - $iRightX - 8)
 
-	; --- подсказки: две ровные колонки под правым заголовком ---
-	; Ширина колонок адаптивна: половина зоны от $iRightX до правого края.
-	; Так вторая колонка ($iRightX + $iColGap) не выходит за край при любой ширине окна.
-	Local $iRowsPerCol = Int(($iHintsCount + 1) / 2)
-	Local $iColGap = Int(($iDstW - $iRightX - 8) / 2)
-	Local $iColW = $iColGap - 8
+	; --- подсказки: две колонки под правым заголовком ---
+	; Колонки асимметричны: левая шире (длинные подписи вроде "Сменить режим
+	; вычитания"), правая — ровно под свои короткие строки и сдвинута правее
+	; в запас у края. Расчёт от правого края, левой достаётся весь остаток.
+	Local $iLeftCount = Int($iHintsCount / 2)        ; левая — меньшая половина
+	Local $iRowsPerCol = $iHintsCount - $iLeftCount  ; правая (большая) задаёт число строк и шаг
+	Local $iColGapMid = 8                            ; зазор между колонками
+	Local $iColW2 = 160                              ; правая колонка (под "Сдвиг ±100 кадров")
+	Local $iAreaW = $iDstW - $iRightX - 4            ; зона от $iRightX до правого края (4px поля)
+	Local $iColW1 = $iAreaW - $iColW2 - $iColGapMid  ; левой — остаток (шире правой)
+	Local $iColGap = $iColW1 + $iColGapMid           ; смещение второй колонки от $iRightX
 	Local $iKeysY0 = 36
 	Local $iLineH = 15
 	Local $iBottomPad = 6
@@ -122,12 +129,12 @@ Func _HeaderCreateBitmap($sIconsRootPath, $sTheme, $sFontName, $iDstW, $iDstH, B
 
 	For $i = 0 To $iRowsPerCol - 1
 		Local $iRowY = $iKeysY0 + Int($i * $nRowStep)
-		If $i < $iHintsCount Then
-			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$i], $hFont, $hFormat, $hBrush, $iRightX, $iRowY, $iColW, $iLineH, $iIconSizeDelta)
+		If $i < $iLeftCount Then
+			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$i], $hFont, $hFormat, $hBrush, $iRightX, $iRowY, $iColW1, $iLineH, $iIconSizeDelta)
 		EndIf
-		Local $iRight = $i + $iRowsPerCol
+		Local $iRight = $i + $iLeftCount
 		If $iRight < $iHintsCount Then
-			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$iRight], $hFont, $hFormat, $hBrush, $iRightX + $iColGap, $iRowY, $iColW, $iLineH, $iIconSizeDelta)
+			__HeaderDrawHotkeyHintRowLocalized($hGfx, $sIconsRootPath, $sIconTheme, $aHintRows[$iRight], $hFont, $hFormat, $hBrush, $iRightX + $iColGap, $iRowY, $iColW2, $iLineH, $iIconSizeDelta)
 		EndIf
 	Next
 
@@ -222,6 +229,8 @@ Func __HeaderResolveIconPath($sIconsRootPath, $sTheme, $sToken)
 
 	Local $sFile = ""
 	Switch StringUpper($sToken)
+		Case "F"
+			$sFile = "KeyboardF"
 		Case "H"
 			$sFile = "KeyboardH"
 		Case "Y"

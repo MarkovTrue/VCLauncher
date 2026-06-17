@@ -6,7 +6,6 @@
 
 #include <GUIConstantsEx.au3>
 #include <WindowsConstants.au3>
-#include <WindowsNotifsConstants.au3>
 #include <FileConstants.au3>
 #include <WinAPI.au3>
 #include <Math.au3>
@@ -14,9 +13,6 @@
 #include <EditConstants.au3>
 #include <ComboConstants.au3>
 #include <ButtonConstants.au3>
-#include <APIProcConstants.au3>
-#include <APISysConstants.au3>
-#include <APIGdiConstants.au3>
 #include <ProcessConstants.au3>
 #include <SecurityConstants.au3>
 #include <ImageListConstants.au3>
@@ -41,11 +37,10 @@ Global Const $gc_aSupportedExtensions[] = [ _
         "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "asf", "flv", "f4v", "mpg", "mpeg", "mp2", "m2v", _
         "ts", "m2ts", "mts", "mxf", "vob", "3gp", "3g2", "ogv", "ogg", "dv", "divx", "rm", "rmvb", "gif", "vpy"]
 Global Const $gc_iGuiWidth = 548
-Global Const $gc_iHeaderH = 120 ; высота шапки с логотипом
-; Картинка-шапка ýже окна на ширину кнопки настроек: кнопка ложится на фон GUI,
-; а не на Pic (иначе её иконка пропадает после перерисовки шапки).
+Global Const $gc_iHeaderH = 138 ; высота шапки с логотипом (6 строк подсказок в колонке)
+; Картинка-шапка меньше окна на ширину кнопки настроек: кнопка ложится на фон GUI,
 Global Const $gc_iHeaderW = $gc_iGuiWidth - 44
-Global Const $gc_iGuiHeight = $gc_iHeaderH + 289 ; высота клиента (+4px воздуха после полоски)
+Global Const $gc_iGuiHeight = $gc_iHeaderH + 310 ; высота клиента (+место под подсказку команды)
 ; Фон окна по темам. Используется и в палитре (_SetPalette), и в фоне шапки (_RenderHeader),
 ; чтобы полоса справа под кнопкой настроек не отличалась по тону.
 Global Const $gc_iClrBgDark = 0x1E1E1E
@@ -81,7 +76,7 @@ Global $g_sAppFont = "MS Shell Dlg 2", $g_iAppFontSize = 9
 ; Кеш в памяти: разрешения видео и сдвиги sync. Ключ включает mtime —
 ; автоматически инвалидируется, если файл на диске заменён.
 Global $g_oCache[]
-Global $g_iLabel1, $g_iLabel2, $g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelCompare, $g_iLabelCommand
+Global $g_iLabel1, $g_iLabel2, $g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelCompare, $g_iLabelCommand, $g_iLabelCommandHint
 Global $g_iEditCommand, $g_iButtonSettings ; кнопка настроек в шапке
 Global $g_iSeparator, $g_iSeparatorTop
 Global $g_hSettingsGui = 0, $g_iSettingsComboLang, $g_iSettingsComboTheme
@@ -164,9 +159,9 @@ Func _MainGUI()
 	GUICtrlSetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 
 	; Разделитель сразу под шапкой (как перед блоком «Смещение»). Цвет ставит _ApplyTheme.
-	$g_iSeparatorTop = GUICtrlCreateLabel("", 0, $gc_iHeaderH, $gc_iGuiWidth, 1)
+	$g_iSeparatorTop = GUICtrlCreateLabel("", 0, $gc_iHeaderH + 1, $gc_iGuiWidth, 1)
 
-	Local $iY = $gc_iHeaderH + 16 ; отступ от нижнего края шапки (+4px воздуха после полоски)
+	Local $iY = $gc_iHeaderH + 17 ; отступ от нижнего края шапки (+4px воздуха после полоски)
 
 	; --- Видео 1 ---
 	$g_iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 10, $iY + 3, 74, 20)
@@ -226,6 +221,8 @@ Func _MainGUI()
 	; --- Команда ---
 	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 10, $iY + 172, 70, 20)
 	$g_iEditCommand = GUICtrlCreateEdit("", 90, $iY + 171, $gc_iGuiWidth - 180, 70, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $WS_VSCROLL))
+	; Подсказка под полем: команда формируется автоматически, но редактируема.
+	$g_iLabelCommandHint = GUICtrlCreateLabel(Lang("GUI", "CommandHint", "Generated automatically. Editable."), 90, $iY + 226 + 18, $gc_iGuiWidth - 180, 15)
 
 	; --- Кнопка «Сравнить» ---
 	$g_iButtonCompare = GUICtrlCreateButton(Lang("GUI", "Compare", "Compare"), $gc_iGuiWidth - 82, $iY + 171, 70, 70, $BS_MULTILINE)
@@ -1310,6 +1307,7 @@ Func _SetCtrlResizing()
 	GUICtrlSetResizing($g_iSeparator, $iDockStretchH)
 	GUICtrlSetResizing($g_iSeparatorTop, $iDockStretchH)
 	GUICtrlSetResizing($g_iEditCommand, $iDockStretchHV)
+	GUICtrlSetResizing($g_iLabelCommandHint, $iDockStretchH_B)
 
 	; Фиксированные слева
 	GUICtrlSetResizing($g_iLabel1, $iDockFixed)
@@ -1335,18 +1333,20 @@ EndFunc   ;==>_SetCtrlResizing
 
 
 Func _RenderHeader()
-	; Новый порядок: help, info, HUD, mode, toggle, seek1, seek15, shift10, shift100, shift1 (нижняя первой колонки — наверх второй)
-	Local $aHintRows[10]
+	; Обе колонки по 6: левая — управление/режимы/действие, правая — навигация по времени.
+	Local $aHintRows[12]
 	$aHintRows[0] = Lang("Hotkeys", "2", "{H} Control hints")
 	$aHintRows[1] = Lang("Hotkeys", "3", "{Y} Video info")
 	$aHintRows[2] = Lang("Hotkeys", "7", "{3} Show/hide HUD")
 	$aHintRows[3] = Lang("Hotkeys", "8", "{0} Video/subtraction mode")
 	$aHintRows[4] = Lang("Hotkeys", "9", "{Y} Toggle subtraction mode")
-	$aHintRows[5] = Lang("Hotkeys", "4", "{LEFT}{RIGHT} Seek ±1 sec")
-	$aHintRows[6] = Lang("Hotkeys", "5", "{UP}{DOWN} Seek ±15 sec")
-	$aHintRows[7] = Lang("Hotkeys", "10", "{PLUS}{MINUS} Shift ±1 frame")
-	$aHintRows[8] = Lang("Hotkeys", "11", "{CTRL}{PLUS}{MINUS} Shift ±10 frames")
-	$aHintRows[9] = Lang("Hotkeys", "12", "{ALT}{PLUS}{MINUS} Shift ±100 frames")
+	$aHintRows[5] = Lang("Hotkeys", "6", "{F} Save frames as PNG")
+	$aHintRows[6] = Lang("Hotkeys", "4", "{LEFT}{RIGHT} Seek ±1 sec")
+	$aHintRows[7] = Lang("Hotkeys", "5", "{UP}{DOWN} Seek ±15 sec")
+	$aHintRows[8] = Lang("Hotkeys", "13", "{6}{7} Zoom ±100%")
+	$aHintRows[9] = Lang("Hotkeys", "10", "{PLUS}{MINUS} Shift ±1 frame")
+	$aHintRows[10] = Lang("Hotkeys", "11", "{CTRL}{PLUS}{MINUS} Shift ±10 frames")
+	$aHintRows[11] = Lang("Hotkeys", "12", "{ALT}{PLUS}{MINUS} Shift ±100 frames")
 
 
 	Local $sIconsRoot = @ScriptDir & "\Assets\KeyIcons"
@@ -1786,6 +1786,7 @@ Func _ApplyLanguage()
 	GUICtrlSetData($g_iRadioOffsetAuto, Lang("GUI", "OffsetAuto", "Auto"))
 	GUICtrlSetData($g_iRadioOffsetManual, Lang("GUI", "OffsetManual", "Manual"))
 	GUICtrlSetData($g_iLabelCommand, Lang("GUI", "TabCommand", "Command"))
+	GUICtrlSetData($g_iLabelCommandHint, Lang("GUI", "CommandHint", "Generated automatically. Editable."))
 	_RenderHeader()
 	_UpdateFilesInfo()
 	_ApplyTheme()
@@ -1899,6 +1900,8 @@ Func _ApplyTheme()
 	GUICtrlSetBkColor($g_iLabelInfo2, $g_iClrBg)
 	GUICtrlSetColor($g_iLabelInfo1, $g_iClrInfo)
 	GUICtrlSetColor($g_iLabelInfo2, $g_iClrInfo)
+	GUICtrlSetBkColor($g_iLabelCommandHint, $g_iClrBg)
+	GUICtrlSetColor($g_iLabelCommandHint, $g_iClrInfo)
 
 	; Поле сдвига красит UDF (edit), проектная покраска убрана как дубль.
 
