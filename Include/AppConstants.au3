@@ -8,7 +8,7 @@
 ; её формат менять нельзя.
 
 Global Const $gc_sAppTitle   = "VCLauncher"            ; имя продукта
-Global Const $gc_sAppVersion = "1.08"                  ; версия приложения
+Global Const $gc_sAppVersion = "1.09"                  ; версия приложения
 Global Const $gc_sAppName    = $gc_sAppTitle & " " & $gc_sAppVersion
 
 ; Сырой URL этого же файла в ветке main - источник проверки обновлений.

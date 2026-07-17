@@ -18,14 +18,18 @@ A handy GUI launcher for [Video Compare](https://github.com/pixop/video-compare)
 - Auto-scaling the window when the video exceeds the screen
 - Quick switching between comparison modes
 - Drag-and-drop support
-- Manual editing of the `video-compare` launch command
-- Cheat sheet with some commonly used `video-compare` hotkeys
+- Manual editing of the `Video-compare` launch command
+- Cheat sheet with some commonly used `Video-compare` hotkeys
 - Caching and autosave
 - Theme and localization support
-- Hiding the `video-compare` console
+- Hiding the `Video-compare` console
 
 ### VCLauncher uses (already bundled in the release)
 
 - [Video-compare](https://github.com/pixop/video-compare) - the comparison engine itself
 - [FFmpeg](https://github.com/FFmpeg/FFmpeg) - for extracting audio/video streams
 - `Sync.exe` - proprietary CLI utility for time shift search
+
+### Note
+
+⚠️ Your antivirus may falsely flag the exe files. This is a known quirk of compiled AutoIt scripts and PyInstaller builds. The launcher source code is open, so if in doubt you can review it and compile it yourself.
