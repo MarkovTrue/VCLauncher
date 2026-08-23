@@ -2,7 +2,6 @@
 #pragma compile(Icon, Assets\Icons\Icon.ico)
 
 #NoTrayIcon
-#RequireAdmin
 
 #include <GUIConstantsEx.au3>
 #include <WindowsConstants.au3>
@@ -441,7 +440,7 @@ Func _OnEvent_GUI_EVENT_DROPPED()
 
 	; Проверяем расширение файла
 	If Not _IsValidVideoExtension($sDropFile) Then
-		Local $sExt = StringLower(StringRegExpReplace($sDropFile, '^.*\.', ''))
+		Local $sExt = _GetFileExt($sDropFile)
 		MsgBox(48, $gc_sAppName, Lang("Errors", "UnsupportedFormat", "Unsupported file format:") & " " & $sExt & @CR & @CR & _
 				Lang("Errors", "SupportedFormats", "Supported formats:") & " " & _GetVideoExtensionsFilter())
 		Return
@@ -826,9 +825,20 @@ Func _GetSyncOffset($sFile1, $sFile2)
 
 	; Вызов Sync.exe с таймаутом и прогрессом
 	Local $aRun = _RunSyncWithTimeout($sFile1, $sFile2, $g_iSyncTimeoutSec)
+	Local $bByVideo = ($g_sSyncMethod = "video")
+
+	; Audio не нашёл совпадения — встречная попытка video-методом: разные озвучки
+	; роняют корреляцию огибающих, а scene-cuts от аудиодорожек не зависят
+	If $aRun[0] = "NOMATCH" And Not $bByVideo Then
+		Local $sAudioOutput = $g_sLastSyncOutput
+		$aRun = _RunSyncWithTimeout($sFile1, $sFile2, $g_iSyncTimeoutSec, "video")
+		$bByVideo = True
+		; Click-details показывает оба прогона, а не только последний
+		$g_sLastSyncOutput = $sAudioOutput & @CRLF & "--- video fallback ---" & @CRLF & $g_sLastSyncOutput
+	EndIf
 
 	; Подозрительно большой сдвиг перепроверяем по видео (для audio-метода)
-	If $aRun[0] = "OK" And Abs($aRun[1]) > $g_iSyncSuspectMs And $g_sSyncMethod <> "video" Then
+	If $aRun[0] = "OK" And Abs($aRun[1]) > $g_iSyncSuspectMs And Not $bByVideo Then
 		$aRun = _VerifyOffsetByVideo($sFile1, $sFile2, $aRun)
 	EndIf
 
@@ -1275,15 +1285,10 @@ Func _GetVideoResolution($sVideoPath)
 EndFunc   ;==>_GetVideoResolution
 
 
+; Запускает инструмент и возвращает его stderr целиком: ffmpeg пишет метаданные туда.
 Func _RunToolReadStderr($sCmdLine)
 	Local $iPid = Run($sCmdLine, "", @SW_HIDE, $STDERR_CHILD + $STDOUT_CHILD)
-	Local $sOutput = "", $sLine
-	While 1
-		$sLine = StderrRead($iPid)
-		If @error Then ExitLoop
-		$sOutput &= $sLine
-	WEnd
-	Return StringStripWS($sOutput, 3)
+	Return StringStripWS(_DrainPipe($iPid, True), 3)
 EndFunc   ;==>_RunToolReadStderr
 
 
@@ -1573,12 +1578,11 @@ Func _ApplyAppFont()
 EndFunc   ;==>_ApplyAppFont
 
 
+; Папка файла без завершающего разделителя. Понимает и обратный, и прямой слэш:
+; _NormalizePath пропускает пути с "/". Путь без разделителя даёт "".
 Func _PathGetDir($sPath)
-	Local $iPos = StringInStr($sPath, "\", 0, -1)
-	If $iPos > 0 Then
-		Return StringLeft($sPath, $iPos - 1)
-	EndIf
-	Return ""
+	If Not StringRegExp($sPath, '[\\/]') Then Return ""
+	Return StringRegExpReplace($sPath, '[\\/][^\\/]*$', '')
 EndFunc   ;==>_PathGetDir
 
 
@@ -1587,13 +1591,19 @@ Func _GetFileName($sPath)
 EndFunc   ;==>_GetFileName
 
 
+; Расширение файла в нижнем регистре, без точки. Файл без расширения даёт имя целиком.
+Func _GetFileExt($sPath)
+	Return StringLower(StringRegExpReplace(_GetFileName($sPath), '^.*\.', ''))
+EndFunc   ;==>_GetFileExt
+
+
 Func _ResetInputCaret($iCtrlID)
 	GUICtrlSendMsg($iCtrlID, $EM_SETSEL, 0, 0)
 EndFunc   ;==>_ResetInputCaret
 
 
 Func _IsValidVideoExtension($sFilePath)
-	Local $sExt = StringLower(StringRegExpReplace($sFilePath, '^.*\.', ''))
+	Local $sExt = _GetFileExt($sFilePath)
 	For $sSupportedExt In $gc_aSupportedExtensions
 		If $sExt = $sSupportedExt Then Return True
 	Next
