@@ -230,6 +230,7 @@ Func _MainGUI()
 	_SetCtrlResizing()
 	_RenderHeader()
 	_ApplyTheme()
+	_ValidateVideoFiles() ; пути из ini могли устареть, не показываем несуществующие файлы
 
 	GUISetState(@SW_SHOW)
 
@@ -292,7 +293,9 @@ Func _OnEvent_ButtonChoose()
 		$sCurrentFile = $g_sVideoFile2
 	EndIf
 
-	Local $sFile = FileOpenDialog($sTitle, _PathGetDir($sCurrentFile), _GetVideoExtensionsFilter(), 1, _GetFileName($sCurrentFile))
+	; Слот мог быть сброшен из-за пропавшего файла, стартовую папку тогда берём из ini
+	Local $sStartFile = ($sCurrentFile <> "") ? $sCurrentFile : _NormalizePath(IniRead($gc_sPathIni, "LastDirs", $sIniKey, ""))
+	Local $sFile = FileOpenDialog($sTitle, _PathGetDir($sStartFile), _GetVideoExtensionsFilter(), 1, _GetFileName($sCurrentFile))
 	If Not @error And FileExists($sFile) Then
 		If $iButtonID = $g_iButtonChoose1 Then
 			$g_sVideoFile1 = $sFile
@@ -309,6 +312,10 @@ EndFunc   ;==>_OnEvent_ButtonChoose
 
 
 Func _OnEvent_ButtonCompare()
+	If _ValidateVideoFiles() Then
+		_UpdateFilesInfo()
+		Return
+	EndIf
 	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then Return
 
 	; Индикация «идёт запуск»: блокируем кнопку и меняем её надпись
@@ -342,6 +349,8 @@ EndFunc   ;==>_OnEvent_ButtonSettings
 
 
 Func _OnEvent_ButtonSwap()
+	_ValidateVideoFiles() ; пропавший файл не переносим в соседний слот
+
 	Local $sTmp = $g_sVideoFile1
 	$g_sVideoFile1 = $g_sVideoFile2
 	$g_sVideoFile2 = $sTmp
@@ -513,7 +522,37 @@ Func _OnEvent_WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>_OnEvent_WM_COMMAND
 
 
+; Сбрасывает слоты, чей файл исчез с диска (удалён или переименован после выбора).
+; Возвращает True, если что-то сброшено – вызывающий обязан перерисовать окно
+; через _UpdateFilesInfo, иначе останется полузаполненный вид.
+Func _ValidateVideoFiles()
+	Local $bReset = False
+
+	If $g_sVideoFile1 <> "" And Not FileExists($g_sVideoFile1) Then
+		$g_sVideoFile1 = ""
+		GUICtrlSetData($g_iInput1, "")
+		$bReset = True
+	EndIf
+
+	If $g_sVideoFile2 <> "" And Not FileExists($g_sVideoFile2) Then
+		$g_sVideoFile2 = ""
+		GUICtrlSetData($g_iInput2, "")
+		$bReset = True
+	EndIf
+
+	; Сдвиг считается для пары файлов, без одного из них он бессмыслен
+	If $bReset Then
+		GUICtrlSetData($g_iInputOffset, "")
+		_TryFillCachedOffset() ; в авто-режиме поставит статус «не запускался»
+	EndIf
+
+	Return $bReset
+EndFunc   ;==>_ValidateVideoFiles
+
+
 Func _UpdateFilesInfo()
+	_ValidateVideoFiles() ; выбранный файл мог исчезнуть с диска
+
 	Local $bFile1Exists = FileExists($g_sVideoFile1)
 	Local $bFile2Exists = FileExists($g_sVideoFile2)
 
@@ -581,6 +620,11 @@ EndFunc   ;==>_FormatInfoLabel
 
 
 Func _UpdateCommandField()
+	; Пропавший файл обнуляет не только команду, окно приводим к виду «файл не выбран»
+	If _ValidateVideoFiles() Then
+		_UpdateFilesInfo()
+		Return
+	EndIf
 	GUICtrlSetData($g_iEditCommand, _ComputeCommand())
 EndFunc   ;==>_UpdateCommandField
 
