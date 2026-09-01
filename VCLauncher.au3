@@ -1,5 +1,9 @@
-#pragma compile(Out, VCLauncher.exe)
+#pragma compile(Out, #Build\VCLauncher.exe)
 #pragma compile(Icon, Assets\Icons\Icon.ico)
+#pragma compile(ProductName, VCLauncher)
+#pragma compile(FileDescription, Side by side video comparison tool)
+#pragma compile(FileVersion, 1.11.0.0)
+#pragma compile(x64, true)
 
 #NoTrayIcon
 
