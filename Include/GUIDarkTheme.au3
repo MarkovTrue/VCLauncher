@@ -3439,29 +3439,34 @@ Func __GUIDarkTheme_SubclassProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 				$tRect = _WinAPI_GetWindowRect($hWnd)
 				Local $iW = $tRect.Right - $tRect.Left
 				Local $iH = $tRect.Bottom - $tRect.Top
+				; $__DM_g_bShowCtrlBorder = False (_GUIDarkTheme_CtrlBorderSet) должно означать
+				; «рамки вообще нет», а не «рамка в цвет фона»: цвет $hPenGui берётся из
+				; ФИКСИРОВАННОГО фона темы UDF, который не совпадает с кастомным фоном скина
+				; (VCLauncher.au3 красит окно в свою палитру) — несовпадение давало видимый
+				; прямоугольный контур поверх скруглённой рамки скина, углы которой этот
+				; квадратный контур обрезал. Наши Edit-поля рамку рисуют сами (SkinInput),
+				; поэтому здесь её не рисуем вовсе, если рамка выключена явно.
 				If $__DM_g_bShowCtrlBorder Then
 					$hPen = $__DM_g_bUseDarkMode ? $__DM_g_hPenBorder : $__DM_g_hPenBorderSel
-				Else
-					$hPen = $__DM_g_hPenGui
+					Local $hOldPen = _WinAPI_SelectObject($hDC, $hPen)
+					Local $hNull = _WinAPI_GetStockObject(5)
+					Local $hOldBr = _WinAPI_SelectObject($hDC, $hNull)
+					DllCall('gdi32.dll', "bool", "Rectangle", "handle", $hDC, "int", 0, "int", 0, "int", $iW, "int", $iH)
+					Local $hPen2 = (_WinAPI_GetFocus() = $hWnd) ? $__DM_g_hPen2Accent : $__DM_g_bUseDarkMode ? $__DM_g_hPen2Border : $__DM_g_hPen2BorderSel
+					Local $hOldPen2 = _WinAPI_SelectObject($hDC, $hPen2)
+					If _WinAPI_GetClassName($hWnd) = "Edit" Then
+						If $__DM_g_bShowEditActive Then _WinAPI_DrawLine($hDC, 0, $iH - 1, $tRect.Right, $iH - 1)
+					EndIf
+					Local $hPen3 = (_WinAPI_GetFocus() = $hWnd) ? $__DM_g_hPenAccent : $__DM_g_hPenGui
+					Local $hOldPen3 = _WinAPI_SelectObject($hDC, $hPen3)
+					If _WinAPI_GetClassName($hWnd) = "Edit" And _WinAPI_GetFocus() <> $hWnd Then
+						If $__DM_g_bShowEditActive Then _WinAPI_DrawLine($hDC, 0, $iH - 1, $tRect.Right, $iH - 1)
+					EndIf
+					_WinAPI_SelectObject($hDC, $hOldPen)
+					_WinAPI_SelectObject($hDC, $hOldBr)
+					_WinAPI_SelectObject($hDC, $hOldPen2)
+					_WinAPI_SelectObject($hDC, $hOldPen3)
 				EndIf
-				Local $hOldPen = _WinAPI_SelectObject($hDC, $hPen)
-				Local $hNull = _WinAPI_GetStockObject(5)
-				Local $hOldBr = _WinAPI_SelectObject($hDC, $hNull)
-				DllCall('gdi32.dll', "bool", "Rectangle", "handle", $hDC, "int", 0, "int", 0, "int", $iW, "int", $iH)
-				Local $hPen2 = (_WinAPI_GetFocus() = $hWnd) ? $__DM_g_hPen2Accent : $__DM_g_bUseDarkMode ? $__DM_g_hPen2Border : $__DM_g_hPen2BorderSel
-				Local $hOldPen2 = _WinAPI_SelectObject($hDC, $hPen2)
-				If _WinAPI_GetClassName($hWnd) = "Edit" Then
-					If $__DM_g_bShowEditActive Then _WinAPI_DrawLine($hDC, 0, $iH - 1, $tRect.Right, $iH - 1)
-				EndIf
-				Local $hPen3 = (_WinAPI_GetFocus() = $hWnd) ? $__DM_g_hPenAccent : $__DM_g_hPenGui
-				Local $hOldPen3 = _WinAPI_SelectObject($hDC, $hPen3)
-				If _WinAPI_GetClassName($hWnd) = "Edit" And _WinAPI_GetFocus() <> $hWnd Then
-					If $__DM_g_bShowEditActive Then _WinAPI_DrawLine($hDC, 0, $iH - 1, $tRect.Right, $iH - 1)
-				EndIf
-				_WinAPI_SelectObject($hDC, $hOldPen)
-				_WinAPI_SelectObject($hDC, $hOldBr)
-				_WinAPI_SelectObject($hDC, $hOldPen2)
-				_WinAPI_SelectObject($hDC, $hOldPen3)
 				__GUIDarkTheme_PaintSizeBox($hWnd, $hDC)
 				_WinAPI_ReleaseDC($hWnd, $hDC)
 				Return $iRet
@@ -3484,6 +3489,11 @@ Func __GUIDarkTheme_SubclassProc($hWnd, $iMsg, $wParam, $lParam, $iID, $pData)
 			$sClass = _WinAPI_GetClassName($hWnd)
 			If _IsBorderedControl($sClass) And $wParam Then
 				$iRet = __WinAPI_DefSubclassProc($hWnd, $iMsg, $wParam, $lParam)
+				; Рамка выключена (_GUIDarkTheme_CtrlBorderSet(False,...)) — WM_NCPAINT ничего
+				; не рисует (см. ниже), поэтому резервировать под неё поле тоже не нужно:
+				; иначе это поле остаётся непрокрашенным (виден чёрный/неинициализированный
+				; контур там, где раньше была рамка). Клиентская область — во весь контрол.
+				If Not $__DM_g_bShowCtrlBorder Then Return $iRet
 				$tRect = DllStructCreate($tagRECT, $lParam)
 				If $sClass = "ListBox" Then Return $iRet
 				$tRect.left += 1

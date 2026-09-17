@@ -1,7 +1,7 @@
 ﻿#include-once
 
 ; ============================================================
-; FontHelper.au3 — утилиты для проверки и выбора шрифтов
+; FontHelper.au3 – утилиты для проверки и выбора шрифтов
 ; ============================================================
 
 
@@ -22,7 +22,7 @@ EndFunc   ;==>_FontExists
 
 
 ; Находит первый установленный шрифт из массива $aCandidates.
-; Если ни один не найден — возвращает $sDefault.
+; Если ни один не найден – возвращает $sDefault.
 Func _FontFindBest(Const ByRef $aCandidates, $sDefault = "MS Shell Dlg 2")
 	For $sCand In $aCandidates
 		If _FontExists($sCand) Then Return $sCand
