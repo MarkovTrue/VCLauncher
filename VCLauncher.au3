@@ -2,7 +2,6 @@
 #pragma compile(Icon, Assets\Icons\Icon.ico)
 #pragma compile(ProductName, VCLauncher)
 #pragma compile(FileDescription, Side by side video comparison tool)
-#pragma compile(FileVersion, 1.11.0.0)
 #pragma compile(x64, true)
 
 #NoTrayIcon
@@ -25,17 +24,19 @@
 #include <Date.au3>
 
 #include "Include\AppConstants.au3"
-#include "Include\GUIDarkTheme.au3"
 #include "Include\FontHelper.au3"
 
-; Скинизированные контролы: вид рисуется в GDI+, штатные Edit и Button
-; прямоугольные и под тему не красятся. Модуль на компонент.
-#include "Controls\SkinCore.au3"
-#include "Controls\SkinButton.au3"
-#include "Controls\SkinInput.au3"
-#include "Controls\SkinSegment.au3"
-#include "Controls\SkinHeader.au3"
-#include "Controls\SkinHotkeys.au3"
+; Интерфейс – общая библиотека Fluent из соседнего проекта AutoitFluentSkin: штатные Edit
+; и Button прямоугольные и под тему не красятся, их вид рисуется в GDI+
+#include "..\AutoitFluentSkin\Include\FluentButton.au3"
+#include "..\AutoitFluentSkin\Include\FluentHeader.au3"
+#include "..\AutoitFluentSkin\Include\FluentHotkeys.au3"
+#include "..\AutoitFluentSkin\Include\FluentInput.au3"
+#include "..\AutoitFluentSkin\Include\FluentNumber.au3"
+#include "..\AutoitFluentSkin\Include\FluentSegment.au3"
+#include "..\AutoitFluentSkin\Include\FluentNativeEdit.au3"
+#include "..\AutoitFluentSkin\Include\FluentNativeStatic.au3"
+#include "..\AutoitFluentSkin\Include\FluentTheme.au3"
 
 Opt("GUIOnEventMode", 1)
 
@@ -73,10 +74,9 @@ Global Const $gc_iTipWidth = 46
 
 Global Const $gc_iUpdateTimeoutMs = 30000 ; зависшая загрузка версии обрывается
 
-; Цвета статуса поиска сдвига – единственное цветное место в окне
+; Цвета статуса поиска сдвига – единственное цветное место в окне. Внимание и ошибка –
+; $g_iFluentWarn и $g_iFluentErr библиотеки; найденный сдвиг – свой синий: это сведение, а не «готово»
 Global Const $gc_iClrOkDark = 0x4CC2FF, $gc_iClrOkLight = 0x0A66C2
-Global Const $gc_iClrWarnDark = 0xFFCC66, $gc_iClrWarnLight = 0x9A6700
-Global Const $gc_iClrErrDark = 0xFF8A8A, $gc_iClrErrLight = 0xC42B1C
 
 ; Кадры спиннера статуса поиска
 Global Const $gc_aSpinnerFrames[4] = [ChrW(0x25D0), ChrW(0x25D3), ChrW(0x25D1), ChrW(0x25D2)]
@@ -157,11 +157,11 @@ Global $g_iSpinnerIdx = 0
 Global $g_sLangFile = "", $g_sCurrentLang = "", $g_mLang[]
 Global $g_sTheme = "Light" ; Light | Dark
 Global $g_bDarkMode = False
-Global $g_bThemeInitialized = False ; UDF-тема уже применялась
+Global $g_bThemeInitialized = False ; тема Fluent уже применялась
 Global $g_bAppliedDark = False ; тема, реально применённая к GUI
 Global $g_iClrBg, $g_iClrFg, $g_iClrInfo, $g_iClrSep
-; Подсветка поля при drag&drop. WM_CTLCOLOREDIT забирает UDF темы,
-; поэтому заливку даёт свой делегат _OnEvent_WM_CTLCOLOREDIT.
+; Подсветка поля при drag&drop. Цвета полей отдаёт FluentInput через WM_CTLCOLOREDIT,
+; поэтому заливку даёт свой обработчик _OnEvent_WM_CTLCOLOREDIT, стоящий в цепочке раньше.
 Global $g_hDragHiCtrl = 0 ; HWND подсвечиваемого поля
 Global $g_hBrushDrag = 0  ; кисть подсветки, создаётся лениво
 
@@ -202,57 +202,57 @@ Func _MainGUI()
 	_FitWindowToContent() ; размеры GUICreate внешние, раскладка считается от клиентских
 	$g_sAppFont = _FontApply($g_hGui, $g_iAppFontSize)
 
-	; Ядро скина до первого контрола. Палитра здесь первичная, чтобы контролы
+	; Ядро Fluent до первого контрола. Палитра здесь первичная, чтобы контролы
 	; сразу создавались нужного цвета; окончательную ставит _ApplyTheme.
-	_SkinInit($g_hGui, $g_sAppFont, $g_iAppFontSize, @ScriptDir & "\Assets\Icons")
-	_SkinSetTheme(_ResolveDarkMode())
-	_SkinHoverRegister("_SkinBtnHoverTick")
-	_SkinHoverRegister("_SkinInputHoverTick")
-	_SkinHoverRegister("_SegHoverTick")
+	_FluentInit($g_hGui, $g_sAppFont, $g_iAppFontSize, @ScriptDir & "\Assets\Icons")
+	_FluentSetTheme(_ResolveDarkMode())
+	; Обработчики зовутся по порядку регистрации: drag-подсветка должна ответить раньше,
+	; чем FluentInput, который регистрирует свой при создании первого поля
+	_FluentMsg_Register($WM_CTLCOLOREDIT, "_OnEvent_WM_CTLCOLOREDIT")
 
 	; --- Шапка: логотип, название, версия video-compare ---
-	$g_iHeaderPic = _SkinHeaderCreate(0, 0, _
-			@ScriptDir & "\Assets\Icons\HeaderIcon.png", $gc_sAppName, _HeaderSubtitle())
+	$g_iHeaderPic = _FluentHeader_Create(@ScriptDir & "\Assets\Icons\HeaderIcon.png", $gc_sAppName, _
+			_HeaderSubtitle(), 0, 0)
 
 	Local $iBx = $gc_iGuiWidth - $gc_iPadX - $gc_iHeaderBtn
-	$g_iButtonSettings = _SkinBtnCreate("", "Settings", 20, $iBx, 14, _
-			$gc_iHeaderBtn, $gc_iHeaderBtn, $SKINBTN_SUBTLE)
+	$g_iButtonSettings = _FluentButton_Create("", "Settings", 20, $iBx, 14, _
+			$gc_iHeaderBtn, $gc_iHeaderBtn, $FLUENTBUTTON_SUBTLE)
 	_SetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 
-	$g_iButtonKeys = _SkinBtnCreate("", "Keyboard", 20, $iBx - $gc_iHeaderBtn - 4, 14, _
-			$gc_iHeaderBtn, $gc_iHeaderBtn, $SKINBTN_SUBTLE)
+	$g_iButtonKeys = _FluentButton_Create("", "Keyboard", 20, $iBx - $gc_iHeaderBtn - 4, 14, _
+			$gc_iHeaderBtn, $gc_iHeaderBtn, $FLUENTBUTTON_SUBTLE)
 	_SetTip($g_iButtonKeys, Lang("Hotkeys", "1", "Video-compare hotkeys"))
 	; Шапка – подложка под кнопками, вниз её можно отправить только после них
-	_SkinSendToBack($g_iHeaderPic)
+	_FluentSendToBack($g_iHeaderPic)
 
 	; --- Шпаргалка горячих клавиш: создаётся сразу, раскрывается кнопкой ---
 	Local $aRows = _HotkeyRows()
-	$g_iHotkeysPanel = _SkinHotkeysCreate($gc_iPadX, $gc_iSkinHeaderH, _
-			$gc_iGuiWidth - $gc_iPadX * 2, Lang("Hotkeys", "1", "Video-compare hotkeys"), $aRows)
-	$g_iHotkeysH = _SkinHotkeysHeight(UBound($aRows)) + $gc_iGap
-	_SkinBtnSetOn($g_iButtonKeys, $g_bHotkeysOpen)
-	If Not $g_bHotkeysOpen Then _SkinHotkeysSetShow($g_iHotkeysPanel, False)
+	$g_iHotkeysPanel = _FluentHotkeys_Create(Lang("Hotkeys", "1", "Video-compare hotkeys"), $aRows, _
+			$gc_iPadX, $gc_iFluentHeaderH, $gc_iGuiWidth - $gc_iPadX * 2, @ScriptDir & "\Assets\KeyIcons")
+	$g_iHotkeysH = _FluentHotkeys_MeasureHeight(UBound($aRows)) + $gc_iGap
+	_FluentButton_SetChecked($g_iButtonKeys, $g_bHotkeysOpen)
+	If Not $g_bHotkeysOpen Then _FluentHotkeys_SetVisible($g_iHotkeysPanel, False)
 
 	$g_iSeparatorTop = GUICtrlCreateLabel("", 0, 0, $gc_iGuiWidth, 1)
 
 	; --- Тело окна. Координаты раздаёт _LayoutBody, здесь только создание ---
 	$g_iLabel1 = GUICtrlCreateLabel(Lang("GUI", "File1", "File 1"), 0, 0, 10, 16)
-	$g_iInput1 = _SkinInputCreate(0, 0, 100, $gc_iRowH)
+	$g_iInput1 = _FluentInput_Create(0, 0, 100, $gc_iRowH)
 	_AcceptVideoDrop($g_iInput1)
 	_ShowVideoFile($g_iInput1, $g_sVideoFile1)
-	$g_iButtonChoose1 = _SkinBtnCreate("", "Ellipsis", 18, 0, 0, $gc_iIconBtn, $gc_iIconBtn)
+	$g_iButtonChoose1 = _FluentButton_Create("", "Ellipsis", 18, 0, 0, $gc_iIconBtn, $gc_iIconBtn)
 	_SetTip($g_iButtonChoose1, Lang("GUI", "Choose", "Choose"))
 	$g_iLabelInfo1 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 0, 0, 10, $gc_iSubH)
 
 	; Кнопка обмена встаёт ровно посередине между полями
-	$g_iButtonSwap = _SkinBtnCreate("", "Swap", 18, 0, 0, $gc_iIconBtn, $gc_iIconBtn)
+	$g_iButtonSwap = _FluentButton_Create("", "Swap", 18, 0, 0, $gc_iIconBtn, $gc_iIconBtn)
 	_SetTip($g_iButtonSwap, Lang("GUI", "SwapTip", "Swap files"))
 
 	$g_iLabel2 = GUICtrlCreateLabel(Lang("GUI", "File2", "File 2"), 0, 0, 10, 16)
-	$g_iInput2 = _SkinInputCreate(0, 0, 100, $gc_iRowH)
+	$g_iInput2 = _FluentInput_Create(0, 0, 100, $gc_iRowH)
 	_AcceptVideoDrop($g_iInput2)
 	_ShowVideoFile($g_iInput2, $g_sVideoFile2)
-	$g_iButtonChoose2 = _SkinBtnCreate("", "Ellipsis", 18, 0, 0, $gc_iIconBtn, $gc_iIconBtn)
+	$g_iButtonChoose2 = _FluentButton_Create("", "Ellipsis", 18, 0, 0, $gc_iIconBtn, $gc_iIconBtn)
 	_SetTip($g_iButtonChoose2, Lang("GUI", "Choose", "Choose"))
 	$g_iLabelInfo2 = GUICtrlCreateLabel(Lang("GUI", "FileNotSelected", "File not selected"), 0, 0, 10, $gc_iSubH)
 
@@ -260,10 +260,11 @@ Func _MainGUI()
 
 	; --- Смещение: режим сегментом, значение в поле ---
 	$g_iLabelOffset = GUICtrlCreateLabel(Lang("GUI", "Offset", "Offset"), 0, 0, 10, 16)
-	$g_iSegOffset = _SegCreate(Lang("GUI", "OffsetAuto", "Auto") & "|" & Lang("GUI", "OffsetManual", "Manual"), _
+	$g_iSegOffset = _FluentSegment_Create(Lang("GUI", "OffsetAuto", "Auto") & "|" & Lang("GUI", "OffsetManual", "Manual"), _
 			"SegAuto|SegManual", 0, 0, $gc_iRowH, 0, "_OnEvent_SegOffsetMode")
-	$g_iInputOffset = _SkinInputCreate(0, 0, 88, $gc_iRowH, $ES_RIGHT)
-	GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
+	; Сдвиг в мс бывает отрицательным, ±999999 – с запасом на любое расхождение начала
+	$g_iInputOffset = _FluentNumber_Create('', 0, 0, 88, $gc_iRowH, -999999, 999999, '', '', $ES_RIGHT)
+	_FluentInput_SetEnabled($g_iInputOffset, False)
 	$g_iLabelOffsetUnits = GUICtrlCreateLabel(Lang("GUI", "OffsetUnits", "ms"), 0, 0, 30, 16)
 
 	; Статус поиска кликабелен: по нему открываются детали неудачи
@@ -271,23 +272,23 @@ Func _MainGUI()
 
 	; --- Режим: слева расположение кадров, справа их укладка на холст ---
 	$g_iLabelCompare = GUICtrlCreateLabel(Lang("GUI", "CompareMode", "Mode"), 0, 0, 10, 16)
-	$g_iSegCompare = _SegCreate(Lang("GUI", "SegDirect", "Direct") & "|" & Lang("GUI", "SegVertical", "Vertical"), _
+	$g_iSegCompare = _FluentSegment_Create(Lang("GUI", "SegDirect", "Direct") & "|" & Lang("GUI", "SegVertical", "Vertical"), _
 			"SegDirect|SegVertical", 0, 0, $gc_iRowH, 0, "_OnEvent_SegCompareMode")
-	$g_iSegFit = _SegCreate(Lang("GUI", "SegNative", "Native") & "|" & Lang("GUI", "SegCrop", "Cropped"), _
+	$g_iSegFit = _FluentSegment_Create(Lang("GUI", "SegNative", "Native") & "|" & Lang("GUI", "SegCrop", "Cropped"), _
 			"SegNative|SegCrop", 0, 0, $gc_iRowH, ($g_sFit = "crop") ? 1 : 0, "_OnEvent_SegFit")
 	$g_iLabelModeDesc = GUICtrlCreateLabel("", 0, 0, 10, $gc_iSubH)
 	$g_iLabelFitDesc = GUICtrlCreateLabel("", 0, 0, 10, $gc_iSubH)
 	; Пояснения несут подсказку с полным текстом: рука подсказывает, что на них стоит навести
-	_SkinHandCursor($g_iLabelModeDesc)
-	_SkinHandCursor($g_iLabelFitDesc)
+	_FluentHandCursor($g_iLabelModeDesc)
+	_FluentHandCursor($g_iLabelFitDesc)
 
 	$g_iSepCompare = GUICtrlCreateLabel("", 0, 0, 10, 1)
 
 	; --- Команда и «Сравнить» в одной строке ---
 	$g_iLabelCommand = GUICtrlCreateLabel(Lang("GUI", "TabCommand", "Command"), 0, 0, 10, 16)
-	$g_iEditCommand = _SkinInputCreate(0, 0, 200, $gc_iCommandH, -1, True)
-	$g_iButtonCompare = _SkinBtnCreate(Lang("GUI", "Compare", "Compare"), "CompareDirect", 32, _
-			0, 0, $gc_iCompareBtnW, $gc_iCommandH, $SKINBTN_ACCENT)
+	$g_iEditCommand = _FluentInput_Create(0, 0, 200, $gc_iCommandH, '', '', $ES_MULTILINE)
+	$g_iButtonCompare = _FluentButton_Create(Lang("GUI", "Compare", "Compare"), "CompareDirect", 32, _
+			0, 0, $gc_iCompareBtnW, $gc_iCommandH, $FLUENTBUTTON_ACCENT)
 	$g_iLabelCommandHint = GUICtrlCreateLabel(Lang("GUI", "CommandHint", "Generated automatically. Editable."), _
 			0, 0, 10, $gc_iSubH)
 
@@ -321,7 +322,7 @@ Func _SetCtrlResizing()
 
 	; Тянутся по горизонтали. Шапка остаётся фиксированной: её картинка под контент
 	Local $aStretchH[11] = [$g_iHotkeysPanel, $g_iSeparatorTop, $g_iSepFiles, $g_iSepCompare, _
-			$g_iInput1, _SkinInputFrame($g_iInput1), $g_iInput2, _SkinInputFrame($g_iInput2), _
+			$g_iInput1, _FluentInput_GetFrame($g_iInput1), $g_iInput2, _FluentInput_GetFrame($g_iInput2), _
 			$g_iLabelInfo1, $g_iLabelInfo2, $g_iLabelSyncStatus]
 	For $iCtrl In $aStretchH
 		GUICtrlSetResizing($iCtrl, $iStretchH)
@@ -329,19 +330,19 @@ Func _SetCtrlResizing()
 
 	; Поле команды забирает и ширину, и высоту, подсказка под ним держится низа
 	GUICtrlSetResizing($g_iEditCommand, $iStretchHV)
-	GUICtrlSetResizing(_SkinInputFrame($g_iEditCommand), $iStretchHV)
+	GUICtrlSetResizing(_FluentInput_GetFrame($g_iEditCommand), $iStretchHV)
 	GUICtrlSetResizing($g_iLabelCommandHint, $iStretchH_B)
 
 	; Стоят на месте: колонка подписей, переключатели, поле сдвига
 	Local $aFixed[13] = [$g_iLabel1, $g_iLabel2, $g_iLabelOffset, $g_iLabelCompare, $g_iLabelCommand, _
 			$g_iSegCompare, $g_iSegFit, $g_iSegOffset, _
-			$g_iInputOffset, _SkinInputFrame($g_iInputOffset), $g_iLabelOffsetUnits, _
+			$g_iInputOffset, _FluentInput_GetFrame($g_iInputOffset), $g_iLabelOffsetUnits, _
 			$g_iLabelModeDesc, $g_iLabelFitDesc]
 	For $iCtrl In $aFixed
 		GUICtrlSetResizing($iCtrl, $iFixed)
 	Next
 
-	; Держатся правого края. Колонки шпаргалки расставляет сама SkinHotkeys
+	; Держатся правого края. Колонки шпаргалки расставляет сама FluentHotkeys
 	Local $aRight[5] = [$g_iButtonSettings, $g_iButtonKeys, _
 			$g_iButtonChoose1, $g_iButtonSwap, $g_iButtonChoose2]
 	For $iCtrl In $aRight
@@ -364,38 +365,38 @@ Func _LayoutBody($bFit = True)
 
 	; Шапка ресайзом не трогается, двигаются только её кнопки у правого края
 	Local $iBx = $iRight - $gc_iHeaderBtn
-	_SkinBtnSetPos($g_iButtonSettings, $iBx, 14)
-	_SkinBtnSetPos($g_iButtonKeys, $iBx - $gc_iHeaderBtn - 4, 14)
-	_SkinHotkeysSetPos($g_iHotkeysPanel, $gc_iPadX, $gc_iSkinHeaderH, $iSepW, $g_iHotkeysH - $gc_iGap)
+	_FluentButton_SetPos($g_iButtonSettings, $iBx, 14)
+	_FluentButton_SetPos($g_iButtonKeys, $iBx - $gc_iHeaderBtn - 4, 14)
+	_FluentHotkeys_SetPos($g_iHotkeysPanel, $gc_iPadX, $gc_iFluentHeaderH, $iSepW, $g_iHotkeysH - $gc_iGap)
 
-	Local $iTop = $gc_iSkinHeaderH + ($g_bHotkeysOpen ? $g_iHotkeysH : 0)
+	Local $iTop = $gc_iFluentHeaderH + ($g_bHotkeysOpen ? $g_iHotkeysH : 0)
 	GUICtrlSetPos($g_iSeparatorTop, 0, $iTop, $g_iClientW, 1)
 
 	Local $iY = $iTop + 1 + $gc_iBlockGap
 
 	; --- Видео 1 ---
 	GUICtrlSetPos($g_iLabel1, $gc_iPadX, $iY + 6, $gc_iLabelW, 16)
-	_SkinInputSetPos($g_iInput1, $gc_iCtrlX, $iY, $iFieldW, $gc_iRowH)
-	_SkinBtnSetPos($g_iButtonChoose1, $iBtnX, $iY)
+	_FluentInput_SetPos($g_iInput1, $gc_iCtrlX, $iY, $iFieldW, $gc_iRowH)
+	_FluentButton_SetPos($g_iButtonChoose1, $iBtnX, $iY)
 	GUICtrlSetPos($g_iLabelInfo1, $gc_iCtrlX + 1, $iY + $gc_iSubTop, $iFieldW, $gc_iSubH)
-	_SkinBtnSetPos($g_iButtonSwap, $iBtnX, $iY + $gc_iIconBtn + $gc_iBtnColGap)
+	_FluentButton_SetPos($g_iButtonSwap, $iBtnX, $iY + $gc_iIconBtn + $gc_iBtnColGap)
 
 	; --- Видео 2 ---
 	$iY += $gc_iRowGap
 	GUICtrlSetPos($g_iLabel2, $gc_iPadX, $iY + 6, $gc_iLabelW, 16)
-	_SkinInputSetPos($g_iInput2, $gc_iCtrlX, $iY, $iFieldW, $gc_iRowH)
-	_SkinBtnSetPos($g_iButtonChoose2, $iBtnX, $iY)
+	_FluentInput_SetPos($g_iInput2, $gc_iCtrlX, $iY, $iFieldW, $gc_iRowH)
+	_FluentButton_SetPos($g_iButtonChoose2, $iBtnX, $iY)
 	GUICtrlSetPos($g_iLabelInfo2, $gc_iCtrlX + 1, $iY + $gc_iSubTop, $iFieldW, $gc_iSubH)
 
 	$iY = _LayoutSeparator($g_iSepFiles, $iY, $iSepW)
 
 	; --- Смещение ---
 	GUICtrlSetPos($g_iLabelOffset, $gc_iPadX, $iY + 6, $gc_iLabelW, 16)
-	_SegSetPos($g_iSegOffset, $gc_iCtrlX, $iY)
-	Local $iSegW = _SegWidth($g_iSegOffset)
+	_FluentSegment_SetPos($g_iSegOffset, $gc_iCtrlX, $iY)
+	Local $iSegW = _FluentSegment_GetWidth($g_iSegOffset)
 	Local $iOffX = $gc_iCtrlX + $iSegW + $gc_iGap
 	Local $iOffW = Int($iSegW / 2) ; поле шириной с одну кнопку переключателя
-	_SkinInputSetPos($g_iInputOffset, $iOffX, $iY, $iOffW, $gc_iRowH)
+	_FluentInput_SetPos($g_iInputOffset, $iOffX, $iY, $iOffW, $gc_iRowH)
 	GUICtrlSetPos($g_iLabelOffsetUnits, $iOffX + $iOffW + 8, $iY + 6, 30, 16)
 	GUICtrlSetPos($g_iLabelSyncStatus, $gc_iCtrlX + 1, $iY + $gc_iSubTop, $iFieldW, $gc_iSubH)
 
@@ -404,10 +405,10 @@ Func _LayoutBody($bFit = True)
 
 	; --- Режим: два переключателя подряд, под каждым своё пояснение ---
 	GUICtrlSetPos($g_iLabelCompare, $gc_iPadX, $iY + 6, $gc_iLabelW, 16)
-	_SegSetPos($g_iSegCompare, $gc_iCtrlX, $iY)
-	Local $iModeW = _SegWidth($g_iSegCompare)
+	_FluentSegment_SetPos($g_iSegCompare, $gc_iCtrlX, $iY)
+	Local $iModeW = _FluentSegment_GetWidth($g_iSegCompare)
 	Local $iFitX = $gc_iCtrlX + $iModeW + $gc_iGap
-	_SegSetPos($g_iSegFit, $iFitX, $iY)
+	_FluentSegment_SetPos($g_iSegFit, $iFitX, $iY)
 	GUICtrlSetPos($g_iLabelModeDesc, $gc_iCtrlX + 1, $iY + $gc_iSubTop, $iModeW + 8, $gc_iSubH)
 	GUICtrlSetPos($g_iLabelFitDesc, $iFitX + 1, $iY + $gc_iSubTop, $iRight - $iFitX, $gc_iSubH)
 
@@ -419,8 +420,8 @@ Func _LayoutBody($bFit = True)
 	Local $iCmdH = $gc_iCommandH + $g_iExtraH
 
 	GUICtrlSetPos($g_iLabelCommand, $gc_iPadX, $iY + 4, $gc_iLabelW, 16)
-	_SkinInputSetPos($g_iEditCommand, $gc_iCtrlX, $iY, $iCmdW, $iCmdH)
-	_SkinBtnSetPos($g_iButtonCompare, $iRight - $gc_iCompareBtnW, _
+	_FluentInput_SetPos($g_iEditCommand, $gc_iCtrlX, $iY, $iCmdW, $iCmdH)
+	_FluentButton_SetPos($g_iButtonCompare, $iRight - $gc_iCompareBtnW, _
 			$iY + $iCmdH - $gc_iCommandH, $gc_iCompareBtnW, $gc_iCommandH)
 	GUICtrlSetPos($g_iLabelCommandHint, $gc_iCtrlX + 1, $iY + $iCmdH + 4, $iCmdW, $gc_iSubH)
 
@@ -559,16 +560,17 @@ Func _DefineEvents()
 	GUICtrlSetOnEvent($g_iButtonSettings, "_OnEvent_ButtonSettings")
 	GUICtrlSetOnEvent($g_iButtonKeys, "_OnEvent_ButtonKeys")
 	GUICtrlSetOnEvent($g_iLabelSyncStatus, "_OnEvent_LabelSyncStatusClick")
-	; Сегменты вешают свои обработчики сами при создании (_SegCreate)
+	; Сегменты вешают свои обработчики сами при создании (_FluentSegment_Create)
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_GUI_EVENT_CLOSE")
 	GUISetOnEvent($GUI_EVENT_DROPPED, "_OnEvent_GUI_EVENT_DROPPED")
 
-	GUIRegisterMsg($WM_GETMINMAXINFO, "_OnEvent_WM_GETMINMAXINFO")
-	GUIRegisterMsg($WM_COMMAND, "_OnEvent_WM_COMMAND")
-	GUIRegisterMsg($WM_DROPFILES, "_OnEvent_WM_DROPFILES")
-	GUIRegisterMsg($WM_SIZE, "_OnEvent_WM_SIZE")
-	GUIRegisterMsg($WM_EXITSIZEMOVE, "_OnEvent_WM_EXITSIZEMOVE")
-	GUIRegisterMsg($gc_iWmSkinSync, "_OnEvent_WM_SKINSYNC")
+	; Только через Fluent: прямой GUIRegisterMsg отнял бы сообщение у темы и контролов
+	_FluentMsg_Register($WM_GETMINMAXINFO, "_OnEvent_WM_GETMINMAXINFO")
+	_FluentMsg_Register($WM_COMMAND, "_OnEvent_WM_COMMAND")
+	_FluentMsg_Register($WM_DROPFILES, "_OnEvent_WM_DROPFILES")
+	_FluentMsg_Register($WM_SIZE, "_OnEvent_WM_SIZE")
+	_FluentMsg_Register($WM_EXITSIZEMOVE, "_OnEvent_WM_EXITSIZEMOVE")
+	_FluentMsg_Register($gc_iWmSkinSync, "_OnEvent_WM_SKINSYNC")
 EndFunc   ;==>_DefineEvents
 
 
@@ -634,17 +636,15 @@ EndFunc   ;==>_OnEvent_WM_SKINSYNC
 
 ; Перерисовка картинок скина под размер от докинга. Шапка от ширины окна не зависит
 Func _SkinSyncAll()
-	_SkinHotkeysSyncSize()
-	_SkinInputSyncSize()
-	_SkinBtnSyncSize()
+	_FluentSyncSize()
 EndFunc   ;==>_SkinSyncAll
 
 
 ; Кнопка-клавиатура раскрывает шпаргалку. Состояние помнится в ini
 Func _OnEvent_ButtonKeys()
 	$g_bHotkeysOpen = Not $g_bHotkeysOpen
-	_SkinBtnSetOn($g_iButtonKeys, $g_bHotkeysOpen)
-	_SkinHotkeysSetShow($g_iHotkeysPanel, $g_bHotkeysOpen)
+	_FluentButton_SetChecked($g_iButtonKeys, $g_bHotkeysOpen)
+	_FluentHotkeys_SetVisible($g_iHotkeysPanel, $g_bHotkeysOpen)
 
 	; Сначала высота окна, потом раскладка: иначе докинг сдвинет нижний блок второй раз
 	$g_iGuiHeight += $g_bHotkeysOpen ? $g_iHotkeysH : -$g_iHotkeysH
@@ -691,8 +691,8 @@ Func _OnEvent_ButtonCompare()
 	If Not FileExists($g_sVideoFile1) Or Not FileExists($g_sVideoFile2) Then Return
 
 	; На время поиска сдвига и работы video-compare кнопка заблокирована
-	_SkinBtnSetEnabled($g_iButtonCompare, False)
-	_SkinBtnSetText($g_iButtonCompare, Lang("GUI", "Running", "Running"))
+	_FluentButton_SetEnabled($g_iButtonCompare, False)
+	_FluentButton_SetText($g_iButtonCompare, Lang("GUI", "Running", "Running"))
 
 	If _IsAutoOffset() Then
 		_SetSyncStatus("WORKING")
@@ -707,7 +707,7 @@ Func _OnEvent_ButtonCompare()
 	If $sCmdLine <> "" Then _RunVideoCompare($sCmdLine)
 
 	; Доступность кнопке возвращает _UpdateFilesInfo
-	_SkinBtnSetText($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
+	_FluentButton_SetText($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
 	_UpdateFilesInfo()
 EndFunc   ;==>_OnEvent_ButtonCompare
 
@@ -748,7 +748,7 @@ EndFunc   ;==>_OnEvent_SegCompareMode
 
 
 Func _OnEvent_SegFit()
-	$g_sFit = (_SegGetSel($g_iSegFit) = 1) ? "crop" : "native"
+	$g_sFit = (_FluentSegment_GetCurSel($g_iSegFit) = 1) ? "crop" : "native"
 	IniWrite($gc_sPathIni, "Settings", "Fit", $g_sFit)
 	_UpdateModeDesc()
 	_UpdateCommandField()
@@ -757,10 +757,10 @@ EndFunc   ;==>_OnEvent_SegFit
 
 Func _OnEvent_SegOffsetMode()
 	If _IsAutoOffset() Then
-		GUICtrlSetState($g_iInputOffset, $GUI_DISABLE)
+		_FluentInput_SetEnabled($g_iInputOffset, False)
 		_TryFillCachedOffset()
 	Else
-		GUICtrlSetState($g_iInputOffset, $GUI_ENABLE)
+		_FluentInput_SetEnabled($g_iInputOffset, True)
 		_SetSyncStatus("MANUAL")
 	EndIf
 	_UpdateCommandField()
@@ -794,16 +794,16 @@ Func _OnEvent_WM_DROPFILES($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>_OnEvent_WM_DROPFILES
 
 
-; Делегат покраски Edit: UDF темы перехватывает WM_CTLCOLOREDIT глобально,
-; поэтому drag-подсветку вставляем здесь, остальные поля отдаём UDF.
+; Drag-подсветка поля. Остальные поля – дальше по цепочке Fluent: их красит FluentInput
 Func _OnEvent_WM_CTLCOLOREDIT($hWnd, $iMsg, $wParam, $lParam)
+	#forceref $hWnd, $iMsg
 	If $g_hDragHiCtrl <> 0 And $lParam = $g_hDragHiCtrl Then
 		If Not $g_hBrushDrag Then $g_hBrushDrag = _WinAPI_CreateSolidBrush(_WinAPI_SwitchColor($COLOR_SKYBLUE))
 		_WinAPI_SetBkColor($wParam, _WinAPI_SwitchColor($COLOR_SKYBLUE))
 		_WinAPI_SetTextColor($wParam, 0) ; чёрный
 		Return $g_hBrushDrag
 	EndIf
-	Return __GUIDarkTheme_WM_CTLCOLOR($hWnd, $iMsg, $wParam, $lParam)
+	Return $GUI_RUNDEFMSG
 EndFunc   ;==>_OnEvent_WM_CTLCOLOREDIT
 
 
@@ -828,25 +828,30 @@ EndFunc   ;==>_OnEvent_GUI_EVENT_DROPPED
 ; и бросок на них иначе молча пропадал
 Func _AcceptVideoDrop($iInput)
 	GUICtrlSetState($iInput, $GUI_DROPACCEPTED)
-	GUICtrlSetState(_SkinInputFrame($iInput), $GUI_DROPACCEPTED)
+	GUICtrlSetState(_FluentInput_GetFrame($iInput), $GUI_DROPACCEPTED)
 EndFunc   ;==>_AcceptVideoDrop
 
 
 ; Поле видео по ControlID самого поля или его рамки. 0 – контрол не из полей видео
 Func _VideoInputOf($iCtrl)
 	If $iCtrl = 0 Then Return 0
-	If $iCtrl = $g_iInput1 Or $iCtrl = _SkinInputFrame($g_iInput1) Then Return $g_iInput1
-	If $iCtrl = $g_iInput2 Or $iCtrl = _SkinInputFrame($g_iInput2) Then Return $g_iInput2
+	If $iCtrl = $g_iInput1 Or $iCtrl = _FluentInput_GetFrame($g_iInput1) Then Return $g_iInput1
+	If $iCtrl = $g_iInput2 Or $iCtrl = _FluentInput_GetFrame($g_iInput2) Then Return $g_iInput2
 	Return 0
 EndFunc   ;==>_VideoInputOf
 
 
 ; Поле потеряло фокус: пользователь закончил правку. Путь из поля видео
 ; проверяется, относительный ищется в папке текущего файла этого слота.
+; Сдвиг меняет команду сразу, пока поле в фокусе: стрелки и колесо шагают без ухода из поля
 Func _OnEvent_WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg, $lParam
-	If BitShift($wParam, 16) <> $EN_KILLFOCUS Then Return $GUI_RUNDEFMSG
-	Local $iID = BitAND($wParam, 0xFFFF)
+	Local $iCode = BitShift($wParam, 16), $iID = BitAND($wParam, 0xFFFF)
+	If $iID = $g_iInputOffset And $iCode = $EN_CHANGE And _WinAPI_GetFocus() = GUICtrlGetHandle($iID) Then
+		_UpdateCommandField()
+		Return $GUI_RUNDEFMSG
+	EndIf
+	If $iCode <> $EN_KILLFOCUS Then Return $GUI_RUNDEFMSG
 
 	If $iID = $g_iInputOffset Then
 		_UpdateCommandField()
@@ -917,7 +922,7 @@ Func _UpdateFilesInfo()
 	If Not $bExists1 Or Not $bExists2 Or $aInfo1[0] <= 0 Or $aInfo2[0] <= 0 Then
 		GUICtrlSetData($g_iLabelInfo1, _FormatInfoLabel($aInfo1, $bExists1))
 		GUICtrlSetData($g_iLabelInfo2, _FormatInfoLabel($aInfo2, $bExists2))
-		_SkinBtnSetEnabled($g_iButtonCompare, False)
+		_FluentButton_SetEnabled($g_iButtonCompare, False)
 		GUICtrlSetData($g_iEditCommand, "")
 		Return
 	EndIf
@@ -925,7 +930,7 @@ Func _UpdateFilesInfo()
 	Local $aCropArgs = _CalculateCropArgs($aInfo1, $aInfo2)
 	GUICtrlSetData($g_iLabelInfo1, _FormatInfoLabel($aInfo1, True, $aCropArgs[2]))
 	GUICtrlSetData($g_iLabelInfo2, _FormatInfoLabel($aInfo2, True, $aCropArgs[3]))
-	_SkinBtnSetEnabled($g_iButtonCompare, True)
+	_FluentButton_SetEnabled($g_iButtonCompare, True)
 	GUICtrlSetData($g_iEditCommand, _ComputeCommandFrom($aInfo1, $aInfo2, $aCropArgs))
 EndFunc   ;==>_UpdateFilesInfo
 
@@ -1315,13 +1320,13 @@ Func _SetSyncStatus($sStatus, $iOffset = 0)
 			$iColor = $g_bDarkMode ? $gc_iClrOkDark : $gc_iClrOkLight
 			$sTextKey = "StatusOk"
 		Case "NOMATCH"
-			$iColor = $g_bDarkMode ? $gc_iClrErrDark : $gc_iClrErrLight
+			$iColor = $g_iFluentErr
 			$sTextKey = "StatusNoMatch"
 		Case "TIMEOUT"
-			$iColor = $g_bDarkMode ? $gc_iClrWarnDark : $gc_iClrWarnLight
+			$iColor = $g_iFluentWarn
 			$sTextKey = "StatusTimeout"
 		Case "ERROR"
-			$iColor = $g_bDarkMode ? $gc_iClrErrDark : $gc_iClrErrLight
+			$iColor = $g_iFluentErr
 			$sTextKey = "StatusError"
 		Case Else
 			Return
@@ -1597,8 +1602,8 @@ EndFunc   ;==>_UpdateModeDesc
 
 ; Подсказки сегментов «Режима»: у каждого сегмента текст своего режима
 Func _UpdateModeTips()
-	_SegSetTips($g_iSegCompare, _CompareTip(False) & "|" & _CompareTip(True), "_SetTip")
-	_SegSetTips($g_iSegFit, _FitTip("native") & "|" & _FitTip("crop"), "_SetTip")
+	_FluentSegment_SetTips($g_iSegCompare, _CompareTip(False) & "|" & _CompareTip(True), "_SetTip")
+	_FluentSegment_SetTips($g_iSegFit, _FitTip("native") & "|" & _FitTip("crop"), "_SetTip")
 EndFunc   ;==>_UpdateModeTips
 
 
@@ -1624,18 +1629,18 @@ EndFunc   ;==>_FitTip
 
 
 Func _IsVerticalMode()
-	Return (_SegGetSel($g_iSegCompare) = 1)
+	Return (_FluentSegment_GetCurSel($g_iSegCompare) = 1)
 EndFunc   ;==>_IsVerticalMode
 
 
 Func _IsAutoOffset()
-	Return (_SegGetSel($g_iSegOffset) = 0)
+	Return (_FluentSegment_GetCurSel($g_iSegOffset) = 0)
 EndFunc   ;==>_IsAutoOffset
 
 
 ; Иконка «Сравнить» повторяет выбранное расположение кадров
 Func _UpdateCompareButtonIcon()
-	_SkinBtnSetIcon($g_iButtonCompare, _IsVerticalMode() ? "CompareVstack" : "CompareDirect")
+	_FluentButton_SetIcon($g_iButtonCompare, _IsVerticalMode() ? "CompareVstack" : "CompareDirect")
 EndFunc   ;==>_UpdateCompareButtonIcon
 
 
@@ -1891,23 +1896,23 @@ Func _ApplyLanguage()
 	_SetTip($g_iButtonSettings, Lang("GUI", "Settings", "Settings"))
 	_SetTip($g_iButtonKeys, Lang("Hotkeys", "1", "Video-compare hotkeys"))
 	GUICtrlSetData($g_iLabelCompare, Lang("GUI", "CompareMode", "Mode"))
-	_SkinBtnSetText($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
+	_FluentButton_SetText($g_iButtonCompare, Lang("GUI", "Compare", "Compare"))
 	GUICtrlSetData($g_iLabelOffset, Lang("GUI", "Offset", "Offset"))
 	GUICtrlSetData($g_iLabelOffsetUnits, Lang("GUI", "OffsetUnits", "ms"))
 	GUICtrlSetData($g_iLabelCommand, Lang("GUI", "TabCommand", "Command"))
 	GUICtrlSetData($g_iLabelCommandHint, Lang("GUI", "CommandHint", "Generated automatically. Editable."))
 
 	; Ширина сегментов зависит от подписей, поэтому раскладка считается заново
-	_SegSetTexts($g_iSegCompare, Lang("GUI", "SegDirect", "Direct") & "|" & Lang("GUI", "SegVertical", "Vertical"))
-	_SegSetTexts($g_iSegFit, Lang("GUI", "SegNative", "Native") & "|" & Lang("GUI", "SegCrop", "Cropped"))
-	_SegSetTexts($g_iSegOffset, Lang("GUI", "OffsetAuto", "Auto") & "|" & Lang("GUI", "OffsetManual", "Manual"))
+	_FluentSegment_SetTexts($g_iSegCompare, Lang("GUI", "SegDirect", "Direct") & "|" & Lang("GUI", "SegVertical", "Vertical"))
+	_FluentSegment_SetTexts($g_iSegFit, Lang("GUI", "SegNative", "Native") & "|" & Lang("GUI", "SegCrop", "Cropped"))
+	_FluentSegment_SetTexts($g_iSegOffset, Lang("GUI", "OffsetAuto", "Auto") & "|" & Lang("GUI", "OffsetManual", "Manual"))
 	_UpdateModeDesc()
 	_UpdateModeTips()
 	_LayoutBody()
 
 	Local $aRows = _HotkeyRows()
-	_SkinHeaderSetText($g_iHeaderPic, $gc_sAppName, _HeaderSubtitle())
-	_SkinHotkeysSetRows($g_iHotkeysPanel, Lang("Hotkeys", "1", "Video-compare hotkeys"), $aRows)
+	_FluentHeader_SetText($g_iHeaderPic, $gc_sAppName, _HeaderSubtitle())
+	_FluentHotkeys_SetRows($g_iHotkeysPanel, Lang("Hotkeys", "1", "Video-compare hotkeys"), $aRows)
 	_UpdateFilesInfo()
 	_ApplyTheme() ; заодно переводит статус поиска
 	_ApplyUpdateNotice() ; пометка об обновлении в заголовке
@@ -1919,8 +1924,8 @@ EndFunc   ;==>_ApplyLanguage
 ; ============================================================
 
 Func _InitTheme()
-	; Рамки полей и кнопок рисует скин: вторая рамка от UDF дала бы двойной контур
-	_GUIDarkTheme_CtrlBorderSet(False, False)
+	; Рамки полей и кнопок рисует Fluent сам: вторая рамка темы дала бы двойной контур
+	_FluentTheme_SetBorders(False, False)
 
 	; Пусто (первый запуск) или «System» из прежних версий – тема системы, запоминаем в ini
 	$g_sTheme = IniRead($gc_sPathIni, "Settings", "Theme", "")
@@ -1947,14 +1952,14 @@ Func _ReadSystemDarkMode()
 EndFunc   ;==>_ReadSystemDarkMode
 
 
-; Палитра одна на окно и живёт в SkinCore: подписи и разделители берут цвета оттуда же,
-; что и скин, иначе тона разъезжаются.
+; Палитра одна на окно и живёт в FluentCore: подписи и разделители берут цвета оттуда же,
+; что и контролы, иначе тона разъезжаются.
 Func _SetPalette()
-	_SkinSetTheme($g_bDarkMode)
-	$g_iClrBg = $g_iSkinBg
-	$g_iClrFg = $g_iSkinText2   ; подписи строк
-	$g_iClrInfo = $g_iSkinText3 ; пояснения под строками
-	$g_iClrSep = $g_iSkinDivider
+	_FluentSetTheme($g_bDarkMode)
+	$g_iClrBg = $g_iFluentBg
+	$g_iClrFg = $g_iFluentText2   ; подписи строк
+	$g_iClrInfo = $g_iFluentText3 ; пояснения под строками
+	$g_iClrSep = $g_iFluentDivider
 EndFunc   ;==>_SetPalette
 
 
@@ -1964,31 +1969,16 @@ Func _ApplyTheme()
 
 	; Сравниваем с темой, реально применённой к GUI: $g_bDarkMode мог обновить вызывающий
 	If Not $g_bThemeInitialized Or $g_bAppliedDark <> $g_bDarkMode Then
-		; _GUIDarkTheme_SwitchTheme не годится: направление он берёт из системной темы.
-		; Его очистку повторяем сами: кисти и перья UDF кеширует, и без неё они
-		; остались бы старого цвета.
-		If $g_bThemeInitialized Then
-			__GUIDarkTheme_SubclassCleanup()
-			__GUIDarkTheme_BrushCleanup()
-			__GUIDarkTheme_PenCleanup()
-		EndIf
-		If $g_bDarkMode Then
-			; Фон Edit у UDF свой (0x383838) и пятном проступал внутри рамки скина
-			$__DM_g_iCtrlBkColorDark = $g_iSkinCtrlBg
-			_GUIDarkTheme_ApplyDark($g_hGui)
-		Else
-			_GUIDarkTheme_ApplyLight($g_hGui)
-		EndIf
+		; Повторная тема сама снимает прежнюю: сабклассы, кисти, перья
+		_FluentTheme_Apply($g_hGui)
 		$g_bThemeInitialized = True
 		$g_bAppliedDark = $g_bDarkMode
-		; UDF переустанавливает свой WM_CTLCOLOREDIT, без делегата пропадёт drag-подсветка
-		GUIRegisterMsg($WM_CTLCOLOREDIT, "_OnEvent_WM_CTLCOLOREDIT")
 	EndIf
 
 	; Фон окна в обеих темах: иначе под непрозрачными подписями проступает другой тон
 	GUISetBkColor($g_iClrBg, $g_hGui)
 
-	; UDF делает static прозрачными, и текст при перерисовке накладывался бы сам на себя.
+	; Тема делает static прозрачными, и текст при перерисовке накладывался бы сам на себя.
 	; Непрозрачный фон цвета окна выглядит так же, но стирается сплошной кистью.
 	Local $aBodyLabels[5] = [$g_iLabel1, $g_iLabel2, $g_iLabelCompare, $g_iLabelOffset, $g_iLabelCommand]
 	For $iLbl In $aBodyLabels
@@ -2009,13 +1999,9 @@ Func _ApplyTheme()
 	; Цвет статуса зависит и от исхода поиска, и от темы
 	If $g_sLastSyncStatus <> "" Then _SetSyncStatus($g_sLastSyncStatus, $g_iLastSyncOffset)
 
-	; Скин нарисован картинками старой палитры
+	; Рисованные контролы – картинки старой палитры
 	_UpdateCompareButtonIcon()
-	_SkinHeaderRenderAll()
-	_SkinHotkeysRenderAll()
-	_SkinBtnRenderAll()
-	_SkinInputRenderAll()
-	_SegRenderAll()
+	_FluentRenderAll()
 
 	_RedrawGui()
 EndFunc   ;==>_ApplyTheme
@@ -2040,14 +2026,8 @@ Func _SettingsWindow()
 	Local $iLabelW = _SettingsLabelW($sUpdatesLabel)
 	Local $iCtrlX = $gc_iPadX + $iLabelW + $gc_iGap
 
-	; По центру главного окна. Размер черновой: окончательный ставит _FitGuiToClient
-	Local $aMain = WinGetPos($g_hGui)
-	Local $iSetX = -1, $iSetY = -1
-	If Not @error Then
-		$iSetX = $aMain[0] + Int($aMain[2] / 2) - 200
-		$iSetY = $aMain[1] + Int($aMain[3] / 2) - 100
-	EndIf
-	$g_hSettingsGui = GUICreate(Lang("GUI", "Settings", "Settings"), 400, 200, $iSetX, $iSetY, _
+	; Размер черновой: окончательный ставит _FitGuiToClient, место – _FluentCenterWindow перед показом
+	$g_hSettingsGui = GUICreate(Lang("GUI", "Settings", "Settings"), 400, 200, -1, -1, _
 			$WS_CAPTION + $WS_SYSMENU, $WS_EX_DLGMODALFRAME, $g_hGui)
 	GUISetFont($g_iAppFontSize, 400, 0, $g_sAppFont, $g_hSettingsGui)
 
@@ -2057,14 +2037,14 @@ Func _SettingsWindow()
 
 	; --- Язык. Подписи сегментов – самоназвания языков, они не переводятся ---
 	$g_iSettingsLabelLang = _SettingsLabel(Lang("GUI", "Language", "Language"), $iY, $iLabelW)
-	$g_iSettingsSegLang = _SegCreate("English|Русский", "", $iCtrlX, $iY, $gc_iRowH, _
+	$g_iSettingsSegLang = _FluentSegment_Create("English|Русский", "", $iCtrlX, $iY, $gc_iRowH, _
 			($g_sCurrentLang = "Russian") ? 1 : 0)
 
 	$iY += $gc_iRowH + $iRowGap
 
 	; --- Тема ---
 	$g_iSettingsLabelTheme = _SettingsLabel(Lang("GUI", "Theme", "Theme"), $iY, $iLabelW)
-	$g_iSettingsSegTheme = _SegCreate( _
+	$g_iSettingsSegTheme = _FluentSegment_Create( _
 			Lang("GUI", "ThemeLight", "Light") & "|" & Lang("GUI", "ThemeDark", "Dark"), _
 			"SegLight|SegDark", $iCtrlX, $iY, $gc_iRowH, ($g_sTheme = "Dark") ? 1 : 0)
 
@@ -2072,7 +2052,7 @@ Func _SettingsWindow()
 
 	; --- Проверка обновлений: да/нет сегментами, справа ручная проверка ---
 	$g_iSettingsLabelUpdates = _SettingsLabel($sUpdatesLabel, $iY, $iLabelW, 2)
-	$g_iSettingsSegUpdates = _SegCreate( _
+	$g_iSettingsSegUpdates = _FluentSegment_Create( _
 			Lang("Updates", "CheckYes", "Yes") & "|" & Lang("Updates", "CheckNo", "No"), _
 			"", $iCtrlX, $iY, $gc_iRowH, _UpdateCheckEnabled() ? 0 : 1)
 
@@ -2080,26 +2060,26 @@ Func _SettingsWindow()
 	; Все строки тянутся до неё, правый край селекторов встаёт по краю «ОК».
 	Local $iCacheW = _SettingsBtnW(Lang("GUI", "ClearCache", "Clear cache"), False)
 	Local $iOkW = _SettingsBtnW(Lang("GUI", "OK", "OK"), True)
-	Local $iRowW = _Max(_Max(_SegWidth($g_iSettingsSegLang), _SegWidth($g_iSettingsSegTheme)), _
-			_SegWidth($g_iSettingsSegUpdates) + $gc_iGap + $gc_iIconBtn)
+	Local $iRowW = _Max(_Max(_FluentSegment_GetWidth($g_iSettingsSegLang), _FluentSegment_GetWidth($g_iSettingsSegTheme)), _
+			_FluentSegment_GetWidth($g_iSettingsSegUpdates) + $gc_iGap + $gc_iIconBtn)
 	Local $iClientW = _Max($iCtrlX + $iRowW + $gc_iPadX, _
 			$gc_iPadX * 2 + $iCacheW + $gc_iGap + $iOkW)
 	$iRowW = $iClientW - $gc_iPadX - $iCtrlX
 
-	_SegSetWidth($g_iSettingsSegLang, $iRowW)
-	_SegSetWidth($g_iSettingsSegTheme, $iRowW)
+	_FluentSegment_SetWidth($g_iSettingsSegLang, $iRowW)
+	_FluentSegment_SetWidth($g_iSettingsSegTheme, $iRowW)
 
 	; Кнопка проверки у правого края, да/нет занимают остаток
-	_SegSetWidth($g_iSettingsSegUpdates, $iRowW - $gc_iGap - $gc_iIconBtn)
-	$g_iSettingsButtonCheckNow = _SkinBtnCreate("", "Refresh", 18, _
+	_FluentSegment_SetWidth($g_iSettingsSegUpdates, $iRowW - $gc_iGap - $gc_iIconBtn)
+	$g_iSettingsButtonCheckNow = _FluentButton_Create("", "Refresh", 18, _
 			$iCtrlX + $iRowW - $gc_iIconBtn, $iY, $gc_iIconBtn, $gc_iIconBtn)
 	_SetTip($g_iSettingsButtonCheckNow, Lang("Updates", "CheckNow", "Check now"))
 	GUICtrlSetOnEvent($g_iSettingsButtonCheckNow, "_OnEvent_SettingsCheckNow")
-	If $g_hUpdateDownload Then _SkinBtnSetEnabled($g_iSettingsButtonCheckNow, False) ; проверка уже идёт
+	If $g_hUpdateDownload Then _FluentButton_SetEnabled($g_iSettingsButtonCheckNow, False) ; проверка уже идёт
 
 	$g_iSettingsLabelUpdateInfo = GUICtrlCreateLabel("", $iCtrlX + 1, $iY + $gc_iSubTop, _
 			$iClientW - $gc_iPadX - $iCtrlX, $gc_iSubH, $SS_NOTIFY)
-	_SkinDockFixed($g_iSettingsLabelUpdateInfo)
+	_FluentDockFixed($g_iSettingsLabelUpdateInfo)
 	GUICtrlSetOnEvent($g_iSettingsLabelUpdateInfo, "_OnEvent_SettingsUpdateLink")
 	If $g_hLinkSubclassCB = 0 Then $g_hLinkSubclassCB = DllCallbackRegister("_LinkSubclassProc", _
 			"lresult", "hwnd;uint;wparam;lparam;uint_ptr;dword_ptr")
@@ -2109,19 +2089,19 @@ Func _SettingsWindow()
 	; --- Полоса и строка действий: сброс кеша и «ОК» – действия, а не настройки ---
 	Local $iSepY = $iY + $gc_iSubTop + $gc_iSubH + $gc_iBlockGap
 	$g_iSettingsSep = GUICtrlCreateLabel("", $gc_iPadX, $iSepY, $iClientW - $gc_iPadX * 2, 1)
-	_SkinDockFixed($g_iSettingsSep)
+	_FluentDockFixed($g_iSettingsSep)
 
 	$iY = $iSepY + $gc_iBlockGap + 1
 
 	; Описание кеша – в подсказке кнопки
-	$g_iSettingsButtonClearCache = _SkinBtnCreate(Lang("GUI", "ClearCache", "Clear cache"), "", 0, _
-			$gc_iPadX, $iY, $iCacheW, $gc_iRowH, $SKINBTN_TEXT)
+	$g_iSettingsButtonClearCache = _FluentButton_Create(Lang("GUI", "ClearCache", "Clear cache"), "", 0, _
+			$gc_iPadX, $iY, $iCacheW, $gc_iRowH, $FLUENTBUTTON_TEXT)
 	_SetTip($g_iSettingsButtonClearCache, Lang("Cache", "Desc", _
 			"Stores video resolutions and detected sync offsets. Clear it if cached data looks stale."))
 	GUICtrlSetOnEvent($g_iSettingsButtonClearCache, "_OnEvent_SettingsClearCache")
 
-	$g_iSettingsButtonOk = _SkinBtnCreate(Lang("GUI", "OK", "OK"), "", 0, _
-			$iClientW - $gc_iPadX - $iOkW, $iY, $iOkW, $gc_iRowH, $SKINBTN_ACCENT)
+	$g_iSettingsButtonOk = _FluentButton_Create(Lang("GUI", "OK", "OK"), "", 0, _
+			$iClientW - $gc_iPadX - $iOkW, $iY, $iOkW, $gc_iRowH, $FLUENTBUTTON_ACCENT)
 	GUICtrlSetOnEvent($g_iSettingsButtonOk, "_OnEvent_SettingsOk")
 
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_OnEvent_SettingsClose", $g_hSettingsGui)
@@ -2131,6 +2111,7 @@ Func _SettingsWindow()
 	_ApplyThemeToSettingsGui()
 	_SettingsUpdateInfoText()
 
+	_FluentCenterWindow($g_hSettingsGui)
 	GUISetState(@SW_SHOW, $g_hSettingsGui)
 EndFunc   ;==>_SettingsWindow
 
@@ -2141,12 +2122,12 @@ EndFunc   ;==>_SettingsWindow
 Func _SettingsLabel($sText, $iY, $iLabelW, $iLines = 1)
 	Local $iTop = $iY + 6, $iH = 16
 	If $iLines > 1 Then
-		$iH = _SkinGdiLineHeight() * $iLines
+		$iH = _FluentGdiLineHeight() * $iLines
 		$iTop = $iY + Int(($gc_iSubTop + $gc_iSubH - $iH) / 2)
 	EndIf
 
 	Local $iCtrl = GUICtrlCreateLabel($sText, $gc_iPadX, $iTop, $iLabelW, $iH)
-	_SkinDockFixed($iCtrl)
+	_FluentDockFixed($iCtrl)
 	Return $iCtrl
 EndFunc   ;==>_SettingsLabel
 
@@ -2154,13 +2135,13 @@ EndFunc   ;==>_SettingsLabel
 ; Две строки с разрывом по пробелу, при котором длинная из них короче всего.
 ; Подпись из одного слова возвращается как есть.
 Func _SettingsTwoLines($sText)
-	Local $hFont = _SkinFont()
+	Local $hFont = _FluentFont()
 	Local $sBest = $sText, $iBestW = -1
 
 	Local $iPos = StringInStr($sText, " ")
 	While $iPos
 		Local $sTop = StringLeft($sText, $iPos - 1), $sBottom = StringMid($sText, $iPos + 1)
-		Local $iW = _Max(_SkinTextW($sTop, $hFont), _SkinTextW($sBottom, $hFont))
+		Local $iW = _Max(_FluentTextW($sTop, $hFont), _FluentTextW($sBottom, $hFont))
 		If $iBestW < 0 Or $iW < $iBestW Then
 			$iBestW = $iW
 			$sBest = $sTop & @CRLF & $sBottom
@@ -2174,13 +2155,13 @@ EndFunc   ;==>_SettingsTwoLines
 ; Колонка подписей: как в главном окне, но не уже самой длинной строки.
 ; $sUpdates – подпись обновлений, уже разбитая на строки.
 Func _SettingsLabelW($sUpdates)
-	Local $hFont = _SkinFont()
+	Local $hFont = _FluentFont()
 	Local $sTexts = Lang("GUI", "Language", "Language") & @CRLF & Lang("GUI", "Theme", "Theme") & @CRLF & $sUpdates
 	Local $aLines = StringSplit($sTexts, @CRLF, $STR_ENTIRESPLIT + $STR_NOCOUNT)
 
 	Local $iW = $gc_iLabelW
 	For $sLine In $aLines
-		Local $iTextW = _SkinTextW($sLine, $hFont) + 4
+		Local $iTextW = _FluentTextW($sLine, $hFont) + 4
 		If $iTextW > $iW Then $iW = $iTextW
 	Next
 	Return $iW
@@ -2190,7 +2171,7 @@ EndFunc   ;==>_SettingsLabelW
 ; Ширина кнопки действия: подпись с полями, но не уже 90 –
 ; короткое «ОК» иначе выглядит обрезком рядом со «Сбросить кеш».
 Func _SettingsBtnW($sText, $bAccent)
-	Return _Max(90, _SkinTextW($sText, _SkinFont(0, $bAccent)) + $gc_iPadX * 2)
+	Return _Max(90, _FluentTextW($sText, _FluentFont(0, $bAccent)) + $gc_iPadX * 2)
 EndFunc   ;==>_SettingsBtnW
 
 
@@ -2201,22 +2182,11 @@ EndFunc   ;==>_UpdateCheckEnabled
 
 
 ; Всплывающая подсказка. Windows тянет её одной строкой во всю ширину экрана,
-; поэтому длинный текст сначала ломается на строки близкой длины.
+; поэтому длинный текст сначала ломается на строки близкой длины. Новое окно подсказки
+; красит тема: _FluentSetTip
 Func _SetTip($iCtrlID, $sText)
-	GUICtrlSetTip($iCtrlID, _WrapText($sText, $gc_iTipWidth))
-	; GUICtrlSetTip пересоздаёт окно подсказки, а UDF затемнила только прежние
-	If $g_bThemeInitialized And $g_bAppliedDark Then _DarkenTooltips()
+	_FluentSetTip($iCtrlID, _WrapText($sText, $gc_iTipWidth))
 EndFunc   ;==>_SetTip
-
-
-; Тёмная тема всем подсказкам процесса: у AutoIt своё окно подсказки на каждый контрол.
-Func _DarkenTooltips()
-	Local $aWnd = _WinAPI_EnumProcessWindows(0, False)
-	If @error Then Return
-	For $i = 1 To $aWnd[0][0]
-		If $aWnd[$i][1] = "tooltips_class32" Then _GUIDarkTheme_GUICtrlSetDarkTheme($g_hGui, $aWnd[$i][0], True)
-	Next
-EndFunc   ;==>_DarkenTooltips
 
 
 ; Ломает текст по пробелам на строки не длиннее $iMax. Строк берём столько, сколько
@@ -2262,18 +2232,8 @@ EndFunc   ;==>__WrapGreedy
 Func _ApplyThemeToSettingsGui()
 	If $g_hSettingsGui = 0 Then Return
 
-	; Реестр subclass-кнопок у UDF один на процесс, и тема каждого окна его обнуляет.
-	; Штатные кнопки главного окна (на Win10 до 24H2) читают его без проверки границ,
-	; и тема окна настроек роняла бы AutoIt. Реестр сохраняем вокруг покраски.
-	Local $aButtonSubSaved = $__DM_g_aButtonSub
-	Local $iButtonCountSaved = $__DM_g_iButtonCount
-
-	_GUIDarkTheme_GUISetDarkTheme($g_hSettingsGui, $g_bDarkMode)
-	_GUIDarkTheme_GUICtrlAllSetDarkTheme($g_hSettingsGui, $g_bDarkMode)
-
-	$__DM_g_aButtonSub = $aButtonSubSaved
-	$__DM_g_iButtonCount = $iButtonCountSaved
-
+	; Тема снимает и ставит только своё окно: главное она не трогает
+	_FluentTheme_Apply($g_hSettingsGui)
 	GUISetBkColor($g_iClrBg, $g_hSettingsGui)
 
 	; Подписи строк – тот же слой, что в главном окне: непрозрачный фон цвета окна
@@ -2286,7 +2246,7 @@ Func _ApplyThemeToSettingsGui()
 	; Цвет пояснения (ссылка или дата) ставит _SettingsUpdateInfoText
 	GUICtrlSetBkColor($g_iSettingsLabelUpdateInfo, $g_iClrBg)
 
-	; Полосу красим после темы UDF: она переводит static в прозрачный фон
+	; Полосу красим после темы: она переводит static в прозрачный фон
 	GUICtrlSetBkColor($g_iSettingsSep, $g_iClrSep)
 EndFunc   ;==>_ApplyThemeToSettingsGui
 
@@ -2298,12 +2258,12 @@ Func _OnEvent_SettingsClose()
 
 	; Скин держит HBITMAP и строки реестра модулей, о которых GUIDelete не знает,
 	; а освободившийся ControlID AutoIt выдаёт заново
-	_SegDelete($g_iSettingsSegLang)
-	_SegDelete($g_iSettingsSegTheme)
-	_SegDelete($g_iSettingsSegUpdates)
-	_SkinBtnDelete($g_iSettingsButtonCheckNow)
-	_SkinBtnDelete($g_iSettingsButtonClearCache)
-	_SkinBtnDelete($g_iSettingsButtonOk)
+	_FluentSegment_Delete($g_iSettingsSegLang)
+	_FluentSegment_Delete($g_iSettingsSegTheme)
+	_FluentSegment_Delete($g_iSettingsSegUpdates)
+	_FluentButton_Delete($g_iSettingsButtonCheckNow)
+	_FluentButton_Delete($g_iSettingsButtonClearCache)
+	_FluentButton_Delete($g_iSettingsButtonOk)
 
 	GUIDelete($g_hSettingsGui)
 	$g_hSettingsGui = 0
@@ -2317,18 +2277,18 @@ Func _OnEvent_SettingsOk()
 	If $g_hSettingsGui = 0 Then Return
 
 	; Выбор читаем до удаления окна
-	Local $sLangCode = (_SegGetSel($g_iSettingsSegLang) = 1) ? "Russian" : "English"
+	Local $sLangCode = (_FluentSegment_GetCurSel($g_iSettingsSegLang) = 1) ? "Russian" : "English"
 	Local $bLangChanged = ($sLangCode <> $g_sCurrentLang)
 	If $bLangChanged Then IniWrite($gc_sPathIni, "Settings", "Language", $sLangCode)
 
-	Local $sTheme = (_SegGetSel($g_iSettingsSegTheme) = 1) ? "Dark" : "Light"
+	Local $sTheme = (_FluentSegment_GetCurSel($g_iSettingsSegTheme) = 1) ? "Dark" : "Light"
 	Local $bThemeChanged = ($sTheme <> $g_sTheme)
 	If $bThemeChanged Then
 		$g_sTheme = $sTheme
 		IniWrite($gc_sPathIni, "Settings", "Theme", $sTheme)
 	EndIf
 
-	IniWrite($gc_sPathIni, "Settings", "UpdateCheck", (_SegGetSel($g_iSettingsSegUpdates) = 1) ? 0 : 1)
+	IniWrite($gc_sPathIni, "Settings", "UpdateCheck", (_FluentSegment_GetCurSel($g_iSettingsSegUpdates) = 1) ? 0 : 1)
 
 	_OnEvent_SettingsClose()
 
@@ -2347,7 +2307,7 @@ Func _OnEvent_SettingsClearCache()
 	$g_oCache = $mEmpty
 	FileDelete($gc_sPathCache)
 	_EnsureUtf16File($gc_sPathCache)
-	_SkinBtnSetEnabled($g_iSettingsButtonClearCache, False)
+	_FluentButton_SetEnabled($g_iSettingsButtonClearCache, False)
 
 	; В режиме «Авто» сдвиг брался из кеша
 	If _IsAutoOffset() Then
@@ -2366,7 +2326,7 @@ Func _SettingsUpdateInfoText()
 	If $g_sAvailableVersion <> "" Then
 		GUICtrlSetData($g_iSettingsLabelUpdateInfo, _
 				StringFormat(Lang("Updates", "AvailableVersion", "Version %s is available"), $g_sAvailableVersion))
-		GUICtrlSetColor($g_iSettingsLabelUpdateInfo, $g_iSkinAccent)
+		GUICtrlSetColor($g_iSettingsLabelUpdateInfo, $g_iFluentAccent)
 	Else
 		Local $sLast = IniRead($gc_sPathIni, "Settings", "LastUpdateCheck", "")
 		If $sLast = "" Then $sLast = Lang("Updates", "LastCheckNever", "never")
@@ -2407,7 +2367,7 @@ Func _CheckUpdates()
 EndFunc   ;==>_CheckUpdates
 
 
-; Запускает фоновую загрузку Include\AppConstants.au3 из ветки main: синхронный
+; Запускает фоновую загрузку последнего релиза из API GitHub: синхронный
 ; InetRead без сети держал окно мёртвым до таймаута. Результат разбирает
 ; _UpdateCheckTick. $bPulse – мигать шестерёнкой при находке.
 ; True – проверка идёт, в том числе начатая раньше.
@@ -2443,7 +2403,8 @@ Func _UpdateCheckTick()
 	If $hFile <> -1 Then
 		Local $sText = BinaryToString(FileRead($hFile), $SB_UTF8)
 		FileClose($hFile) ; иначе _FinishUpdateCheck не удалит файл
-		Local $aMatch = StringRegExp($sText, '\$gc_sAppVersion\s*=\s*"([^"]+)"', $STR_REGEXPARRAYMATCH)
+		; Тег релиза – номер версии, допускается префикс v
+		Local $aMatch = StringRegExp($sText, '"tag_name"\s*:\s*"v?([\d.]+)"', $STR_REGEXPARRAYMATCH)
 		If Not @error Then $sRemote = $aMatch[0]
 	EndIf
 	_FinishUpdateCheck($sRemote)
@@ -2464,7 +2425,7 @@ Func _FinishUpdateCheck($sRemote)
 	EndIf
 
 	If $g_hSettingsGui Then
-		_SkinBtnSetEnabled($g_iSettingsButtonCheckNow, True)
+		_FluentButton_SetEnabled($g_iSettingsButtonCheckNow, True)
 		_SettingsUpdateInfoText()
 	EndIf
 EndFunc   ;==>_FinishUpdateCheck
@@ -2490,12 +2451,12 @@ Func _StopSettingsPulse()
 	If Not $g_bPulseActive Then Return
 	AdlibUnRegister("_PulseSettingsButton")
 	$g_bPulseActive = False
-	_SkinBtnSetOn($g_iButtonSettings, False)
+	_FluentButton_SetChecked($g_iButtonSettings, False)
 EndFunc   ;==>_StopSettingsPulse
 
 
 Func _PulseSettingsButton()
-	_SkinBtnSetOn($g_iButtonSettings, $g_bPulsePhase)
+	_FluentButton_SetChecked($g_iButtonSettings, $g_bPulsePhase)
 	$g_bPulsePhase = Not $g_bPulsePhase
 EndFunc   ;==>_PulseSettingsButton
 
@@ -2519,7 +2480,7 @@ EndFunc   ;==>_LinkSubclassProc
 ; Проверка обновлений вне недельного интервала. Кнопку разблокирует _FinishUpdateCheck
 Func _OnEvent_SettingsCheckNow()
 	If $g_hSettingsGui = 0 Then Return
-	If _StartUpdateCheck(False) Then _SkinBtnSetEnabled($g_iSettingsButtonCheckNow, False)
+	If _StartUpdateCheck(False) Then _FluentButton_SetEnabled($g_iSettingsButtonCheckNow, False)
 EndFunc   ;==>_OnEvent_SettingsCheckNow
 
 
@@ -2538,14 +2499,9 @@ Func _Cleanup()
 	; Subclass ссылки снимается до освобождения своего callback
 	If $g_hSettingsGui Then _OnEvent_SettingsClose()
 	If $g_hBrushDrag Then _WinAPI_DeleteObject($g_hBrushDrag)
-	_SegShutdown()
-	_SkinBtnShutdown()
-	_SkinInputShutdown()
-	_SkinHeaderShutdown()
-	_SkinHotkeysShutdown()
-	_SkinHandCursorRemove($g_iLabelModeDesc) ; subclass снимается до освобождения callback
-	_SkinHandCursorRemove($g_iLabelFitDesc)
-	_SkinShutdown()
+	_FluentHandCursorRemove($g_iLabelModeDesc) ; subclass снимается до освобождения callback
+	_FluentHandCursorRemove($g_iLabelFitDesc)
+	_FluentShutdown() ; контролы Fluent освобождают картинки в своём хуке
 	If $g_hLinkSubclassCB Then
 		DllCallbackFree($g_hLinkSubclassCB)
 		$g_hLinkSubclassCB = 0

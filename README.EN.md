@@ -35,4 +35,4 @@ A handy GUI launcher for [Video-compare](https://github.com/pixop/video-compare)
 
 ### Note
 
-⚠️ Your antivirus may falsely flag the exe files. This is a known quirk of compiled AutoIt scripts and PyInstaller builds. The launcher source code is open, you can review it and compile it yourself.
+⚠️ Your antivirus may falsely flag the exe files. This is a known quirk of compiled AutoIt scripts and PyInstaller builds. The launcher source code is open for review.
